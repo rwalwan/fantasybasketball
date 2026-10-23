@@ -1,4 +1,4 @@
-import { Book, WeekPlan, weekDays, teamGames, fits } from "./engine.js";
+import { Book, WeekPlan, weekDays, teamGames, fits, playerValue, teamValue } from "./engine.js";
 
 // ---- config -----------------------------------------------------------------------------------
 const LEAGUE = "1400915575915491328", USER = "1388708038000533504";
@@ -54,7 +54,7 @@ async function loadLive() {
   const { week, league } = base, season = league.season;
   const days = weekDays(base.schedule, week), today = etToday();
   const tipDays = days.filter(d => d >= today || d === days.find(x => x >= today));
-  const [rosters, matchups, stats, proj, trending, snapsGh, overridesGh, locksGh, backend, tips, news, claims] = await Promise.all([
+  const [rosters, matchups, stats, proj, trending, snapsGh, overridesGh, locksGh, backend, tips, news, claims, moves] = await Promise.all([
     get(`${S1}/league/${LEAGUE}/rosters`), get(`${S1}/league/${LEAGUE}/matchups/${week}`),
     get(`${S2}/stats/nba/${season}/${week}?season_type=regular`), get(`${S2}/projections/nba/${season}/${week}?season_type=regular`),
     get(`${S1}/players/nba/trending/add?lookback_hours=24&limit=50`).catch(() => []),
@@ -62,12 +62,13 @@ async function loadLive() {
     API ? soft(`${API}/state?season=${season}&week=${week}`) : Promise.resolve({}),
     get(`static/tips.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({})),
     get(`static/news.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({ items: [], mine: [] })),
-    get(`static/claims.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({ experts: [], consensus: {}, recent: [] }))]);
+    get(`static/claims.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({ experts: [], consensus: {}, recent: [] })),
+    get(`static/moves.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({ adds: [], trades: [] }))]);
   // backend (minute-level lineup records, shared answers) wins over the 15-minute GitHub state branch
   const snaps = { ...snapsGh, ...(backend.lineups || {}) };
   const overrides = { ...overridesGh, ...(backend.elig || {}) };
   const locks = { ...locksGh, ...(backend.locks || {}) };
-  live = { rosters, matchups, stats, proj, trending, snaps, overrides, locks, tips, news, claims, backend: !!backend.heartbeat, at: new Date() };
+  live = { rosters, matchups, stats, proj, trending, snaps, overrides, locks, tips, news, claims, moves, backend: !!backend.heartbeat, at: new Date() };
   void tipDays;
 }
 
@@ -108,14 +109,23 @@ function render() {
   $("score").innerHTML = `<b>${r1((my.points || 0) / 10)}</b> – ${r1((opp?.points || 0) / 10)}<span>vs ${esc(base.users[oppOwner] || "opponent")} · FAAB $${base.league.settings.waiver_budget - (mine.settings?.waiver_budget_used || 0)}</span>`;
   $("metatext").textContent = `${base.league.name} · week ${base.week} · live ${live.at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
 
-  // what to do next, by deadline
-  const todo = plan.slots.filter(s => ["lock", "confirm", "fallback-risk"].includes(s.action) || (s.action === "pass" && s.deadline))
-    .map(s => ({ s, t: s.deadline?.tip })).sort((a, b) => (a.t || "z").localeCompare(b.t || "z"));
-  const moves = plan.lineup.filter(x => x.move && x.pid);
-  const first = todo.find(x => x.t);
-  $("now").innerHTML = (first ? `<b>Next deadline:</b> <span class="when">${until(first.t)}</span> (${esc(tipTime(first.t))})` : "<b>No lock deadlines pending.</b>") +
-    `<ul>${todo.filter(x => x.s.action !== "pass").map(x => `<li><b>${LABEL[x.s.action]}</b> ${esc(x.s.name)} (${esc(x.s.slot)})${x.s.score != null ? ` — ${r1(x.s.score)}` : ""}${x.t ? ` · before ${esc(tipTime(x.t))}` : ""}</li>`).join("")}` +
-    `${moves.length ? `<li><b>Lineup:</b> ${moves.map(m => `${esc(m.name)} → ${esc(m.slot)}`).join(", ")}</li>` : ""}</ul>`;
+  // what to do next, in time order: locks, lineup changes, same-day relief swaps, top waiver move
+  const acts = [];
+  for (const x of plan.slots) {
+    if (x.action === "lock" && x.deadline?.tip) acts.push({ t: x.deadline.tip, html: `<b>Lock</b> ${esc(x.name)} (${esc(x.slot)}) — ${r1(x.score)}`, by: x.deadline.tip });
+    if (x.action === "confirm" && x.deadline?.tip) acts.push({ t: x.deadline.tip, html: `<b>Answer</b>: was ${esc(x.name)} starting on ${esc(x.gameDate)}? (see below)`, by: x.deadline.tip });
+    if (x.action === "fallback-risk") acts.push({ t: "9", html: `<b>Fix</b> ${esc(x.slot)}: ${esc(x.detail)}` });
+  }
+  for (const x of plan.lineup) {
+    if (x.move && x.pid) acts.push({ t: x.bestTime || x.tip, html: `<b>Move</b> ${esc(x.name)} into ${esc(x.slot)}${x.currentName && x.current !== x.pid ? ` (replacing ${esc(x.currentName)})` : ""} — best around ${esc(tipTime(x.bestTime))}, after final injury news`, by: x.changeBy });
+    if (x.relief) acts.push({ t: x.relief.swapAfter, html: `<b>If</b> ${esc(x.name)} scores under ${r1(x.keepBar)}, swap in ${esc(x.relief.name)} at ${esc(x.slot)}`, by: x.relief.tip, from: x.relief.swapAfter });
+  }
+  const topAdd = live.moves?.adds?.[0];
+  if (topAdd) acts.push({ t: "8", html: `<b>Waiver</b>: add ${esc(topAdd.name)}, drop ${esc(topAdd.dropName)}, bid $${topAdd.bid} (Moves tab)` });
+  acts.sort((a, b) => String(a.t).localeCompare(String(b.t)));
+  const nextBy = acts.filter(a => a.by && new Date(a.by) > new Date()).map(a => a.by).sort()[0];
+  $("now").innerHTML = (nextBy ? `<b>Next deadline:</b> <span class="when">${until(nextBy)}</span> (${esc(tipTime(nextBy))})` : "<b>No deadlines pending.</b>") +
+    `<ul>${acts.map(a => `<li>${a.html}${a.by ? ` <span class="pos">· ${a.from ? `between ${esc(tipTime(a.from))} and ` : "by "}${esc(tipTime(a.by))}</span>` : ""}</li>`).join("")}</ul>`;
 
   $("slots").innerHTML = plan.slots.map(s => {
     const nums = s.score != null ? `<div class="nums">game <b>${r1(s.score)}</b>${s.bar ? ` · bar ${r1(s.bar)}` : ""}${s.deadline ? ` · by ${esc(tipTime(s.deadline.tip) || day(s.deadline.date))}` : ""}</div>` : (s.bar ? `<div class="nums">lock bar after his next game: ${r1(s.bar)}</div>` : "");
@@ -126,9 +136,17 @@ function render() {
     return `<div class="slot ${s.action}"><div class="top"><span><span class="pos">${esc(s.slot)}</span> <span class="nm">${esc(s.name)}</span>${s.status ? `<span class="st">${esc(s.status)}</span>` : ""}</span><span class="tag">${LABEL[s.action] || s.action}</span></div><p>${esc(s.detail)}</p>${nums}${acts ? `<div class="acts">${acts}</div>` : ""}</div>`;
   }).join("");
 
-  $("lineup").innerHTML = plan.lineup.length ? plan.lineup.map(x => `<div class="row"><span><span class="pos">${esc(x.slot)}</span> ${x.move ? `<span class="mv">${esc(x.name)}</span>` : esc(x.name)}${x.tip ? ` <span class="pos">vs ${esc(x.opp)} · ${esc(tipTime(x.tip))}</span>` : ""}</span><span class="pos">${x.pid ? `worth ${r1(x.gain)}` : ""}</span></div>`).join("") +
-    (plan.idle.length ? `<div class="row"><span class="pos">Also playing today, no open slot: ${plan.idle.map(x => esc(x.name)).join(", ")}</span></div>` : "")
-    : `<div class="row"><span class="pos">Every slot is locked or decided.</span></div>`;
+  const planBy = Object.fromEntries(plan.lineup.map(x => [x.k, x]));
+  let k = -1;
+  $("lineup").innerHTML = `<div class="wrap" style="border:0"><table><tr><th>Slot</th><th>Now</th><th>Plan for today</th><th>Tip</th><th>Keep his game if ≥</th><th>If he misses it</th></tr>` +
+    plan.before.map(b => {
+      if (b.fixed) return `<tr><td class="pos">${esc(b.slot)}</td><td>${esc(b.name)}</td><td class="pos">locked or decided</td><td></td><td></td><td></td></tr>`;
+      const x = planBy[++k] || {};
+      return `<tr><td class="pos">${esc(b.slot)}</td><td>${esc(b.name)}</td><td>${x.pid ? (x.move ? `<span class="mv">${esc(x.name)}</span>` : esc(x.name)) : '<span class="pos">nobody eligible plays today</span>'}</td>` +
+        `<td class="pos">${x.tip ? esc(tipTime(x.tip)) : ""}</td><td class="n">${x.keepBar ? r1(x.keepBar) : x.pid ? "his lock bar" : ""}</td>` +
+        `<td>${x.relief ? `${esc(x.relief.name)} <span class="pos">(tips ${esc(tipTime(x.relief.tip))})</span>` : ""}</td></tr>`;
+    }).join("") + `</table></div>` +
+    (plan.idle.length ? `<div class="row"><span class="pos">Also playing today without a slot: ${plan.idle.map(x => esc(x.name)).join(", ")}</span></div>` : "");
 
   const today = etToday();
   $("grid").innerHTML = `<tr><th>Player</th><th>Pos</th>${plan.days.map(d => `<th class="${d === today ? "today" : ""}">${day(d)}</th>`).join("")}<th>Left</th></tr>` +
@@ -146,26 +164,12 @@ function render() {
   renderTrades(c);
   renderExperts();
   renderNews();
+  renderMoves();
   $("foot").textContent = `Recomputed every minute from Sleeper and ESPN. A game is lockable only if he was starting when it tipped; lineups are recorded by the scheduled job (every 15 min) and by this page while it's open. ${live.backend ? "Answers sync to your backend, and lineups are recorded every minute." : "Answers are saved in this browser only (backend not connected)."}`;
   $("dot").classList.toggle("stale", Date.now() - live.at > 5 * 60000);
 }
 
 // ---- trade assistant ------------------------------------------------------------------------------
-function playerValue(book, pid) {
-  const g = book.games[pid] || [], base = book.baseline(pid);
-  let cv = 0.3;
-  if (g.length >= 5) { const m = g.reduce((a, x) => a + x.fp, 0) / g.length, sd = Math.sqrt(g.reduce((a, x) => a + (x.fp - m) ** 2, 0) / g.length); cv = Math.min(0.5, Math.max(0.15, sd / Math.max(m, 1))); }
-  const out = ["Out", "IR", "Suspended"].includes(book.status(pid)) ? 0.6 : 1;
-  return base * (1 + 0.7 * cv) * 0.86 * out;     // locked points per week: best-of-~3.5 games, ~14% miss rate
-}
-function teamValue(book, players, slots) {
-  const vals = players.map(p => ({ p, v: playerValue(book, p) })).sort((a, b) => b.v - a.v);
-  const used = new Set(); let total = 0;
-  const order = [...slots].sort((a, b) => vals.filter(x => fits(a, book.pos(x.p))).length - vals.filter(x => fits(b, book.pos(x.p))).length);
-  for (const s of order) { const x = vals.find(x => !used.has(x.p) && fits(s, book.pos(x.p))); if (x) { used.add(x.p); total += x.v; } }
-  const bench = vals.filter(x => !used.has(x.p)).slice(0, 3).reduce((a, x) => a + x.v, 0);
-  return total + 0.12 * bench;   // bench depth = extra lock options
-}
 let tradeSel = { give: new Set(), get: new Set(), partner: null };
 function renderTrades(c) {
   const { book, mine } = c, slots = base.league.roster_positions.filter(s => s !== "BN" && s !== "IR");
@@ -189,32 +193,23 @@ function renderTrades(c) {
     $("verdict").innerHTML = `Your team: <b class="${dm >= 0 ? "good" : "bad"}">${dm >= 0 ? "+" : ""}${r1(dm)}</b> locked pts/week · theirs: <b class="${dt >= 0 ? "good" : "bad"}">${dt >= 0 ? "+" : ""}${r1(dt)}</b>. ` +
       (dm > 0 && dt >= 0 ? "Helps both of you — a realistic offer." : dm > 0 ? "Good for you, but they lose value, so expect pushback." : "This makes your team worse.");
   } else $("verdict").textContent = "";
-  // ideas: 1-for-1 and 2-for-1 across the league that help you and don't hurt them
-  if (!renderTrades.cache || renderTrades.cache.at !== live.at) {
-    const ideas = [];
-    for (const r of others) {
-      const tb = teamValue(book, r.players, slots);
-      const mp = mine.players, tp = r.players;
-      for (const a of mp) for (const b of tp) {
-        const dm = teamValue(book, swap(mp, new Set([a]), new Set([b])), slots) - myB;
-        if (dm <= 0.5) continue;
-        const dt = teamValue(book, swap(tp, new Set([b]), new Set([a])), slots) - tb;
-        if (dt >= 0) ideas.push({ give: [a], get: [b], dm, dt, r });
-      }
-      for (let i = 0; i < mp.length; i++) for (let j = i + 1; j < mp.length; j++) for (const b of tp) {
-        const give = new Set([mp[i], mp[j]]);
-        const dm = teamValue(book, swap(mp, give, new Set([b])), slots) - myB;
-        if (dm <= 0.5) continue;
-        const dt = teamValue(book, swap(tp, new Set([b]), give), slots) - tb;
-        if (dt >= 0) ideas.push({ give: [...give], get: [b], dm, dt, r });
-      }
-    }
-    ideas.sort((x, y) => (y.dm + 0.5 * y.dt) - (x.dm + 0.5 * x.dt));
-    renderTrades.cache = { at: live.at, ideas: ideas.slice(0, 15) };
-  }
-  $("ideas").innerHTML = `<tr><th>With</th><th>You give</th><th>You get</th><th>You</th><th>Them</th></tr>` +
-    renderTrades.cache.ideas.map(x => `<tr><td>${esc(base.users[x.r.owner_id] || "Team " + x.r.roster_id)}</td><td>${x.give.map(p => esc(book.name(p))).join(" + ")}</td><td>${x.get.map(p => esc(book.name(p))).join(" + ")}</td><td class="n good">+${r1(x.dm)}</td><td class="n">+${r1(x.dt)}</td></tr>`).join("") ||
-    `<tr><td colspan="5" class="pos">No trades found that help both sides right now.</td></tr>`;
+  const sug = live.moves?.trades || [];
+  $("ideas").innerHTML = `<tr><th>With</th><th>You give</th><th>You get</th><th>You</th><th>Them</th><th></th></tr>` +
+    sug.map((x, i) => `<tr><td>${esc(x.partner)}</td><td>${x.giveNames.map(esc).join(" + ")}</td><td>${x.getNames.map(esc).join(" + ")}</td><td class="n good">+${r1(x.dm)}</td><td class="n">+${r1(x.dt)}</td><td><button data-loadtrade="${i}">Load</button></td></tr>`).join("") ||
+    `<tr><td colspan="6" class="pos">No trades found that help both sides right now.</td></tr>`;
+}
+
+function renderMoves() {
+  const m = live.moves || { adds: [], trades: [] };
+  $("movesmeta").textContent = m.generated ? `Suggestions updated ${new Date(m.generated).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}; refreshed every 15 minutes.` : "";
+  $("adds").innerHTML = (m.adds || []).length ? m.adds.map(x => `<div class="slot lock"><div class="top"><span><span class="nm">Add ${esc(x.name)}</span> <span class="pos">${esc(x.team)} ${esc(x.pos)}</span></span><span class="tag">bid $${x.bid}</span></div>` +
+      `<p>Drop <b>${esc(x.dropName)}</b>. Team +${r1(x.gain)} locked pts/week · ${r1(x.fpg)} FP/G · ${x.left} games left this week${x.experts ? ` · ${Math.round(x.experts.bull_share * 100)}% of experts say add` : ""}${x.trend ? ` · ${x.trend.toLocaleString()} adds in 24h` : ""}</p>` +
+      (x.reason ? `<p><i>${esc(x.reason)}</i></p>` : "") + `</div>`).join("")
+    : `<div class="box"><div class="row"><span class="pos">No add/drop improves your team right now.</span></div></div>`;
+  $("trades2").innerHTML = (m.trades || []).length ? m.trades.map((x, i) => `<div class="slot start"><div class="top"><span class="nm">${esc(x.partner)}</span><span class="tag">+${r1(x.dm)} you / +${r1(x.dt)} them</span></div>` +
+      `<p>Give <b>${x.giveNames.map(esc).join(" + ")}</b>, get <b>${x.getNames.map(esc).join(" + ")}</b></p>` + (x.reason ? `<p><i>${esc(x.reason)}</i></p>` : "") +
+      `<div class="acts"><button data-loadtrade="${i}">Open in trade builder</button></div></div>`).join("")
+    : `<div class="box"><div class="row"><span class="pos">No trades found that help both sides right now.</span></div></div>`;
 }
 
 const consCell = pid => { const c = live.claims?.consensus?.[pid]; return c && c.bull_share != null ? `<span title="${c.n} call(s) in the last 7 days, weighted by each expert's record">${Math.round(c.bull_share * 100)}% add</span>` : "–"; };
@@ -249,6 +244,12 @@ function renderExperts() {
 document.addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
   if (b.dataset.t) { tab = b.dataset.t; document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x === b)); document.querySelectorAll("section[data-p]").forEach(s => s.classList.toggle("hide", s.dataset.p !== tab)); return; }
+  if (b.dataset.loadtrade != null) {
+    const x = live.moves.trades[+b.dataset.loadtrade];
+    tradeSel = { give: new Set(x.give), get: new Set(x.get), partner: x.roster_id };
+    $("partner").value = String(x.roster_id);
+    document.querySelector('#tabs button[data-t="trades"]').click(); render(); return;
+  }
   if (b.dataset.elig) { saveAnswer("elig", b.dataset.elig, b.dataset.v === "1"); render(); }
   if (b.dataset.lock) { saveAnswer(`locks_w${base.week}`, b.dataset.lock, true); render(); }
   if (b.dataset.unlock) { saveAnswer(`locks_w${base.week}`, b.dataset.unlock, false); render(); }
