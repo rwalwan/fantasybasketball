@@ -1,0 +1,151 @@
+
+======== 1. Top 25 by FP/G (min 50 GP), 2023-24, with rank under ESPN standard ========
+                 player  gp   fpg  rank  std_rank  ddr  tdr   reb   ast   pts
+            Luka Doncic  70 82.04   1.0       1.0 0.70 0.30  9.24  9.80 33.86
+           Nikola Jokic  79 76.51   2.0       2.0 0.86 0.32 12.35  8.96 26.39
+  Giannis Antetokounmpo  73 72.75   3.0       3.0 0.78 0.14 11.52  6.52 30.44
+       Domantas Sabonis  82 68.99   4.0       9.0 0.94 0.32 13.66  8.21 19.43
+          Anthony Davis  76 64.59   5.0       5.0 0.84 0.03 12.64  3.50 24.68
+           LeBron James  71 62.77   6.0       6.0 0.38 0.07  7.30  8.30 25.66
+      Victor Wembanyama  71 60.86   7.0       7.0 0.61 0.03 10.63  3.86 21.44
+             Trae Young  54 60.12   8.0      12.0 0.69 0.00  2.76 10.80 25.72
+Shai Gilgeous-Alexander  75 59.50   9.0       4.0 0.11 0.00  5.53  6.20 30.05
+           Jayson Tatum  74 59.18  10.0      13.0 0.34 0.00  8.12  4.92 26.85
+      Tyrese Haliburton  69 57.31  11.0       8.0 0.64 0.01  3.93 10.90 20.13
+           Kevin Durant  75 56.40  12.0      11.0 0.19 0.01  6.60  5.04 27.09
+       Donovan Mitchell  55 56.17  13.0      10.0 0.11 0.00  5.09  6.05 26.60
+         Scottie Barnes  60 55.21  14.0      19.0 0.42 0.07  8.23  6.05 19.85
+           Devin Booker  68 54.98  15.0      16.0 0.19 0.00  4.53  6.94 27.07
+          Jalen Brunson  77 54.38  16.0      17.0 0.12 0.00  3.61  6.74 28.73
+         Alperen Sengun  63 54.21  17.0      22.0 0.46 0.03  9.35  4.95 21.13
+           De'Aaron Fox  74 54.03  18.0      14.0 0.08 0.00  4.59  5.65 26.57
+        Anthony Edwards  79 52.56  19.0      24.0 0.11 0.00  5.44  5.13 25.94
+          Stephen Curry  74 52.47  20.0      25.0 0.09 0.00  4.46  5.12 26.43
+            Bam Adebayo  71 52.47  21.0      31.0 0.59 0.03 10.38  3.92 19.25
+         Damian Lillard  73 52.32  22.0      26.0 0.16 0.00  4.38  6.96 24.32
+        Dejounte Murray  78 51.88  23.0      23.0 0.26 0.01  5.33  6.44 22.47
+           Kyrie Irving  58 51.84  24.0      15.0 0.09 0.00  5.00  5.16 25.64
+         Paolo Banchero  80 51.40  25.5      45.0 0.20 0.02  6.92  5.39 22.55
+
+======== 2. Biggest risers / fallers vs ESPN standard (top-150 in either), all 3 seasons pooled ========
+RISERS
+season_year             player  rank  std_rank  reb  ast  pts  to
+    2022-23         Kevin Love 147.0     203.0  6.4  1.9  8.2 1.1
+    2021-22   Precious Achiuwa 136.0     185.0  6.5  1.1  9.1 1.2
+    2023-24    Scoot Henderson 103.0     149.0  3.1  5.4 14.0 3.4
+    2023-24     Keyonte George 131.0     173.0  2.8  4.4 13.0 2.5
+    2022-23     Isaiah Stewart 103.0     141.0  8.1  1.4 11.3 1.4
+    2022-23  Jonas Valanciunas  66.0     101.0 10.2  1.8 14.1 2.0
+    2023-24         Kevin Love 150.0     185.0  6.1  2.1  8.8 0.9
+    2022-23 Bennedict Mathurin 121.0     154.0  4.1  1.5 16.7 1.9
+    2022-23         RJ Barrett  81.0     114.0  5.0  2.8 19.6 2.2
+    2022-23       Bobby Portis  71.0     103.0  9.6  1.5 14.1 1.2
+    2022-23        Deni Avdija 120.0     151.0  6.4  2.8  9.2 1.6
+    2021-22     Isaiah Stewart 109.0     140.0  8.7  1.2  8.3 1.2
+    2023-24          Josh Hart  81.0     112.0  8.3  4.1  9.4 1.5
+    2023-24    Jordan Clarkson  86.0     116.0  3.4  5.0 17.1 2.7
+    2022-23         Jaden Ivey  80.0     110.0  3.9  5.2 16.3 3.2
+FALLERS
+season_year                   player  rank  std_rank  reb  ast  pts  to  tpm
+    2023-24              Brook Lopez 117.0      73.0  5.2  1.6 12.5 1.0  1.9
+    2023-24           Daniel Gafford 105.0      65.0  7.6  1.6 11.0 1.0  0.0
+    2022-23             Delon Wright 154.0     116.0  3.6  3.9  7.4 0.9  0.8
+    2023-24 Kentavious Caldwell-Pope 180.0     143.0  2.4  2.4 10.1 1.0  1.6
+    2023-24              Alex Caruso 128.0      92.0  3.8  3.5 10.1 1.4  1.9
+    2021-22            Herbert Jones 151.0     116.0  3.8  2.1  9.5 1.3  0.7
+    2021-22           Brandon Clarke 141.0     106.0  5.3  1.3 10.4 0.5  0.1
+    2023-24            Herbert Jones 145.0     113.0  3.6  2.6 11.0 1.2  1.5
+    2022-23              Brook Lopez  79.0      47.0  6.7  1.3 15.9 1.4  1.7
+    2022-23 Kentavious Caldwell-Pope 159.0     127.0  2.7  2.4 10.8 1.1  1.8
+    2021-22            Mikal Bridges 107.0      76.0  4.2  2.3 14.2 0.8  1.4
+    2022-23          Trey Murphy III 133.0     102.0  3.6  1.4 14.5 0.8  2.6
+    2021-22            Nicolas Batum 168.0     138.0  4.3  1.7  8.3 0.7  1.8
+    2021-22         Robert Covington 128.0      98.0  5.5  1.3  8.5 1.1  1.8
+    2021-22           Daniel Gafford 154.0     124.5  5.7  0.9  9.4 0.9  0.0
+
+======== 3. Share of fantasy points by source (top-150 players) ========
+pts        40.9
+3pm         4.1
+reb        29.2
+ast        18.9
+stl         3.5
+blk         2.4
+dd/td       1.0
+bonuses     0.1
+
+======== 4. FP/G by rank tier (replacement level). 12 teams x 10 starters = 120; x15 rostered = 180 ========
+2021-22 {1: np.float64(78.1), 12: np.float64(57.9), 24: np.float64(51.0), 48: np.float64(44.6), 72: np.float64(36.8), 96: np.float64(33.0), 120: np.float64(29.0), 150: np.float64(25.8), 180: np.float64(22.9), 220: np.float64(19.3)}
+2022-23 {1: np.float64(75.0), 12: np.float64(58.7), 24: np.float64(51.7), 48: np.float64(44.6), 72: np.float64(39.8), 96: np.float64(34.9), 120: np.float64(30.6), 150: np.float64(27.0), 180: np.float64(24.0), 220: np.float64(19.7)}
+2023-24 {1: np.float64(82.0), 12: np.float64(56.4), 24: np.float64(51.8), 48: np.float64(45.4), 72: np.float64(39.2), 96: np.float64(35.4), 120: np.float64(32.1), 150: np.float64(27.8), 180: np.float64(24.1), 220: np.float64(20.2)}
+
+======== 4b. Position profile: use rebounds/assists proxy. Bigs = reb>=8 & ast<4; creators = ast>=6 ========
+bigs {'2021-22': 24, '2022-23': 24, '2023-24': 23} creators {'2021-22': 20, '2022-23': 27, '2023-24': 26}
+
+======== 5. Team games per Mon-Sun week (regular season) ========
+             1    2    3    4  5
+season_year                     
+2021-22      8   94  332  312  4
+2022-23      6   95  334  313  2
+2023-24      6  109  305  329  1
+Team-games by weekday (all seasons): {'Wednesday': 1430, 'Friday': 1364, 'Monday': 1070, 'Sunday': 1042, 'Saturday': 968, 'Tuesday': 812, 'Thursday': 694}
+
+======== 6. Weekly consistency of top-100 players: weekly FP total CV and correlation of weekly FP/G ========
+median CV of weekly FP/G: 0.197
+median CV of single-game FP: 0.298
+corr(weekly FP total, games played) top-100: 0.715
+
+======== 7. Back-to-backs: FP/G and DNP rate on 2nd night vs other games (top-100 players) ========
+       dnp_rate  fp_when_played
+b2b2                           
+False     0.020          45.703
+True      0.036          45.017
+top-30 DNP rate by b2b2: {False: 0.018, True: 0.032}
+top-30 DNP comments on b2b2: {'DND - Injury/Illness': 24, 'DNP - Injury/Illness': 5, "DNP - Coach's Decision": 1, 'DNP - Rest': 1}
+
+======== 8. Late season (from Mar 15): DNP rate and FP/G vs earlier, top-100 players ========
+        dnp     fpg     mpg
+late                       
+False  0.02  45.506  32.364
+True   0.04  46.071  32.206
+{'bad(<.40)': 0.091, 'mid': 0.03, 'good(>.60)': 0.032} <- late-season DNP rate by team quality
+{'bad(<.40)': 0.024, 'mid': 0.02, 'good(>.60)': 0.017} <- earlier-season DNP rate by team quality
+April DNP by bucket: {'bad(<.40)': 0.158, 'mid': 0.028, 'good(>.60)': 0.062}
+
+======== 9. Prediction: what best predicts next game FP? (players with >=10 prior games) ========
+last1        MAE 13.64
+last5        MAE 10.89
+last10       MAE 10.57
+season_avg   MAE 10.55
+min_x_rate   MAE 10.50
+blend 0.3 min_x_rate + season_avg MAE 10.43
+blend 0.5 min_x_rate + season_avg MAE 10.40
+blend 0.7 min_x_rate + season_avg MAE 10.41
+corr(prev game residual, this game residual): 0.124
+
+======== 10. Injury return: games after an absence of 5+ team games (top-150). Minutes vs season avg ========
+                 n  min_ratio  fp_ratio
+since_return                           
+0             19.0      0.826     0.800
+1             19.0      1.019     1.168
+2             18.0      1.012     1.014
+3             17.0      1.064     1.036
+4             17.0      1.001     1.067
+5             16.0      0.863     0.803
+
+======== 11. Double-double rates and what a DD is worth (top-150) ========
+season_year                player  ddr  tdr   fpg
+    2023-24      Domantas Sabonis 0.94 0.32 68.99
+    2021-22          Nikola Jokic 0.89 0.26 78.08
+    2023-24          Nikola Jokic 0.86 0.32 76.51
+    2023-24         Anthony Davis 0.84 0.03 64.59
+    2022-23          Nikola Jokic 0.84 0.42 74.96
+    2022-23      Domantas Sabonis 0.82 0.18 63.06
+    2021-22           Rudy Gobert 0.80 0.00 53.23
+    2023-24 Giannis Antetokounmpo 0.78 0.14 72.75
+    2021-22      Domantas Sabonis 0.74 0.08 58.18
+    2022-23 Giannis Antetokounmpo 0.73 0.10 71.66
+    2023-24           Jalen Duren 0.72 0.00 45.41
+    2022-23         Anthony Davis 0.71 0.00 63.04
+    2021-22 Giannis Antetokounmpo 0.69 0.06 71.34
+    2021-22           Luka Doncic 0.68 0.15 72.07
+    2022-23        Nikola Vucevic 0.62 0.01 51.09

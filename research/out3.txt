@@ -1,0 +1,22 @@
+Expected locked score / player's average, by games available that week (optimal thresholds)
+V1    1.000
+V2    1.130
+V3    1.206
+V4    1.259
+V5    1.301
+Perfect hindsight (best game of k) / average
+max1    1.000
+max2    1.185
+max3    1.276
+max4    1.337
+max5    1.385
+
+Lock threshold as multiple of the player's average, with N games still to come after this one:
+  1 game(s) left -> lock if score >= 1.00 x average
+  2 game(s) left -> lock if score >= 1.13 x average
+  3 game(s) left -> lock if score >= 1.21 x average
+  4 game(s) left -> lock if score >= 1.26 x average
+
+Naive 'lock first game' = 1.00x; 'always wait for last game' = 1.00x (and zero if he sits).
+
+For a 50 FP/G player: 2 games ~56.5, 3 games ~60.3, 4 games ~63.0 locked FP
