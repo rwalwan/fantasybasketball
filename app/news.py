@@ -139,6 +139,8 @@ def collect(meta, my_players, fa_ids, today):
             if it["id"] in seen:
                 continue
             seen[it["id"]] = today
+            if re.search(r"(?i)how to watch|live stream|get your latest|tv channel|betting|odds|picks? &|prediction", it["title"]):
+                continue
             rec = {"source": src, "title": it["title"], "link": it["link"], "at": now, "text": it["text"][:400]}
             if budget > 0:
                 try:
@@ -160,8 +162,8 @@ def collect(meta, my_players, fa_ids, today):
             print("feed failed", src, e)
             continue
         for it in items:
-            if it["id"] in seen or budget <= 0:
-                continue
+            if it["id"] in seen or budget <= 0 or not os.environ.get("OPENROUTER_API_KEY"):
+                continue                      # without a key, leave articles for when one is added
             title = it["title"].lower()
             if not any(k in title for k in ("waiver", "start", "sit", "pickup", "add", "drop", "sell", "buy", "trade",
                                             "stream", "sleeper", "target", "risers", "fallers", "week")):
