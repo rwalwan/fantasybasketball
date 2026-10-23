@@ -5,7 +5,10 @@ import os
 import sys
 from zoneinfo import ZoneInfo
 
+import requests
+
 from . import espn, sleeper
+from .alerts import send_alerts
 from .engine import WeekPlan, team_game_dates, week_dates
 from .lineups import LineupTracker
 from .model import PlayerBook
@@ -44,13 +47,20 @@ def main():
     tg = team_game_dates(sched)
     slots = [s for s in lg["roster_positions"] if s not in ("BN", "IR")]
     tracker = LineupTracker(season, week)
+    backend = fetch_backend(season, week)
+    tracker.snaps.update(backend.get("lineups") or {})          # minute-level records win
+    tracker.overrides.update(backend.get("elig") or {})
     tracker.record(slots, my_m.get("starters") or [], mine.get("players") or [], book.team,
                    lambda team: sorted(d for d in tg.get(team, {}) if d in days), tips)
 
-    manual = load_manual_locks(week)
+    manual = {**load_manual_locks(week), **(backend.get("locks") or {})}
     wp = WeekPlan(book, sched, week, today, lg["roster_positions"], mine, my_m, rosters, tracker.eligible, tips)
     plan = wp.build(manual)
     waivers, worst = wp.waivers(sleeper.trending_adds())
+    try:
+        print("alerts sent:", send_alerts(plan, waivers, book, tips, today))
+    except Exception as e:
+        print("alerts failed:", e, file=sys.stderr)
 
     opp_owner = next((r.get("owner_id") for r in rosters if opp_m and r["roster_id"] == opp_m["roster_id"]), None)
     out = dict(generated=dt.datetime.now(ZoneInfo("America/Los_Angeles")).strftime("%a %b %d, %I:%M %p PT"),
@@ -94,6 +104,18 @@ def current_week(sched, today):
     weeks = sorted({(g["date"], g["week"]) for g in sched if g.get("week")})
     past = [w for d, w in weeks if d <= today]
     return past[-1] if past else weeks[0][1]
+
+
+def fetch_backend(season, week):
+    url = os.environ.get("WORKER_URL")
+    if not url:
+        return {}
+    try:
+        r = requests.get(f"{url.rstrip('/')}/state", params={"season": season, "week": week}, timeout=20)
+        return r.json() if r.ok else {}
+    except Exception as e:
+        print("backend unavailable:", e, file=sys.stderr)
+        return {}
 
 
 def load_manual_locks(week):
