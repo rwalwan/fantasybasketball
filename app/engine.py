@@ -144,7 +144,7 @@ class WeekPlan:
                     action, why = "lock", f"{score:.1f} beats the bar of {bar:.1f}."
                 else:
                     alt = slot_best[1]
-                    swap = f" Swap in {self.b.name(alt)} before his next game." if alt and alt != pid else ""
+                    swap = f" Bench option for this slot: {self.b.name(alt)}." if alt and alt != pid and alt not in starters else ""
                     action, why = "pass", f"{score:.1f} is under the bar of {bar:.1f}; expected value of waiting is higher.{swap}"
                 decisions.append(dict(slot=slot, pid=pid, name=name, action=action, detail=why, score=score,
                                       bar=round(bar, 1), last_date=last[0], deadline=ups[0].date if ups else None))
