@@ -139,7 +139,7 @@ def collect(meta, my_players, fa_ids, today):
             if it["id"] in seen:
                 continue
             seen[it["id"]] = today
-            if re.search(r"(?i)how to watch|live stream|get your latest|tv channel|betting|odds|picks? &|prediction", it["title"]):
+            if re.search(r"(?i)how to watch|live stream|get your latest|tv channel|betting|odds|picks? &|prediction|wnba|viewers|revenue|ratings", it["title"]):
                 continue
             rec = {"source": src, "title": it["title"], "link": it["link"], "at": now, "text": it["text"][:400]}
             if budget > 0:
@@ -154,6 +154,24 @@ def collect(meta, my_players, fa_ids, today):
             rec["pid"] = names.pid(rec.get("player") or it["title"].split(":")[0])
             rec["beneficiary_pids"] = [p for p in (names.pid(b) for b in (rec.get("beneficiaries") or [])) if p]
             news.append(rec)
+
+    # backfill: items collected before the AI key existed (or that failed) get processed now, newest first
+    for rec in reversed(news):
+        if budget <= 0 or not os.environ.get("OPENROUTER_API_KEY"):
+            break
+        if rec.get("kind") or rec.get("llm_tried"):
+            continue
+        rec["llm_tried"] = True
+        try:
+            x = llm_json(NEWS_PROMPT, f"Title: {rec['title']}\n\n{rec.get('text', '')}")
+            budget -= 1
+            if x:
+                rec.update({k: x.get(k) for k in ("player", "team", "kind", "status", "games_out_estimate",
+                                                  "minutes_effect", "beneficiaries", "summary")})
+                rec["pid"] = names.pid(rec.get("player") or "") or rec.get("pid")
+                rec["beneficiary_pids"] = [p for p in (names.pid(b) for b in (rec.get("beneficiaries") or [])) if p]
+        except Exception as e:
+            print("llm backfill failed:", e)
 
     for src, url in ARTICLE_FEEDS.items():
         try:
