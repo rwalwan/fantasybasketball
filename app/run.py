@@ -5,8 +5,9 @@ import os
 import sys
 from zoneinfo import ZoneInfo
 
-from . import sleeper
-from .engine import WeekPlan
+from . import espn, sleeper
+from .engine import WeekPlan, team_game_dates, week_dates
+from .lineups import LineupTracker
 from .model import PlayerBook
 
 LEAGUE_ID = os.environ.get("FBB_LEAGUE_ID", "1400915575915491328")
@@ -37,9 +38,19 @@ def main():
     except Exception as e:  # prior season is a nice-to-have
         print("prior season unavailable:", e, file=sys.stderr)
 
+    # record who is starting right now for every game that hasn't tipped (lock eligibility)
+    days = week_dates(sched, week)
+    tips = espn.tip_times([d for d in days if d >= (dt.date.fromisoformat(today) - dt.timedelta(days=1)).isoformat()])
+    tg = team_game_dates(sched)
+    slots = [s for s in lg["roster_positions"] if s not in ("BN", "IR")]
+    tracker = LineupTracker(season, week)
+    tracker.record(slots, my_m.get("starters") or [], mine.get("players") or [], book.team,
+                   lambda team: sorted(d for d in tg.get(team, {}) if d in days), tips)
+
     manual = load_manual_locks(week)
-    plan = WeekPlan(book, sched, week, today, lg["roster_positions"], mine, my_m, rosters).build(manual)
-    waivers, worst = WeekPlan(book, sched, week, today, lg["roster_positions"], mine, my_m, rosters).waivers(sleeper.trending_adds())
+    wp = WeekPlan(book, sched, week, today, lg["roster_positions"], mine, my_m, rosters, tracker.eligible, tips)
+    plan = wp.build(manual)
+    waivers, worst = wp.waivers(sleeper.trending_adds())
 
     opp_owner = next((r.get("owner_id") for r in rosters if opp_m and r["roster_id"] == opp_m["roster_id"]), None)
     out = dict(generated=dt.datetime.now(ZoneInfo("America/Los_Angeles")).strftime("%a %b %d, %I:%M %p PT"),
@@ -61,7 +72,7 @@ def current_week(sched, today):
 
 
 def load_manual_locks(week):
-    path = os.path.join(ROOT, "data", f"locks_w{week}.json")
+    path = os.path.join(ROOT, "data", "state", f"locks_w{week}.json")
     return json.load(open(path)) if os.path.exists(path) else {}
 
 

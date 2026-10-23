@@ -25,8 +25,11 @@ def team_game_dates(schedule):
 
 
 class WeekPlan:
-    def __init__(self, book, schedule, week, today, roster_positions, my_roster, my_matchup, all_rosters):
+    def __init__(self, book, schedule, week, today, roster_positions, my_roster, my_matchup, all_rosters,
+                 elig=None, tips=None):
         self.b = book
+        self.elig = elig or (lambda pid, date: None)   # was he starting when that game tipped? True/False/None
+        self.tips = tips or {}
         self.week = week
         self.today = today
         self.days = week_dates(schedule, week)
@@ -72,7 +75,17 @@ class WeekPlan:
         for g in played[:-1]:
             if abs(g[1] - pts) < 0.01 and abs(latest[1] - pts) >= 0.01:
                 return "locked", g
-        return "open", latest
+        # Only his most recent game can still be locked (the window closes when his next game tips),
+        # and only if he was in a starting slot when it tipped.
+        e = self.elig(pid, latest[0])
+        if e is True:
+            return "open", latest
+        if e is None:
+            return "confirm", latest
+        return "bench", latest
+
+    def tip(self, pid, date):
+        return self.tips.get((date, self.b.team(pid)))
 
     # ---- the plan ------------------------------------------------------------------------------------
     def build(self, manual_locks=None):
@@ -136,6 +149,18 @@ class WeekPlan:
             own_bar = lock_bar(ups)
             slot_best = best_for_slot.get(i, (0.0, None))
             bar = max(own_bar, slot_best[0])
+            if st == "confirm" and last is not None:
+                score = last[1]
+                verdict = "lock it" if score >= own_bar else "pass"
+                decisions.append(dict(slot=slot, pid=pid, name=name, action="confirm", score=score, bar=round(own_bar, 1),
+                                      last_date=last[0], deadline=ups[0].date if ups else None,
+                                      deadline_tip=self.tip(pid, ups[0].date) if ups else None,
+                                      detail=f"Was he in your starting lineup when his {last[0]} game ({score:.1f}) tipped? "
+                                             f"Tracking started after that game. If yes, {verdict} (his bar is {own_bar:.1f}); "
+                                             f"if he was on your bench, that game can't count."))
+                continue
+            if st == "bench" and last is not None:
+                pass  # falls through to the "start" branch below: nothing lockable, plan his next game
             if st == "open" and last is not None:
                 score = last[1]
                 if not ups and slot_best[1] in (None, pid):
@@ -147,14 +172,16 @@ class WeekPlan:
                     swap = f" Bench option for this slot: {self.b.name(alt)}." if alt and alt != pid and alt not in starters else ""
                     action, why = "pass", f"{score:.1f} is under the bar of {bar:.1f}; expected value of waiting is higher.{swap}"
                 decisions.append(dict(slot=slot, pid=pid, name=name, action=action, detail=why, score=score,
-                                      bar=round(bar, 1), last_date=last[0], deadline=ups[0].date if ups else None))
+                                      bar=round(bar, 1), last_date=last[0], deadline=ups[0].date if ups else None,
+                                      deadline_tip=self.tip(pid, ups[0].date) if ups else None))
             else:
                 nxt = ups[0] if ups else None
                 if nxt is None:
                     action, why = "fallback-risk", "No games left and nothing locked: this slot scores his last game."
                 else:
                     lo, hi = percentile_range(nxt.mu)
-                    action, why = "start", f"Next game {nxt.date} vs {nxt.opp}: {nxt.mu:.1f} projected ({lo}-{hi}), plays {int(nxt.q * 100)}%."
+                    note = " His last game was played from your bench, so it can't be locked." if st == "bench" else ""
+                    action, why = "start", f"Next game {nxt.date} vs {nxt.opp}: {nxt.mu:.1f} projected ({lo}-{hi}), plays {int(nxt.q * 100)}%.{note}"
                 decisions.append(dict(slot=slot, pid=pid, name=name, action=action, detail=why, bar=round(bar, 1)))
 
         fixed = {**locked, **{p: pending[p] for p in will_lock}}
@@ -195,9 +222,9 @@ class WeekPlan:
                 if not info:
                     cells.append(None)
                 elif d in played:
-                    cells.append(dict(kind="played", fp=round(played[d], 1), opp=info["opp"]))
+                    cells.append(dict(kind="played", fp=round(played[d], 1), opp=info["opp"], started=self.elig(p, d)))
                 else:
-                    cells.append(dict(kind="upcoming", mu=self.b.game_mu(p, d), opp=info["opp"]))
+                    cells.append(dict(kind="upcoming", mu=self.b.game_mu(p, d), opp=info["opp"], tip=self.tips.get((d, team))))
             rows.append(dict(pid=p, name=self.b.name(p), team=team, pos="/".join(self.b.positions(p)),
                              status=self.b.status(p), locked=p in locked, cells=cells,
                              games_left=sum(1 for c in cells if c and c["kind"] == "upcoming")))
