@@ -1,0 +1,85 @@
+// Suggested moves with short AI reasoning -> site/static/moves.json
+// Runs in the scheduled job after `python -m app.run` (needs site/static/*.json). Uses the same engine as
+// the site, so the numbers match what you see there. Reasons are cached so each suggestion is only
+// written once (OpenRouter key stays server-side; never shipped to the browser).
+import fs from "node:fs";
+import { Book, WeekPlan, weekDays, tradeIdeas, waiverMoves, playerValue } from "../site/engine.js";
+
+const LEAGUE = "1400915575915491328", USER = "1388708038000533504";
+const S1 = "https://api.sleeper.app/v1", S2 = "https://api.sleeper.com";
+const MODEL = process.env.OPENROUTER_MODEL || "anthropic/claude-haiku-5.5";
+const get = async u => { const r = await fetch(u, { headers: { "user-agent": "we-back-lock-desk" } }); if (!r.ok) throw new Error(`${r.status} ${u}`); return r.json(); };
+const st = n => JSON.parse(fs.readFileSync(`site/static/${n}.json`, "utf8"));
+const stateFile = n => `data/state/${n}`;
+const readState = (n, d) => { try { return JSON.parse(fs.readFileSync(stateFile(n), "utf8")); } catch { return d; } };
+
+const league = await get(`${S1}/league/${LEAGUE}`), season = league.season;
+const schedule = await get(`${S2}/schedule/nba/regular/${season}`);
+const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+const week = schedule.filter(g => g.week && g.date <= today).map(g => g.week).sort((a, b) => a - b).at(-1) || 1;
+const [rosters, matchups, users, stats, proj, trending] = await Promise.all([
+  get(`${S1}/league/${LEAGUE}/rosters`), get(`${S1}/league/${LEAGUE}/matchups/${week}`), get(`${S1}/league/${LEAGUE}/users`),
+  get(`${S2}/stats/nba/${season}/${week}?season_type=regular`), get(`${S2}/projections/nba/${season}/${week}?season_type=regular`),
+  get(`${S1}/players/nba/trending/add?lookback_hours=24&limit=50`).catch(() => [])]);
+const userName = Object.fromEntries(users.map(u => [u.user_id, u.display_name]));
+
+const backend = process.env.WORKER_URL ? await get(`${process.env.WORKER_URL}/state?season=${season}&week=${week}`).catch(() => ({})) : {};
+const locks = { ...readState(`locks_w${week}.json`, {}), ...(backend.locks || {}) };
+const ov = { ...readState("eligibility_overrides.json", {}), ...(backend.elig || {}) };
+const snaps = { ...readState(`lineups_${season}_w${week}.json`, {}), ...(backend.lineups || {}) };
+const tipsRaw = st("tips");
+
+const book = new Book({ scoring: league.scoring_settings, players: st("players"), priors: st("priors"), gamelog: st("gamelog").games, weights: st("experts").weights });
+book.addStats(stats); book.addProjections(proj);
+const mine = rosters.find(r => r.owner_id === USER), my = matchups.find(m => m.roster_id === mine.roster_id);
+const slots = league.roster_positions.filter(s => s !== "BN" && s !== "IR");
+const wp = new WeekPlan({ Q: st("quantiles").quantiles, book, schedule, week, today, rosterPositions: league.roster_positions,
+  roster: mine, matchup: my, rosters, tips: tipsRaw, locks,
+  elig: (p, d) => { const k = `${d}|${p}`; if (k in ov) return !!ov[k]; const s = snaps[k]; return s && s.frozen ? s.slot != null : null; } });
+const plan = wp.build();
+const protect = new Set([...(mine.reserve || []), ...plan.slots.filter(s => s.action === "locked").map(s => s.pid)]);
+
+const claims = (() => { try { return st("claims"); } catch { return { consensus: {} }; } })();
+const fa = wp.waivers(trending, 40).list;
+const adds = waiverMoves(book, mine, fa, slots, protect, 8).map(m => ({ ...m, experts: claims.consensus?.[m.pid] || null }));
+const trades = tradeIdeas(book, mine, rosters.filter(r => r.roster_id !== mine.roster_id), slots, 10)
+  .map(t => ({ ...t, partner: userName[t.owner_id] || `Team ${t.roster_id}`,
+               giveNames: t.give.map(p => book.name(p)), getNames: t.get.map(p => book.name(p)) }));
+
+// ---- short reasons from the AI model (cached per suggestion) ----
+const cache = readState("reasons.json", {});
+const fmtP = p => { const g = book.games[p] || []; return `${book.name(p)} (${book.team(p)}, ${book.pos(p).join("/")}, ${book.baseline(p).toFixed(1)} FP/G proj, ${g.length} games this season, last 3: ${g.slice(-3).map(x => x.fp).join("/") || "none"}${book.status(p) ? ", " + book.status(p) : ""})`; };
+const items = [
+  ...adds.map(m => ({ key: `add|${m.pid}|${m.drop}|${today}`, text: `WAIVER: add ${fmtP(m.pid)}; drop ${fmtP(m.drop)}. Team value +${m.gain} locked pts/week. ${m.experts ? `Experts: ${Math.round(m.experts.bull_share * 100)}% bullish over ${m.experts.n} calls.` : ""} Sleeper adds last 24h: ${m.trend}.` })),
+  ...trades.map(t => ({ key: `trade|${t.give.join("+")}|${t.get.join("+")}|${today}`, text: `TRADE with ${t.partner}: give ${t.give.map(fmtP).join(" + ")}; get ${t.get.map(fmtP).join(" + ")}. Our team +${t.dm.toFixed(1)}, theirs +${t.dt.toFixed(1)} locked pts/week.` })),
+].filter(x => !cache[x.key]);
+
+if (items.length && process.env.OPENROUTER_API_KEY) {
+  const sys = "You write one-sentence reasons (max 25 words) for fantasy basketball moves in a 12-team head-to-head points league on Sleeper using Lock-In mode (each starter's weekly score is one game the manager locks; rebounds and assists are worth 2, steals/blocks 1.5, no turnover penalty, double-double +2, triple-double +3). Use only the numbers given. Reply as JSON: {\"reasons\": [{\"key\": \"...\", \"reason\": \"...\"}]}.";
+  try {
+    const r = await fetch("https://openrouter.ai/api/v1/chat/completions", { method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`, "x-title": "Lock Desk" },
+      body: JSON.stringify({ model: MODEL, temperature: 0.2, response_format: { type: "json_object" },
+        messages: [{ role: "system", content: sys }, { role: "user", content: items.map(i => `key=${i.key}\n${i.text}`).join("\n\n") }] }) });
+    const txt = (await r.json()).choices?.[0]?.message?.content || "{}";
+    const parsed = JSON.parse(txt.match(/\{[\s\S]*\}/)?.[0] || "{}");
+    for (const x of parsed.reasons || []) if (x.key && x.reason) cache[x.key] = x.reason.slice(0, 240);
+  } catch (e) { console.error("reasoning failed:", e.message); }
+}
+const cutoff = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
+for (const k of Object.keys(cache)) if (k.split("|").at(-1) < cutoff) delete cache[k];
+fs.mkdirSync("data/state", { recursive: true });
+fs.writeFileSync(stateFile("reasons.json"), JSON.stringify(cache));
+
+const out = {
+  generated: new Date().toISOString(), week,
+  adds: adds.map(m => ({ pid: m.pid, name: m.name, team: m.team, pos: m.pos, fpg: m.fpg, left: m.left, trend: m.trend,
+    drop: m.drop, dropName: m.dropName, gain: m.gain, bid: m.bid, experts: m.experts ? { bull_share: m.experts.bull_share, n: m.experts.n } : null,
+    reason: cache[`add|${m.pid}|${m.drop}|${today}`] || null })),
+  trades: trades.map(t => ({ partner: t.partner, roster_id: t.roster_id, give: t.give, get: t.get, giveNames: t.giveNames, getNames: t.getNames,
+    dm: Math.round(t.dm * 10) / 10, dt: Math.round(t.dt * 10) / 10,
+    reason: cache[`trade|${t.give.join("+")}|${t.get.join("+")}|${today}`] || null })),
+};
+fs.writeFileSync("site/static/moves.json", JSON.stringify(out));
+console.log(`moves: ${out.adds.length} adds, ${out.trades.length} trades, ${items.length} new reasons requested`);
+void playerValue;

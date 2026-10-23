@@ -61,15 +61,21 @@ select{font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);
 </header>
 <div class="now" id="now">Loading…</div>
 <nav id="tabs">
-  <button data-t="locks" class="on">Locks</button><button data-t="week">Week</button><button data-t="waivers">Waivers</button><button data-t="trades">Trades</button><button data-t="news">News</button><button data-t="experts">Experts</button>
+  <button data-t="locks" class="on">Locks</button><button data-t="week">Week</button><button data-t="moves">Moves</button><button data-t="waivers">Waivers</button><button data-t="trades">Trades</button><button data-t="news">News</button><button data-t="experts">Experts</button>
 </nav>
 
 <section data-p="locks">
   <h2>Lock calls by slot</h2><div class="slots" id="slots"></div>
-  <h2>Who to have in your open slots today</h2><div class="box" id="lineup"></div>
+  <h2>Today's lineup: now vs plan</h2>
+  <p class="foot" style="margin-top:0">Open slots only count a game if he's starting at tip. Make changes as late as you safely can (final injury reports come ~30–60 min before tip). Relief: if the first player's game misses the keep line, pass on it and slide the later player into that slot before his tip.</p>
+  <div class="box" id="lineup"></div>
 </section>
 <section data-p="week" class="hide">
   <h2>This week, game by game</h2><div class="wrap"><table id="grid"></table></div>
+</section>
+<section data-p="moves" class="hide">
+  <h2>Suggested pickups</h2><p class="foot" id="movesmeta" style="margin-top:0"></p><div class="slots" id="adds"></div>
+  <h2>Suggested trades</h2><div class="slots" id="trades2"></div>
 </section>
 <section data-p="waivers" class="hide">
   <h2>Waiver targets</h2><div class="wrap"><table id="waivers"></table></div>
@@ -80,7 +86,7 @@ select{font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);
   <div style="margin:8px 0 12px"><select id="partner"></select></div>
   <div class="trade"><div class="box pick" id="give"></div><div class="box pick" id="get"></div></div>
   <div class="verdict" id="verdict"></div>
-  <h2>Trade ideas that help both sides</h2><div class="wrap"><table id="ideas"></table></div>
+  <h2>Suggested trades (from the Moves tab)</h2><div class="wrap"><table id="ideas"></table></div>
 </section>
 
 <section data-p="experts" class="hide">

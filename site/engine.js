@@ -233,15 +233,40 @@ export class WeekPlan {
       // value of sampling him today: the option gain over waiting, or his full value if it's his last game
       gain[p] = u.length === 1 ? u[0].q * u[0].mu : u[0].q * (expectedMax(Q, u[0].mu, after) - after);
     }
+    // Primary assignment: scarcest slots first, best option value first.
+    const tipMs = p => { const t = cont[p]?.u[0]?.tip; return t ? Date.parse(t) : null; };
     const used = new Set();
-    const lineup = openToday.sort((a, b) => todayPl.filter(p => fits(a.s, this.b.pos(p))).length - todayPl.filter(p => fits(b.s, this.b.pos(p))).length)
+    const lineup = openToday.map((x, k) => ({ ...x, k })).sort((a, b) => todayPl.filter(p => fits(a.s, this.b.pos(p))).length - todayPl.filter(p => fits(b.s, this.b.pos(p))).length)
       .map(x => {
         const c = todayPl.filter(p => !used.has(p) && fits(x.s, this.b.pos(p))).sort((a, b) => gain[b] - gain[a])[0];
-        if (!c) return { slot: x.s, pid: null, name: "nobody eligible plays today", current: x.p, gain: 0 };
+        if (!c) return { slot: x.s, k: x.k, pid: null, name: "nobody eligible plays today", current: x.p, currentName: x.p ? this.b.name(x.p) : null, gain: 0 };
         used.add(c);
         const g = cont[c].u[0];
-        return { slot: x.s, pid: c, name: this.b.name(c), current: x.p, move: c !== x.p, gain: r1(gain[c]), tip: g.tip, opp: g.opp };
-      });
+        return { slot: x.s, k: x.k, pid: c, name: this.b.name(c), current: x.p, currentName: x.p ? this.b.name(x.p) : null,
+                 move: c !== x.p, gain: r1(gain[c]), tip: g.tip, opp: g.opp, mu: g.mu };
+      }).sort((a, b) => a.k - b.k);
+
+    // Same-day relief: a player whose game tips at least 2.5 h after the primary's can take the slot if the
+    // primary's game misses its bar. Primaries most likely to miss (lowest projection) get relief first.
+    const GAME_MS = 150 * 60000;
+    const relievers = todayPl.filter(p => !used.has(p)).sort((a, b) => (cont[b].u[0]?.mu || 0) - (cont[a].u[0]?.mu || 0));
+    for (const rp of relievers) {
+      const rt = tipMs(rp); if (!rt) continue;
+      const cands = lineup.filter(x => x.pid && !x.relief && fits(x.slot, this.b.pos(rp)) && tipMs(x.pid) && rt >= tipMs(x.pid) + GAME_MS)
+        .sort((a, b) => a.mu - b.mu);
+      const x = cands[0]; if (!x) continue;
+      const rg = cont[rp].u[0], rW = contValues(Q, cont[rp].u)[0];
+      const ownAfter = cont[x.pid].u.length > 1 ? contValues(Q, cont[x.pid].u.slice(1))[0] : 0;
+      x.relief = { pid: rp, name: this.b.name(rp), tip: rg.tip, opp: rg.opp, mu: rg.mu,
+                   swapAfter: new Date(tipMs(x.pid) + 135 * 60000).toISOString() };
+      x.keepBar = r1(Math.max(ownAfter, rW));           // keep the primary's game only if it beats this
+      used.add(rp);
+    }
+    // Timing: change as late as possible (final injury reports land ~30-60 min before tip), but before tip.
+    for (const x of lineup) if (x.move && x.tip) {
+      x.changeBy = x.tip;
+      x.bestTime = new Date(Date.parse(x.tip) - 40 * 60000).toISOString();
+    }
 
     const grid = players.map(p => {
       const t = this.b.team(p), pl = Object.fromEntries(this.played(p).map(g => [g.date, g.fp]));
@@ -255,7 +280,9 @@ export class WeekPlan {
                locked: locked.has(p), starter: starters.includes(p), cells, left: cells.filter(c => c?.kind === "upcoming").length };
     }).sort((a, b) => this.b.baseline(b.pid) - this.b.baseline(a.pid));
 
-    return { slots, lineup, idle: todayPl.filter(p => !used.has(p)).map(p => ({ pid: p, name: this.b.name(p) })), grid,
+    const before = this.slots.map((slot, i) => ({ slot, pid: starters[i], name: starters[i] && starters[i] !== "0" ? this.b.name(starters[i]) : "(empty)",
+      fixed: fixed.has(starters[i]), plays: !!cont[starters[i]]?.u.some(g => g.date === this.today) }));
+    return { slots, lineup, before, idle: todayPl.filter(p => !used.has(p)).map(p => ({ pid: p, name: this.b.name(p) })), grid,
              days: this.days, unlocked: open.length - willLock.size };
   }
 
@@ -280,4 +307,65 @@ export class WeekPlan {
     out.sort((a, b) => (b.over > 0) - (a.over > 0) || (b.fpg + 0.15 * b.week) - (a.fpg + 0.15 * a.week));
     return { list: out.slice(0, limit), worst: Math.round(worst * 10) / 10 };
   }
+}
+
+// ---------- roster value: trades and waiver pickups ----------
+// A player's value = locked points per week: baseline x (best-of-~3.5-games gain, larger for streaky
+// players) x ~86% availability. A team's value = best positional fill of the 10 slots + a little for
+// bench depth (more lock options). Used for both trade grading and add/drop suggestions.
+export function playerValue(book, pid) {
+  const g = book.games[pid] || [], base = book.baseline(pid);
+  let cv = 0.3;
+  if (g.length >= 5) {
+    const m = g.reduce((a, x) => a + x.fp, 0) / g.length;
+    const sd = Math.sqrt(g.reduce((a, x) => a + (x.fp - m) ** 2, 0) / g.length);
+    cv = Math.min(0.5, Math.max(0.15, sd / Math.max(m, 1)));
+  }
+  const out = ["Out", "IR", "Suspended"].includes(book.status(pid)) ? 0.6 : 1;
+  return base * (1 + 0.7 * cv) * 0.86 * out;
+}
+export function teamValue(book, players, slots) {
+  const vals = players.map(p => ({ p, v: playerValue(book, p) })).sort((a, b) => b.v - a.v);
+  const used = new Set(); let total = 0;
+  const order = [...slots].sort((a, b) => vals.filter(x => fits(a, book.pos(x.p))).length - vals.filter(x => fits(b, book.pos(x.p))).length);
+  for (const s of order) { const x = vals.find(x => !used.has(x.p) && fits(s, book.pos(x.p))); if (x) { used.add(x.p); total += x.v; } }
+  const bench = vals.filter(x => !used.has(x.p)).slice(0, 3).reduce((a, x) => a + x.v, 0);
+  return total + 0.12 * bench;
+}
+const swapIn = (roster, out, inn) => roster.filter(p => !out.includes(p)).concat(inn);
+
+export function tradeIdeas(book, mine, others, slots, limit = 15) {
+  const myB = teamValue(book, mine.players, slots), ideas = [];
+  for (const r of others) {
+    const tb = teamValue(book, r.players, slots), mp = mine.players, tp = r.players;
+    const tryDeal = (give, get) => {
+      const dm = teamValue(book, swapIn(mp, give, get), slots) - myB;
+      if (dm <= 0.5) return;
+      const dt = teamValue(book, swapIn(tp, get, give), slots) - tb;
+      if (dt >= 0) ideas.push({ give, get, dm, dt, roster_id: r.roster_id, owner_id: r.owner_id });
+    };
+    for (const a of mp) for (const b of tp) tryDeal([a], [b]);
+    for (let i = 0; i < mp.length; i++) for (let j = i + 1; j < mp.length; j++) for (const b of tp) tryDeal([mp[i], mp[j]], [b]);
+  }
+  ideas.sort((x, y) => (y.dm + 0.5 * y.dt) - (x.dm + 0.5 * x.dt));
+  // keep variety: at most 2 ideas per target player
+  const per = {}, out = [];
+  for (const x of ideas) { const k = x.get.join(); if ((per[k] = (per[k] || 0) + 1) <= 2) out.push(x); if (out.length >= limit) break; }
+  return out;
+}
+
+export function waiverMoves(book, mine, candidates, slots, protect, limit = 8) {
+  // for each free agent, the drop that improves the team most; protected = locked/IR players
+  const base = teamValue(book, mine.players, slots), out = [];
+  for (const fa of candidates) {
+    let best = null;
+    for (const d of mine.players) {
+      if (protect.has(d)) continue;
+      const dv = teamValue(book, swapIn(mine.players, [d], [fa.pid]), slots) - base;
+      if (!best || dv > best.dv) best = { drop: d, dv };
+    }
+    if (best && best.dv > 0.3) out.push({ ...fa, drop: best.drop, dropName: book.name(best.drop), gain: Math.round(best.dv * 10) / 10,
+      bid: Math.min(40, Math.max(1, Math.round(best.dv * 2 + Math.min(fa.trend || 0, 20000) / 5000))) });
+  }
+  return out.sort((a, b) => b.gain - a.gain).slice(0, limit);
 }

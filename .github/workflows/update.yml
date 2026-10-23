@@ -43,6 +43,17 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Suggested moves (+ AI reasons)
+        run: node tools/moves.mjs || echo "moves step failed (site still publishes)"
+        env:
+          WORKER_URL: ${{ vars.WORKER_URL }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
+
       - name: Save state to the state branch
         run: |
           cd data/state
