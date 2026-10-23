@@ -61,7 +61,7 @@ select{font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);
 </header>
 <div class="now" id="now">Loading…</div>
 <nav id="tabs">
-  <button data-t="locks" class="on">Locks</button><button data-t="week">Week</button><button data-t="waivers">Waivers</button><button data-t="trades">Trades</button>
+  <button data-t="locks" class="on">Locks</button><button data-t="week">Week</button><button data-t="waivers">Waivers</button><button data-t="trades">Trades</button><button data-t="experts">Experts</button>
 </nav>
 
 <section data-p="locks">
@@ -81,6 +81,12 @@ select{font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);
   <div class="trade"><div class="box pick" id="give"></div><div class="box pick" id="get"></div></div>
   <div class="verdict" id="verdict"></div>
   <h2>Trade ideas that help both sides</h2><div class="wrap"><table id="ideas"></table></div>
+</section>
+
+<section data-p="experts" class="hide">
+  <h2>Projection sources, graded</h2>
+  <p class="foot" style="margin-top:0">Each source's projection for every game is saved before tip-off and scored against the real result in your scoring. "Weight now" is how much that source counts in the projections on the other tabs: inverse squared error, pulled toward equal weights until a source has 300 graded games. Bias above zero means the source projects too low.</p>
+  <div class="wrap"><table id="experts"></table></div>
 </section>
 
 <p class="foot" id="foot"></p>
