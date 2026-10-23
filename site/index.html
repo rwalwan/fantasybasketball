@@ -12,102 +12,79 @@
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "IBM Plex Sans",system-ui,sans-serif}
 main{max-width:1080px;margin:0 auto;padding:20px 16px 60px}
 header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;border-bottom:2px solid var(--ink);padding-bottom:12px}
-h1{font-size:22px;margin:0;letter-spacing:-.01em}h1 small{font-weight:400;color:var(--quiet);font-size:14px;margin-left:8px}
-.score{font-family:"IBM Plex Mono",monospace;font-size:20px}.score b{font-weight:600}.score span{color:var(--quiet);font-size:13px;display:block;text-align:right}
-h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--quiet);margin:28px 0 10px}
+h1{font-size:22px;margin:0;letter-spacing:-.01em}#meta{font-size:13px;color:var(--quiet);margin-top:2px}
+.live{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--lock);margin-right:6px;vertical-align:middle}
+.live.stale{background:var(--risk)}
+.score{font-family:"IBM Plex Mono",monospace;font-size:20px;text-align:right}.score b{font-weight:600}.score span{color:var(--quiet);font-size:13px;display:block}
+nav{display:flex;gap:4px;margin:16px 0 0;flex-wrap:wrap}nav button{font:inherit;font-size:14px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:6px 12px;border-radius:99px;cursor:pointer}
+nav button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--quiet);margin:26px 0 10px}
+.now{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-top:16px}
+.now b{font-weight:600}.now .when{font-family:"IBM Plex Mono",monospace;color:var(--risk)}
+.now ul{margin:8px 0 0;padding-left:18px}.now li{margin:3px 0}
 .slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
 .slot{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:8px;padding:10px 12px}
 .slot .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .pos{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--quiet)}.nm{font-weight:600}
-.tag{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:2px 7px;border-radius:99px}
+.tag{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:2px 7px;border-radius:99px;white-space:nowrap}
 .slot p{margin:6px 0 0;font-size:13px;color:var(--quiet)}
 .lock{border-left-color:var(--lock)}.lock .tag{background:var(--lockbg);color:var(--lock)}
 .pass{border-left-color:var(--pass)}.pass .tag{background:var(--passbg);color:var(--pass)}
 .start{border-left-color:var(--start)}.start .tag{background:var(--startbg);color:var(--start)}
 .locked{opacity:.72}.locked .tag{background:var(--chip);color:var(--quiet)}
-.confirm{border-left-color:var(--risk)}.confirm .tag{background:var(--riskbg);color:var(--risk)}
-.fallback-risk{border-left-color:var(--risk)}.fallback-risk .tag{background:var(--riskbg);color:var(--risk)}
-.nums{font-family:"IBM Plex Mono",monospace;font-size:13px;margin-top:6px}.nums b{font-weight:600}
-.mark{margin-top:8px;font-size:12px;color:var(--quiet);display:flex;gap:6px;align-items:center}
-.tonight{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 12px}
-.tonight div{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}.tonight div:last-child{border:0}
+.confirm,.fallback-risk{border-left-color:var(--risk)}.confirm .tag,.fallback-risk .tag{background:var(--riskbg);color:var(--risk)}
+.nums{font-family:"IBM Plex Mono",monospace;font-size:12.5px;margin-top:6px}.nums b{font-weight:600}
+.acts{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}.acts button{font:inherit;font-size:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:3px 9px;border-radius:6px;cursor:pointer}
+.box{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:4px 12px}
+.row{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}.row:last-child{border:0}
+.mv{color:var(--start);font-weight:600}
 .wrap{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:8px}
 table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
 th{font-weight:500;color:var(--quiet);font-size:12px}td.n{font-family:"IBM Plex Mono",monospace;text-align:right}
-td.c{text-align:center;font-family:"IBM Plex Mono",monospace;font-size:12px}td.c.played{color:var(--quiet)}td.c.up{color:var(--start);font-weight:600}
-td.today,th.today{background:var(--startbg)}td.c.bench{text-decoration:line-through;opacity:.6}
+td.c{text-align:center;font-family:"IBM Plex Mono",monospace;font-size:12px}td.c.played{color:var(--quiet)}td.c.up{color:var(--start);font-weight:600}td.c.bench{text-decoration:line-through;opacity:.55}td.c.livec{color:var(--risk)}
+td.today,th.today{background:var(--startbg)}
 .st{font-size:11px;color:var(--risk);margin-left:6px}
 .foot{margin-top:30px;font-size:12px;color:var(--quiet)}
+.hide{display:none}
+select{font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink)}
+.trade{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:700px){.trade{grid-template-columns:1fr}}
+.pick h3{font-size:13px;margin:8px 0 4px;color:var(--quiet);font-weight:500}
+.pick label{display:flex;gap:8px;align-items:center;padding:3px 0;font-size:14px}.pick label span.v{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--quiet)}
+.verdict{margin-top:12px;font-size:15px}.good{color:var(--lock)}.bad{color:var(--risk)}
 </style>
 </head>
 <body>
 <main>
 <header>
-  <div><h1>Lock Desk <small id="meta"></small></h1></div>
+  <div><h1>Lock Desk</h1><div id="meta"><span class="live" id="dot"></span><span id="metatext">loading live data…</span></div></div>
   <div class="score" id="score"></div>
 </header>
+<div class="now" id="now">Loading…</div>
+<nav id="tabs">
+  <button data-t="locks" class="on">Locks</button><button data-t="week">Week</button><button data-t="waivers">Waivers</button><button data-t="trades">Trades</button>
+</nav>
 
-<h2>Lock calls by slot</h2>
-<div class="slots" id="slots"></div>
-
-<h2>Who to have in your open slots today</h2>
-<div class="tonight" id="tonight"></div>
-
-<h2>This week, game by game</h2>
-<div class="wrap"><table id="grid"></table></div>
-
-<h2>Waiver targets</h2>
-<div class="wrap"><table id="waivers"></table></div>
+<section data-p="locks">
+  <h2>Lock calls by slot</h2><div class="slots" id="slots"></div>
+  <h2>Who to have in your open slots today</h2><div class="box" id="lineup"></div>
+</section>
+<section data-p="week" class="hide">
+  <h2>This week, game by game</h2><div class="wrap"><table id="grid"></table></div>
+</section>
+<section data-p="waivers" class="hide">
+  <h2>Waiver targets</h2><div class="wrap"><table id="waivers"></table></div>
+</section>
+<section data-p="trades" class="hide">
+  <h2>Trade assistant</h2>
+  <p class="foot" style="margin-top:0">Pick a team and tick the players in a deal. Values are projected locked points per week for the rest of the regular season plus the playoffs (weeks 22+ count double), in your scoring.</p>
+  <div style="margin:8px 0 12px"><select id="partner"></select></div>
+  <div class="trade"><div class="box pick" id="give"></div><div class="box pick" id="get"></div></div>
+  <div class="verdict" id="verdict"></div>
+  <h2>Trade ideas that help both sides</h2><div class="wrap"><table id="ideas"></table></div>
+</section>
 
 <p class="foot" id="foot"></p>
 </main>
-<script>
-const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const day = d => new Date(d + "T12:00:00").toLocaleDateString("en-US", {weekday: "short", day: "numeric"});
-let marks = {};
-try { marks = JSON.parse(localStorage.getItem("locks") || "{}"); } catch (e) {}
-const saveMarks = () => { try { localStorage.setItem("locks", JSON.stringify(marks)); } catch (e) {} };
-const LABEL = {lock: "Lock", pass: "Pass", start: "Start", locked: "Locked", confirm: "Confirm", "fallback-risk": "Fallback"};
-const tipTime = t => t ? new Date(t).toLocaleString("en-US", {weekday: "short", hour: "numeric", minute: "2-digit"}) : null;
-
-fetch("data.json", {cache: "no-store"}).then(r => r.json()).then(d => {
-  const key = pid => `${d.week}:${pid}`;
-  document.getElementById("meta").textContent = `${d.league} · week ${d.week} · updated ${d.generated}`;
-  document.getElementById("score").innerHTML = `<b>${d.score.me.toFixed(1)}</b> – ${d.score.opp.toFixed(1)}<span>vs ${esc(d.score.opp_name)} · FAAB $${d.faab_left}</span>`;
-
-  const slots = document.getElementById("slots");
-  const render = () => {
-    slots.innerHTML = d.plan.slots.map(s => {
-      const manual = marks[key(s.pid)];
-      const action = manual ? "locked" : s.action;
-      const detail = manual ? "You marked this slot locked." : s.detail;
-      const nums = s.score != null ? `<div class="nums">game <b>${s.score.toFixed(1)}</b>${s.bar != null ? ` · bar ${s.bar.toFixed(1)}` : ""}${s.deadline ? ` · decide before ${tipTime(s.deadline_tip) || day(s.deadline)}` : ""}</div>` : "";
-      const box = s.action !== "locked" ? `<label class="mark"><input type="checkbox" data-pid="${esc(s.pid)}" ${manual ? "checked" : ""}> I already locked this</label>` : "";
-      return `<div class="slot ${action}"><div class="top"><span><span class="pos">${esc(s.slot)}</span> <span class="nm">${esc(s.name)}</span></span><span class="tag">${LABEL[action] || action}</span></div><p>${esc(detail)}</p>${nums}${box}</div>`;
-    }).join("");
-    slots.querySelectorAll("input[data-pid]").forEach(el => el.onchange = () => { marks[key(el.dataset.pid)] = el.checked; saveMarks(); render(); });
-  };
-  render();
-
-  const t = d.plan.today_lineup;
-  document.getElementById("tonight").innerHTML = t.slots.map(x => `<div><span><span class="pos">${esc(x.slot)}</span> ${esc(x.name)}</span><span class="pos">${x.pid ? "worth " + x.gain.toFixed(1) + " to start today" : ""}</span></div>`).join("")
-    + (t.playing_not_startable.length ? `<div><span class="pos">Also playing, no open slot: ${t.playing_not_startable.map(x => esc(x.name)).join(", ")}</span></div>` : "");
-
-  const g = document.getElementById("grid");
-  g.innerHTML = `<tr><th>Player</th><th>Pos</th>${d.plan.days.map(x => `<th class="${x === d.today ? "today" : ""}">${day(x)}</th>`).join("")}<th>Left</th></tr>` +
-    d.plan.grid.map(r => `<tr><td>${esc(r.name)}${r.status ? `<span class="st">${esc(r.status)}</span>` : ""}</td><td class="pos">${esc(r.pos)}</td>` +
-      r.cells.map((c, i) => { const td = d.plan.days[i] === d.today ? " today" : "";
-        if (!c) return `<td class="c${td}"></td>`;
-        if (c.kind === "played") { const b = c.started === false ? " bench" : ""; const why = c.started === false ? "played from your bench, not lockable" : c.started === true ? "played in your lineup" : "lineup at tip unknown"; return `<td class="c played${b}${td}" title="vs ${esc(c.opp)}: ${why}">${c.fp.toFixed(1)}${c.started == null ? "?" : ""}</td>`; }
-        return `<td class="c up${td}" title="vs ${esc(c.opp)} (projected)${c.tip ? ", tips " + esc(tipTime(c.tip)) : ""}">${c.mu.toFixed(0)}</td>`; }).join("") +
-      `<td class="n">${r.games_left}</td></tr>`).join("");
-
-  const w = document.getElementById("waivers");
-  w.innerHTML = `<tr><th>Player</th><th>Team</th><th>Pos</th><th>FP/G</th><th>vs your worst</th><th>Games left</th><th>Last 3</th><th>Adds 24h</th><th>Bid</th></tr>` +
-    d.waivers.map(x => `<tr><td>${esc(x.name)}</td><td>${esc(x.team)}</td><td class="pos">${esc(x.pos)}</td><td class="n">${x.fpg.toFixed(1)}</td><td class="n">${x.over_worst > 0 ? "+" : ""}${x.over_worst.toFixed(1)}</td><td class="n">${x.games_left}</td><td class="n">${x.recent.join(" / ") || "–"}</td><td class="n">${x.trend.toLocaleString()}</td><td class="n">$${x.faab}</td></tr>`).join("");
-
-  document.getElementById("foot").textContent = `A game is only lockable if he was in a starting slot when it tipped; the app records your lineup every 15 minutes. ? = played before tracking started. Lock bars come from each player's remaining games this week and your best bench option for that slot. Projections blend this season (shrunk toward last season) with Sleeper's per-game projections. Your worst rostered player averages ${d.worst_bench} FP/G.`;
-}).catch(e => { document.getElementById("slots").textContent = "Couldn't load data.json: " + e; });
-</script>
+<script type="module" src="app.js"></script>
 </body>
 </html>
