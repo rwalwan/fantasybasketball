@@ -6,7 +6,12 @@ const STATE = "https://raw.githubusercontent.com/rwalwan/fantasybasketball/state
 const S1 = "https://api.sleeper.app/v1", S2 = "https://api.sleeper.com";
 const ESPN = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=";
 const ESPN_TEAM = { NY: "NYK", GS: "GSW", SA: "SAS", NO: "NOP", UTAH: "UTA", WSH: "WAS" };
-const API = localStorage.getItem("lockdesk_api") || "";   // optional backend for saving locks/answers
+// Backend (Cloudflare Worker). One-time setup per device: open the site with #api=<url>&key=<write key>.
+(() => { const h = new URLSearchParams(location.hash.slice(1));
+  if (h.get("api")) { try { localStorage.setItem("lockdesk_api", h.get("api")); localStorage.setItem("lockdesk_key", h.get("key") || ""); } catch {}
+    history.replaceState(null, "", location.pathname); } })();
+const API = (() => { try { return localStorage.getItem("lockdesk_api") || ""; } catch { return ""; } })();
+const KEY = (() => { try { return localStorage.getItem("lockdesk_key") || ""; } catch { return ""; } })();
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -26,7 +31,11 @@ const local = { get: k => { try { return JSON.parse(localStorage.getItem(k) || "
                 set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 async function saveAnswer(kind, key, value) {
   const store = local.get(kind); store[key] = value; local.set(kind, store);
-  if (API) fetch(`${API}/${kind}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ key, value }) }).catch(() => {});
+  if (API) {
+    const [k, w] = kind.startsWith("locks_w") ? ["locks", kind.slice(7)] : [kind, base.week];
+    fetch(`${API}/answer`, { method: "POST", headers: { "content-type": "application/json", "x-key": KEY },
+      body: JSON.stringify({ kind: k, week: w, key, value }) }).catch(() => {});
+  }
 }
 
 // ---- data ---------------------------------------------------------------------------------------
@@ -45,16 +54,21 @@ async function loadLive() {
   const { week, league } = base, season = league.season;
   const days = weekDays(base.schedule, week), today = etToday();
   const tipDays = days.filter(d => d >= today || d === days.find(x => x >= today));
-  const [rosters, matchups, stats, proj, trending, snaps, overrides, locks, ...espn] = await Promise.all([
+  const [rosters, matchups, stats, proj, trending, snapsGh, overridesGh, locksGh, backend, ...espn] = await Promise.all([
     get(`${S1}/league/${LEAGUE}/rosters`), get(`${S1}/league/${LEAGUE}/matchups/${week}`),
     get(`${S2}/stats/nba/${season}/${week}?season_type=regular`), get(`${S2}/projections/nba/${season}/${week}?season_type=regular`),
     get(`${S1}/players/nba/trending/add?lookback_hours=24&limit=50`).catch(() => []),
     soft(`${STATE}lineups_${season}_w${week}.json`), soft(`${STATE}eligibility_overrides.json`), soft(`${STATE}locks_w${week}.json`),
+    API ? soft(`${API}/state?season=${season}&week=${week}`) : Promise.resolve({}),
     ...days.map(espnGet)]);
   const tips = {};
   espn.forEach((sb, i) => (sb.events || []).forEach(e => (e.competitions?.[0]?.competitors || []).forEach(c => {
     const a = c.team?.abbreviation; tips[`${days[i]}|${ESPN_TEAM[a] || a}`] = e.date; })));
-  live = { rosters, matchups, stats, proj, trending, snaps, overrides, locks, tips, at: new Date() };
+  // backend (minute-level lineup records, shared answers) wins over the 15-minute GitHub state branch
+  const snaps = { ...snapsGh, ...(backend.lineups || {}) };
+  const overrides = { ...overridesGh, ...(backend.elig || {}) };
+  const locks = { ...locksGh, ...(backend.locks || {}) };
+  live = { rosters, matchups, stats, proj, trending, snaps, overrides, locks, tips, backend: !!backend.heartbeat, at: new Date() };
   void tipDays;
 }
 
@@ -130,7 +144,7 @@ function render() {
     w.list.map(x => `<tr><td>${esc(x.name)}${x.status ? `<span class="st">${esc(x.status)}</span>` : ""}</td><td>${esc(x.team)}</td><td class="pos">${esc(x.pos)}</td><td class="n">${r1(x.fpg)}</td><td class="n">${x.over > 0 ? "+" : ""}${r1(x.over)}</td><td class="n">${x.left}</td><td class="n">${x.recent.map(r1).join(" / ") || "–"}</td><td class="n">${x.trend.toLocaleString()}</td><td class="n">$${x.bid}</td></tr>`).join("");
 
   renderTrades(c);
-  $("foot").textContent = `Recomputed every minute from Sleeper and ESPN. A game is lockable only if he was starting when it tipped; lineups are recorded by the scheduled job (every 15 min) and by this page while it's open. Answers you give here are saved in this browser${API ? " and to your backend" : ""}.`;
+  $("foot").textContent = `Recomputed every minute from Sleeper and ESPN. A game is lockable only if he was starting when it tipped; lineups are recorded by the scheduled job (every 15 min) and by this page while it's open. ${live.backend ? "Answers sync to your backend, and lineups are recorded every minute." : "Answers are saved in this browser only (backend not connected)."}`;
   $("dot").classList.toggle("stale", Date.now() - live.at > 5 * 60000);
 }
 

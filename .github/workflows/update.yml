@@ -37,6 +37,9 @@ jobs:
 
       - name: Run engine
         run: python -m app.run
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          WORKER_URL: ${{ vars.WORKER_URL }}
 
       - name: Save state to the state branch
         run: |
