@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>We Back Lock Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f6f5f1;--card:#fff;--ink:#16181d;--quiet:#646a73;--line:#e3e1da;--lock:#1f7a4d;--lockbg:#e6f3ec;--pass:#9a6200;--passbg:#fbf1dd;--start:#2457a6;--startbg:#e8eef9;--risk:#b42318;--riskbg:#fdecea;--chip:#efeee9}
+@media (prefers-color-scheme:dark){:root{--bg:#111316;--card:#191c20;--ink:#eceae4;--quiet:#9aa0a8;--line:#2a2e34;--lock:#5cc58f;--lockbg:#16291f;--pass:#e8b04d;--passbg:#2c2414;--start:#7aa7f0;--startbg:#17223a;--risk:#f28b82;--riskbg:#331a18;--chip:#23272c}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "IBM Plex Sans",system-ui,sans-serif}
+main{max-width:1080px;margin:0 auto;padding:20px 16px 60px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;border-bottom:2px solid var(--ink);padding-bottom:12px}
+h1{font-size:22px;margin:0;letter-spacing:-.01em}h1 small{font-weight:400;color:var(--quiet);font-size:14px;margin-left:8px}
+.score{font-family:"IBM Plex Mono",monospace;font-size:20px}.score b{font-weight:600}.score span{color:var(--quiet);font-size:13px;display:block;text-align:right}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--quiet);margin:28px 0 10px}
+.slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.slot{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:8px;padding:10px 12px}
+.slot .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.pos{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--quiet)}.nm{font-weight:600}
+.tag{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:2px 7px;border-radius:99px}
+.slot p{margin:6px 0 0;font-size:13px;color:var(--quiet)}
+.lock{border-left-color:var(--lock)}.lock .tag{background:var(--lockbg);color:var(--lock)}
+.pass{border-left-color:var(--pass)}.pass .tag{background:var(--passbg);color:var(--pass)}
+.start{border-left-color:var(--start)}.start .tag{background:var(--startbg);color:var(--start)}
+.locked{opacity:.72}.locked .tag{background:var(--chip);color:var(--quiet)}
+.fallback-risk{border-left-color:var(--risk)}.fallback-risk .tag{background:var(--riskbg);color:var(--risk)}
+.nums{font-family:"IBM Plex Mono",monospace;font-size:13px;margin-top:6px}.nums b{font-weight:600}
+.mark{margin-top:8px;font-size:12px;color:var(--quiet);display:flex;gap:6px;align-items:center}
+.tonight{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 12px}
+.tonight div{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}.tonight div:last-child{border:0}
+.wrap{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{font-weight:500;color:var(--quiet);font-size:12px}td.n{font-family:"IBM Plex Mono",monospace;text-align:right}
+td.c{text-align:center;font-family:"IBM Plex Mono",monospace;font-size:12px}td.c.played{color:var(--quiet)}td.c.up{color:var(--start);font-weight:600}
+td.today,th.today{background:var(--startbg)}
+.st{font-size:11px;color:var(--risk);margin-left:6px}
+.foot{margin-top:30px;font-size:12px;color:var(--quiet)}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div><h1>Lock Desk <small id="meta"></small></h1></div>
+  <div class="score" id="score"></div>
+</header>
+
+<h2>Lock calls by slot</h2>
+<div class="slots" id="slots"></div>
+
+<h2>Who to have in your open slots today</h2>
+<div class="tonight" id="tonight"></div>
+
+<h2>This week, game by game</h2>
+<div class="wrap"><table id="grid"></table></div>
+
+<h2>Waiver targets</h2>
+<div class="wrap"><table id="waivers"></table></div>
+
+<p class="foot" id="foot"></p>
+</main>
+<script>
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const day = d => new Date(d + "T12:00:00").toLocaleDateString("en-US", {weekday: "short", day: "numeric"});
+let marks = {};
+try { marks = JSON.parse(localStorage.getItem("locks") || "{}"); } catch (e) {}
+const saveMarks = () => { try { localStorage.setItem("locks", JSON.stringify(marks)); } catch (e) {} };
+const LABEL = {lock: "Lock", pass: "Pass", start: "Start", locked: "Locked", "fallback-risk": "Fallback"};
+
+fetch("data.json", {cache: "no-store"}).then(r => r.json()).then(d => {
+  const key = pid => `${d.week}:${pid}`;
+  document.getElementById("meta").textContent = `${d.league} · week ${d.week} · updated ${d.generated}`;
+  document.getElementById("score").innerHTML = `<b>${d.score.me.toFixed(1)}</b> – ${d.score.opp.toFixed(1)}<span>vs ${esc(d.score.opp_name)} · FAAB $${d.faab_left}</span>`;
+
+  const slots = document.getElementById("slots");
+  const render = () => {
+    slots.innerHTML = d.plan.slots.map(s => {
+      const manual = marks[key(s.pid)];
+      const action = manual ? "locked" : s.action;
+      const detail = manual ? "You marked this slot locked." : s.detail;
+      const nums = s.score != null ? `<div class="nums">game <b>${s.score.toFixed(1)}</b>${s.bar != null ? ` · bar ${s.bar.toFixed(1)}` : ""}${s.deadline ? ` · decide before ${day(s.deadline)}` : ""}</div>` : "";
+      const box = s.action !== "locked" ? `<label class="mark"><input type="checkbox" data-pid="${esc(s.pid)}" ${manual ? "checked" : ""}> I already locked this</label>` : "";
+      return `<div class="slot ${action}"><div class="top"><span><span class="pos">${esc(s.slot)}</span> <span class="nm">${esc(s.name)}</span></span><span class="tag">${LABEL[action] || action}</span></div><p>${esc(detail)}</p>${nums}${box}</div>`;
+    }).join("");
+    slots.querySelectorAll("input[data-pid]").forEach(el => el.onchange = () => { marks[key(el.dataset.pid)] = el.checked; saveMarks(); render(); });
+  };
+  render();
+
+  const t = d.plan.today_lineup;
+  document.getElementById("tonight").innerHTML = t.slots.map(x => `<div><span><span class="pos">${esc(x.slot)}</span> ${esc(x.name)}</span><span class="pos">${x.pid ? "+" + x.gain.toFixed(1) + " option value" : ""}</span></div>`).join("")
+    + (t.playing_not_startable.length ? `<div><span class="pos">Also playing, no open slot: ${t.playing_not_startable.map(x => esc(x.name)).join(", ")}</span></div>` : "");
+
+  const g = document.getElementById("grid");
+  g.innerHTML = `<tr><th>Player</th><th>Pos</th>${d.plan.days.map(x => `<th class="${x === d.today ? "today" : ""}">${day(x)}</th>`).join("")}<th>Left</th></tr>` +
+    d.plan.grid.map(r => `<tr><td>${esc(r.name)}${r.status ? `<span class="st">${esc(r.status)}</span>` : ""}</td><td class="pos">${esc(r.pos)}</td>` +
+      r.cells.map((c, i) => { const td = d.plan.days[i] === d.today ? " today" : "";
+        if (!c) return `<td class="c${td}"></td>`;
+        return c.kind === "played" ? `<td class="c played${td}" title="vs ${esc(c.opp)}">${c.fp.toFixed(1)}</td>` : `<td class="c up${td}" title="vs ${esc(c.opp)} (projected)">${c.mu.toFixed(0)}</td>`; }).join("") +
+      `<td class="n">${r.games_left}</td></tr>`).join("");
+
+  const w = document.getElementById("waivers");
+  w.innerHTML = `<tr><th>Player</th><th>Team</th><th>Pos</th><th>FP/G</th><th>vs your worst</th><th>Games left</th><th>Last 3</th><th>Adds 24h</th><th>Bid</th></tr>` +
+    d.waivers.map(x => `<tr><td>${esc(x.name)}</td><td>${esc(x.team)}</td><td class="pos">${esc(x.pos)}</td><td class="n">${x.fpg.toFixed(1)}</td><td class="n">${x.over_worst > 0 ? "+" : ""}${x.over_worst.toFixed(1)}</td><td class="n">${x.games_left}</td><td class="n">${x.recent.join(" / ") || "–"}</td><td class="n">${x.trend.toLocaleString()}</td><td class="n">$${x.faab}</td></tr>`).join("");
+
+  document.getElementById("foot").textContent = `Lock bars come from each player's remaining games this week and your best bench option for that slot. Projections blend this season (shrunk toward last season) with Sleeper's per-game projections. Your worst rostered player averages ${d.worst_bench} FP/G.`;
+}).catch(e => { document.getElementById("slots").textContent = "Couldn't load data.json: " + e; });
+</script>
+</body>
+</html>

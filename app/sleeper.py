@@ -6,7 +6,8 @@ Everything is cached to disk so a scheduled run only re-downloads what changes.
 import json
 import os
 import time
-import urllib.request
+
+import requests
 
 V1 = "https://api.sleeper.app/v1"
 V2 = "https://api.sleeper.com"
@@ -20,11 +21,11 @@ def _get(url: str, cache_name: str | None = None, max_age_s: float = 0):
         if max_age_s and os.path.exists(path) and time.time() - os.path.getmtime(path) < max_age_s:
             with open(path) as f:
                 return json.load(f)
-    req = urllib.request.Request(url, headers={"User-Agent": UA})
     for attempt in range(3):
         try:
-            with urllib.request.urlopen(req, timeout=60) as r:
-                data = json.load(r)
+            r = requests.get(url, headers={"User-Agent": UA}, timeout=60)
+            r.raise_for_status()
+            data = r.json()
             break
         except Exception:
             if attempt == 2:
