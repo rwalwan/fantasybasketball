@@ -1,0 +1,25 @@
+Top-100 players, share of team games missed (within their stint): 0.149
+by tier: {Interval(0, 30, closed='right'): 0.157, Interval(30, 75, closed='right'): 0.162, Interval(75, 150, closed='right'): 0.132}
+
+Back-to-back 2nd night miss rate (top-100): {False: 0.139, True: 0.198}
+Back-to-back 2nd night miss rate (top-30): {False: 0.144, True: 0.221}
+
+Miss rate early vs late season (top-100): {False: 0.147, True: 0.159}
+Late-season miss rate by team quality: {'bad<.40': 0.262, 'mid': 0.128, 'good>.60': 0.162}
+Earlier miss rate by team quality: {'bad<.40': 0.145, 'mid': 0.149, 'good>.60': 0.145}
+April miss rate by team quality: {'bad<.40': 0.299, 'mid': 0.113, 'good>.60': 0.18}
+
+Return from 5+ game absence (top-150): minutes and FP vs player's season average
+           n  min_ratio  fp_ratio
+since                            
+0      278.0      0.853     0.860
+1      254.0      0.947     0.961
+2      242.0      0.969     0.952
+3      238.0      0.986     1.008
+4      240.0      0.997     0.991
+5      221.0      1.000     0.992
+6      207.0      1.013     1.003
+7      207.0      0.998     0.996
+absences 5+ games count: 278
+
+Teammate FP/G when a top-30 teammate sits vs plays: median ratio 1.134 | share of teammates gaining >10%: 0.568 n= 370
