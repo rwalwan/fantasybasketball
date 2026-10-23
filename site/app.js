@@ -17,6 +17,9 @@ const until = t => { const m = Math.round((new Date(t) - Date.now()) / 60000); r
 const etToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
 const get = async (url, opt = {}) => { const r = await fetch(url, { cache: "no-store", ...opt }); if (!r.ok) throw new Error(`${r.status} ${url}`); return r.json(); };
 const soft = url => get(url).catch(() => ({}));
+// ESPN rejects CORS preflights, and cache:"no-store" makes Chrome add headers that trigger one.
+// So scoreboard requests use a plain GET with a cache-busting query param instead.
+const espnGet = d => fetch(`${ESPN}${d.replace(/-/g, "")}&_=${Math.floor(Date.now() / 60000)}`).then(r => r.ok ? r.json() : {}).catch(() => ({}));
 
 // ---- local answers (until a backend is connected these live in this browser) --------------------
 const local = { get: k => { try { return JSON.parse(localStorage.getItem(k) || "{}"); } catch { return {}; } },
@@ -47,7 +50,7 @@ async function loadLive() {
     get(`${S2}/stats/nba/${season}/${week}?season_type=regular`), get(`${S2}/projections/nba/${season}/${week}?season_type=regular`),
     get(`${S1}/players/nba/trending/add?lookback_hours=24&limit=50`).catch(() => []),
     soft(`${STATE}lineups_${season}_w${week}.json`), soft(`${STATE}eligibility_overrides.json`), soft(`${STATE}locks_w${week}.json`),
-    ...days.map(d => soft(ESPN + d.replace(/-/g, "")))]);
+    ...days.map(espnGet)]);
   const tips = {};
   espn.forEach((sb, i) => (sb.events || []).forEach(e => (e.competitions?.[0]?.competitors || []).forEach(c => {
     const a = c.team?.abbreviation; tips[`${days[i]}|${ESPN_TEAM[a] || a}`] = e.date; })));
