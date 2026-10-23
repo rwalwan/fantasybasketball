@@ -223,50 +223,55 @@ export class WeekPlan {
         detail: `Next: ${nxt.date} vs ${nxt.opp} · ${nxt.mu.toFixed(1)} projected (${lo}–${hi}) · plays ${Math.round(nxt.q * 100)}%.${note}` };
     });
 
-    // who should sit in each still-open slot for TODAY's games (only a starter's game can be locked)
+    // TODAY's plan for each still-open slot. Only a starter's game can be locked, and a slot can try
+    // more than one player in a day: if the first game misses its keep-line, pass and slide in a player
+    // whose game tips >= 2.5 h later. For each slot we compare every single and pair (by tip order):
+    //   C      = value of the slot from tomorrow on (best eligible player's games after today)
+    //   V(b)   = q_b * E[max(X_b, C)] + (1 - q_b) * C
+    //   V(a,b) = q_a * E[max(X_a, V(b))] + (1 - q_a) * V(b)
+    // and assign slots greedily by largest gain V - C.
     const fixed = new Set([...locked, ...willLock]);
-    const openToday = this.slots.map((s, i) => ({ s, p: starters[i] })).filter(x => !fixed.has(x.p));
+    const openToday = this.slots.map((s, i) => ({ s, p: starters[i] })).filter(x => !fixed.has(x.p)).map((x, k) => ({ ...x, k }));
     const todayPl = Object.keys(cont).filter(p => !willLock.has(p) && cont[p].u.some(g => g.date === this.today));
-    const gain = {};
-    for (const p of todayPl) {
-      const u = cont[p].u, after = u.length > 1 ? contValues(Q, u.slice(1))[0] : 0;
-      // value of sampling him today: the option gain over waiting, or his full value if it's his last game
-      gain[p] = u.length === 1 ? u[0].q * u[0].mu : u[0].q * (expectedMax(Q, u[0].mu, after) - after);
-    }
-    // Primary assignment: scarcest slots first, best option value first.
     const tipMs = p => { const t = cont[p]?.u[0]?.tip; return t ? Date.parse(t) : null; };
-    const used = new Set();
-    const lineup = openToday.map((x, k) => ({ ...x, k })).sort((a, b) => todayPl.filter(p => fits(a.s, this.b.pos(p))).length - todayPl.filter(p => fits(b.s, this.b.pos(p))).length)
-      .map(x => {
-        const c = todayPl.filter(p => !used.has(p) && fits(x.s, this.b.pos(p))).sort((a, b) => gain[b] - gain[a])[0];
-        if (!c) return { slot: x.s, k: x.k, pid: null, name: "nobody eligible plays today", current: x.p, currentName: x.p ? this.b.name(x.p) : null, gain: 0 };
-        used.add(c);
-        const g = cont[c].u[0];
-        return { slot: x.s, k: x.k, pid: c, name: this.b.name(c), current: x.p, currentName: x.p ? this.b.name(x.p) : null,
-                 move: c !== x.p, gain: r1(gain[c]), tip: g.tip, opp: g.opp, mu: g.mu };
-      }).sort((a, b) => a.k - b.k);
-
-    // Same-day relief: a player whose game tips at least 2.5 h after the primary's can take the slot if the
-    // primary's game misses its bar. Primaries most likely to miss (lowest projection) get relief first.
+    const afterToday = p => { const u = (cont[p]?.u || []).filter(g => g.date > this.today); return u.length ? contValues(Q, u)[0] : 0; };
     const GAME_MS = 150 * 60000;
-    const relievers = todayPl.filter(p => !used.has(p)).sort((a, b) => (cont[b].u[0]?.mu || 0) - (cont[a].u[0]?.mu || 0));
-    for (const rp of relievers) {
-      const rt = tipMs(rp); if (!rt) continue;
-      const cands = lineup.filter(x => x.pid && !x.relief && fits(x.slot, this.b.pos(rp)) && tipMs(x.pid) && rt >= tipMs(x.pid) + GAME_MS)
-        .sort((a, b) => a.mu - b.mu);
-      const x = cands[0]; if (!x) continue;
-      const rg = cont[rp].u[0], rW = contValues(Q, cont[rp].u)[0];
-      const ownAfter = cont[x.pid].u.length > 1 ? contValues(Q, cont[x.pid].u.slice(1))[0] : 0;
-      x.relief = { pid: rp, name: this.b.name(rp), tip: rg.tip, opp: rg.opp, mu: rg.mu,
-                   swapAfter: new Date(tipMs(x.pid) + 135 * 60000).toISOString() };
-      x.keepBar = r1(Math.max(ownAfter, rW));           // keep the primary's game only if it beats this
-      used.add(rp);
+    const used = new Set(), assigned = {};
+    const chainVal = (a, b, C) => {
+      const ga = cont[a].u[0], vb = b ? cont[b].u[0].q * expectedMax(Q, cont[b].u[0].mu, C) + (1 - cont[b].u[0].q) * C : C;
+      return { V: ga.q * expectedMax(Q, ga.mu, vb) + (1 - ga.q) * vb, keep: vb };
+    };
+    for (let round = 0; round < openToday.length; round++) {
+      let best = null;
+      for (const x of openToday) {
+        if (assigned[x.k]) continue;
+        const elig = todayPl.filter(p => !used.has(p) && fits(x.s, this.b.pos(p)));
+        const C = Math.max(0, ...Object.keys(cont).filter(p => !willLock.has(p) && fits(x.s, this.b.pos(p))).map(afterToday));
+        for (const a of elig) {
+          const opts = [null, ...elig.filter(b => b !== a && tipMs(a) && tipMs(b) && tipMs(b) >= tipMs(a) + GAME_MS)];
+          for (const r of opts) {
+            const { V, keep } = chainVal(a, r, C);
+            if (!best || V - C > best.gain) best = { x, a, r, gain: V - C, keep, C };
+          }
+        }
+      }
+      if (!best || best.gain <= 0.05) break;
+      assigned[best.x.k] = best; used.add(best.a); if (best.r) used.add(best.r);
     }
-    // Timing: change as late as possible (final injury reports land ~30-60 min before tip), but before tip.
-    for (const x of lineup) if (x.move && x.tip) {
-      x.changeBy = x.tip;
-      x.bestTime = new Date(Date.parse(x.tip) - 40 * 60000).toISOString();
-    }
+    const lineup = openToday.map(x => {
+      const t = assigned[x.k];
+      if (!t) return { slot: x.s, k: x.k, pid: null, name: "nobody eligible plays today", current: x.p, currentName: x.p ? this.b.name(x.p) : null, gain: 0 };
+      const g = cont[t.a].u[0];
+      const row = { slot: x.s, k: x.k, pid: t.a, name: this.b.name(t.a), current: x.p, currentName: x.p ? this.b.name(x.p) : null,
+        move: t.a !== x.p, gain: r1(t.gain), tip: g.tip, opp: g.opp, mu: g.mu, keepBar: r1(t.keep) };
+      if (t.r) {
+        const rg = cont[t.r].u[0];
+        row.relief = { pid: t.r, name: this.b.name(t.r), tip: rg.tip, opp: rg.opp, mu: rg.mu, swapAfter: new Date(tipMs(t.a) + 135 * 60000).toISOString() };
+      }
+      // change as late as safely possible: final injury reports land ~30-60 min before tip
+      if (row.move && row.tip) { row.changeBy = row.tip; row.bestTime = new Date(Date.parse(row.tip) - 40 * 60000).toISOString(); }
+      return row;
+    });
 
     const grid = players.map(p => {
       const t = this.b.team(p), pl = Object.fromEntries(this.played(p).map(g => [g.date, g.fp]));
