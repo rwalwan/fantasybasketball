@@ -202,6 +202,8 @@ export class WeekPlan {
       if (s.st === "locked") return { ...base, action: "locked", score: s.g?.fp ?? null, detail: s.g ? `Locked ${s.g.fp.toFixed(1)} (${s.g.date}).` : "Locked." };
       const u = cont[p]?.u || [], own = lockBar(Q, u), alt = best[i] || { W: 0, p: null }, bar = Math.max(own, alt.W);
       const nxt = u[0], deadline = nxt ? { date: nxt.date, tip: nxt.tip } : null;
+      if (s.st === "confirm" && s.g.fp < own) return { ...base, action: "pass", score: s.g.fp, bar: r1(own), deadline,
+        detail: `Pass either way: ${s.g.fp.toFixed(1)} is under his bar of ${own.toFixed(1)}, so it doesn't matter whether that game was from your lineup.` };
       if (s.st === "confirm") return { ...base, action: "confirm", score: s.g.fp, bar: r1(own), gameDate: s.g.date, deadline,
         detail: `Was he in your starting lineup when his ${s.g.date} game (${s.g.fp.toFixed(1)}) tipped? If yes, ${s.g.fp >= own ? "lock it" : "pass"} (bar ${own.toFixed(1)}).` };
       if (s.st === "open") {
