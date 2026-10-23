@@ -59,10 +59,35 @@ def main():
                           opp_name=users.get(opp_owner, "Opponent")),
                faab_left=lg["settings"].get("waiver_budget", 100) - (mine.get("settings") or {}).get("waiver_budget_used", 0))
     os.makedirs(os.path.join(ROOT, "site"), exist_ok=True)
+    export_static(book, season, week, meta, lg)
     with open(os.path.join(ROOT, "site", "data.json"), "w") as f:
         json.dump(out, f, indent=1, default=str)
     print(f"week {week}, {len(plan['slots'])} slots, {plan['unlocked']} unlocked, {len(waivers)} waiver targets")
     return out
+
+
+def export_static(book, season, week, meta, lg):
+    """Slow-changing inputs for the live browser app (site/static/*.json)."""
+    out_dir = os.path.join(ROOT, "site", "static")
+    os.makedirs(out_dir, exist_ok=True)
+    gl = {pid: [[g[0], g[1], round(g[2] or 0, 1), g[3]] for g in gs] for pid, gs in book.games.items()}
+    keep = {pid for pid in gl} | set(book.prior) | {p for (p, _d) in book.proj}
+    players = {}
+    for pid in keep:
+        m = meta.get(pid) or {}
+        if not m.get("team"):
+            continue
+        players[pid] = [f"{m.get('first_name', '')} {m.get('last_name', '')}".strip(), m.get("team"),
+                        m.get("fantasy_positions") or [], m.get("injury_status")]
+    with open(os.path.join(os.path.dirname(__file__), "data", "game_ratio_quantiles.json")) as f:
+        quantiles = json.load(f)
+    for name, obj in (("quantiles", quantiles),
+                      ("gamelog", dict(season=season, week=week, games=gl)),
+                      ("priors", {p: round(v, 1) for p, v in book.prior.items()}),
+                      ("players", players),
+                      ("league", dict(scoring=lg["scoring_settings"], roster_positions=lg["roster_positions"]))):
+        with open(os.path.join(out_dir, f"{name}.json"), "w") as f:
+            json.dump(obj, f, separators=(",", ":"))
 
 
 def current_week(sched, today):
