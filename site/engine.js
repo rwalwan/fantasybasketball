@@ -343,7 +343,10 @@ export function tradeIdeas(book, mine, others, slots, limit = 15) {
   const myB = teamValue(book, mine.players, slots), ideas = [];
   for (const r of others) {
     const tb = teamValue(book, r.players, slots), mp = mine.players, tp = r.players;
+    const raw = ps => ps.reduce((a, p) => a + playerValue(book, p), 0);
     const tryDeal = (give, get) => {
+      // realism: managers judge by player value, so they must get back ~90%+ of what they give up
+      if (raw(give) < 0.9 * raw(get)) return;
       const dm = teamValue(book, swapIn(mp, give, get), slots) - myB;
       if (dm <= 0.5) return;
       const dt = teamValue(book, swapIn(tp, get, give), slots) - tb;
