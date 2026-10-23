@@ -54,18 +54,20 @@ async function loadLive() {
   const { week, league } = base, season = league.season;
   const days = weekDays(base.schedule, week), today = etToday();
   const tipDays = days.filter(d => d >= today || d === days.find(x => x >= today));
-  const [rosters, matchups, stats, proj, trending, snapsGh, overridesGh, locksGh, backend, tips] = await Promise.all([
+  const [rosters, matchups, stats, proj, trending, snapsGh, overridesGh, locksGh, backend, tips, news, claims] = await Promise.all([
     get(`${S1}/league/${LEAGUE}/rosters`), get(`${S1}/league/${LEAGUE}/matchups/${week}`),
     get(`${S2}/stats/nba/${season}/${week}?season_type=regular`), get(`${S2}/projections/nba/${season}/${week}?season_type=regular`),
     get(`${S1}/players/nba/trending/add?lookback_hours=24&limit=50`).catch(() => []),
     soft(`${STATE}lineups_${season}_w${week}.json`), soft(`${STATE}eligibility_overrides.json`), soft(`${STATE}locks_w${week}.json`),
     API ? soft(`${API}/state?season=${season}&week=${week}`) : Promise.resolve({}),
-    get(`static/tips.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({}))]);
+    get(`static/tips.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({})),
+    get(`static/news.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({ items: [], mine: [] })),
+    get(`static/claims.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({ experts: [], consensus: {}, recent: [] }))]);
   // backend (minute-level lineup records, shared answers) wins over the 15-minute GitHub state branch
   const snaps = { ...snapsGh, ...(backend.lineups || {}) };
   const overrides = { ...overridesGh, ...(backend.elig || {}) };
   const locks = { ...locksGh, ...(backend.locks || {}) };
-  live = { rosters, matchups, stats, proj, trending, snaps, overrides, locks, tips, backend: !!backend.heartbeat, at: new Date() };
+  live = { rosters, matchups, stats, proj, trending, snaps, overrides, locks, tips, news, claims, backend: !!backend.heartbeat, at: new Date() };
   void tipDays;
 }
 
@@ -138,11 +140,12 @@ function render() {
         return `<td class="c up${td}" title="vs ${esc(x.opp)}${x.tip ? " · " + esc(tipTime(x.tip)) : ""}">${Math.round(x.mu)}</td>`; }).join("") + `<td class="n">${r.left}</td></tr>`).join("");
 
   const w = c.waivers;
-  $("waivers").innerHTML = `<tr><th>Player</th><th>Team</th><th>Pos</th><th>FP/G</th><th>vs your worst (${r1(w.worst)})</th><th>Games left</th><th>Last 3</th><th>Adds 24h</th><th>Bid</th></tr>` +
-    w.list.map(x => `<tr><td>${esc(x.name)}${x.status ? `<span class="st">${esc(x.status)}</span>` : ""}</td><td>${esc(x.team)}</td><td class="pos">${esc(x.pos)}</td><td class="n">${r1(x.fpg)}</td><td class="n">${x.over > 0 ? "+" : ""}${r1(x.over)}</td><td class="n">${x.left}</td><td class="n">${x.recent.map(r1).join(" / ") || "–"}</td><td class="n">${x.trend.toLocaleString()}</td><td class="n">$${x.bid}</td></tr>`).join("");
+  $("waivers").innerHTML = `<tr><th>Player</th><th>Team</th><th>Pos</th><th>FP/G</th><th>vs your worst (${r1(w.worst)})</th><th>Games left</th><th>Last 3</th><th>Adds 24h</th><th>Experts</th><th>Bid</th></tr>` +
+    w.list.map(x => `<tr><td>${esc(x.name)}${x.status ? `<span class="st">${esc(x.status)}</span>` : ""}</td><td>${esc(x.team)}</td><td class="pos">${esc(x.pos)}</td><td class="n">${r1(x.fpg)}</td><td class="n">${x.over > 0 ? "+" : ""}${r1(x.over)}</td><td class="n">${x.left}</td><td class="n">${x.recent.map(r1).join(" / ") || "–"}</td><td class="n">${x.trend.toLocaleString()}</td><td class="n">${consCell(x.pid)}</td><td class="n">$${x.bid}</td></tr>`).join("");
 
   renderTrades(c);
   renderExperts();
+  renderNews();
   $("foot").textContent = `Recomputed every minute from Sleeper and ESPN. A game is lockable only if he was starting when it tipped; lineups are recorded by the scheduled job (every 15 min) and by this page while it's open. ${live.backend ? "Answers sync to your backend, and lineups are recorded every minute." : "Answers are saved in this browser only (backend not connected)."}`;
   $("dot").classList.toggle("stale", Date.now() - live.at > 5 * 60000);
 }
@@ -214,6 +217,18 @@ function renderTrades(c) {
     `<tr><td colspan="5" class="pos">No trades found that help both sides right now.</td></tr>`;
 }
 
+const consCell = pid => { const c = live.claims?.consensus?.[pid]; return c && c.bull_share != null ? `<span title="${c.n} call(s) in the last 7 days, weighted by each expert's record">${Math.round(c.bull_share * 100)}% add</span>` : "–"; };
+
+// ---- news -------------------------------------------------------------------------------------------
+function renderNews() {
+  const n = live.news || { items: [], mine: [] };
+  const ago = t => { const m = Math.round((Date.now() - new Date(t)) / 60000); return m < 60 ? `${m}m ago` : m < 1440 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)}d ago`; };
+  $("mynews").innerHTML = n.mine.length ? n.mine.map(x => `<div class="row"><span><b>${esc(x.player || x.title)}</b> — ${esc(x.summary || x.title)}<br><span class="pos">${esc(x.means)}</span></span><span class="pos"><a href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.source)}</a> · ${ago(x.at)}</span></div>`).join("")
+    : `<div class="row"><span class="pos">Nothing in the latest news changes your roster.</span></div>`;
+  $("allnews").innerHTML = n.items.slice(0, 50).map(x => `<div class="row"><span>${x.player ? `<b>${esc(x.player)}</b> — ` : ""}${esc(x.summary || x.title)}${x.status && x.status !== "unknown" ? ` <span class="st">${esc(x.status)}</span>` : ""}</span><span class="pos"><a href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.source)}</a> · ${ago(x.at)}</span></div>`).join("")
+    || `<div class="row"><span class="pos">No news collected yet.</span></div>`;
+}
+
 // ---- experts ----------------------------------------------------------------------------------------
 const SRC_NAME = { rotowire: "RotoWire per-game projections (via Sleeper)", model: "Lock Desk model (season avg shrunk to last season)" };
 function renderExperts() {
@@ -222,6 +237,12 @@ function renderExperts() {
   $("experts").innerHTML = `<tr><th>Source</th><th>Graded games</th><th>Avg miss (FP)</th><th>RMSE</th><th>Bias</th><th>Weight now</th>${weeks.map(w => `<th>Wk ${w}</th>`).join("")}</tr>` +
     (rows.map(r => `<tr><td>${esc(SRC_NAME[r.source] || r.source)}</td><td class="n">${r.games}</td><td class="n">${r1(r.mae)}</td><td class="n">${r1(r.rmse)}</td><td class="n">${r.bias > 0 ? "+" : ""}${r1(r.bias)}</td><td class="n">${r.weight != null ? Math.round(r.weight * 100) + "%" : "–"}</td>${weeks.map(w => `<td class="n">${r.weekly?.[w] != null ? r1(r.weekly[w]) : ""}</td>`).join("")}</tr>`).join("") ||
      `<tr><td colspan="6" class="pos">Grading starts with tonight's games: each source's projection is logged before tip and scored once the box score is in.</td></tr>`);
+  const cl = live.claims || { experts: [], recent: [] };
+  $("pundits").innerHTML = `<tr><th>Expert</th><th>Calls</th><th>Graded</th><th>Hit rate</th><th>Weight</th></tr>` +
+    (cl.experts.map(e => `<tr><td>${esc(e.expert)}</td><td class="n">${e.calls}</td><td class="n">${e.graded}</td><td class="n">${e.hit_rate != null ? Math.round(e.hit_rate * 100) + "%" : "–"}</td><td class="n">${Math.round(e.weight * 100)}%</td></tr>`).join("") ||
+     `<tr><td colspan="5" class="pos">No expert calls collected yet. They appear as advice articles are published and read.</td></tr>`);
+  $("calls").innerHTML = `<tr><th>Date</th><th>Expert</th><th>Call</th><th>Player</th><th>Why</th><th>Result</th></tr>` +
+    cl.recent.slice(0, 40).map(c => `<tr><td class="pos">${esc(c.date)}</td><td>${esc(c.expert)}</td><td>${esc(c.action)}</td><td>${esc(c.player)}</td><td class="pos" style="white-space:normal">${esc(c.reason)}</td><td class="n">${c.correct === true ? '<span class="good">right</span>' : c.correct === false ? '<span class="bad">wrong</span>' : "pending"}</td></tr>`).join("");
 }
 
 // ---- events + loop --------------------------------------------------------------------------------
