@@ -54,16 +54,13 @@ async function loadLive() {
   const { week, league } = base, season = league.season;
   const days = weekDays(base.schedule, week), today = etToday();
   const tipDays = days.filter(d => d >= today || d === days.find(x => x >= today));
-  const [rosters, matchups, stats, proj, trending, snapsGh, overridesGh, locksGh, backend, ...espn] = await Promise.all([
+  const [rosters, matchups, stats, proj, trending, snapsGh, overridesGh, locksGh, backend, tips] = await Promise.all([
     get(`${S1}/league/${LEAGUE}/rosters`), get(`${S1}/league/${LEAGUE}/matchups/${week}`),
     get(`${S2}/stats/nba/${season}/${week}?season_type=regular`), get(`${S2}/projections/nba/${season}/${week}?season_type=regular`),
     get(`${S1}/players/nba/trending/add?lookback_hours=24&limit=50`).catch(() => []),
     soft(`${STATE}lineups_${season}_w${week}.json`), soft(`${STATE}eligibility_overrides.json`), soft(`${STATE}locks_w${week}.json`),
     API ? soft(`${API}/state?season=${season}&week=${week}`) : Promise.resolve({}),
-    ...days.map(espnGet)]);
-  const tips = {};
-  espn.forEach((sb, i) => (sb.events || []).forEach(e => (e.competitions?.[0]?.competitors || []).forEach(c => {
-    const a = c.team?.abbreviation; tips[`${days[i]}|${ESPN_TEAM[a] || a}`] = e.date; })));
+    get(`static/tips.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({}))]);
   // backend (minute-level lineup records, shared answers) wins over the 15-minute GitHub state branch
   const snaps = { ...snapsGh, ...(backend.lineups || {}) };
   const overrides = { ...overridesGh, ...(backend.elig || {}) };

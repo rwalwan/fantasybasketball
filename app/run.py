@@ -70,6 +70,8 @@ def main():
                faab_left=lg["settings"].get("waiver_budget", 100) - (mine.get("settings") or {}).get("waiver_budget_used", 0))
     os.makedirs(os.path.join(ROOT, "site"), exist_ok=True)
     export_static(book, season, week, meta, lg)
+    with open(os.path.join(ROOT, "site", "static", "tips.json"), "w") as f:
+        json.dump({f"{d}|{t}": v for (d, t), v in tips.items()}, f, separators=(",", ":"))
     with open(os.path.join(ROOT, "site", "data.json"), "w") as f:
         json.dump(out, f, indent=1, default=str)
     print(f"week {week}, {len(plan['slots'])} slots, {plan['unlocked']} unlocked, {len(waivers)} waiver targets")
