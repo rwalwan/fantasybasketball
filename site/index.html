@@ -45,7 +45,7 @@ td.c{text-align:center;font-family:"IBM Plex Mono",monospace;font-size:12px}td.c
 td.today,th.today{background:var(--startbg)}
 .st{font-size:11px;color:var(--risk);margin-left:6px}
 .foot{margin-top:30px;font-size:12px;color:var(--quiet)}
-.hide{display:none}
+.hide{display:none}a{color:var(--start)}
 select{font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink)}
 .trade{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:700px){.trade{grid-template-columns:1fr}}
 .pick h3{font-size:13px;margin:8px 0 4px;color:var(--quiet);font-weight:500}
@@ -61,7 +61,7 @@ select{font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);
 </header>
 <div class="now" id="now">Loading…</div>
 <nav id="tabs">
-  <button data-t="locks" class="on">Locks</button><button data-t="week">Week</button><button data-t="waivers">Waivers</button><button data-t="trades">Trades</button><button data-t="experts">Experts</button>
+  <button data-t="locks" class="on">Locks</button><button data-t="week">Week</button><button data-t="waivers">Waivers</button><button data-t="trades">Trades</button><button data-t="news">News</button><button data-t="experts">Experts</button>
 </nav>
 
 <section data-p="locks">
@@ -87,6 +87,14 @@ select{font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);
   <h2>Projection sources, graded</h2>
   <p class="foot" style="margin-top:0">Each source's projection for every game is saved before tip-off and scored against the real result in your scoring. "Weight now" is how much that source counts in the projections on the other tabs: inverse squared error, pulled toward equal weights until a source has 300 graded games. Bias above zero means the source projects too low.</p>
   <div class="wrap"><table id="experts"></table></div>
+  <h2>Written advice, graded</h2>
+  <p class="foot" style="margin-top:0">Add/drop/start/sit/buy/sell calls pulled from bylined articles. A bullish call counts as right if the player then averaged above replacement level (25 FP/G) over its horizon; a start call is right if he beat his own average that game; bearish calls are the reverse. Weight = hit rate pulled toward 50% until an expert has a record.</p>
+  <div class="wrap"><table id="pundits"></table></div>
+  <h2>Latest calls</h2><div class="wrap"><table id="calls"></table></div>
+</section>
+<section data-p="news" class="hide">
+  <h2>What the news means for your team</h2><div class="box" id="mynews"></div>
+  <h2>Latest NBA news</h2><div class="box" id="allnews"></div>
 </section>
 
 <p class="foot" id="foot"></p>

@@ -10,6 +10,7 @@ import requests
 from . import espn, sleeper
 from .alerts import send_alerts
 from . import experts
+from . import news as newsmod
 from .engine import WeekPlan, team_game_dates, week_dates
 from .lineups import LineupTracker
 from .model import PlayerBook
@@ -62,6 +63,25 @@ def main():
     wp = WeekPlan(book, sched, week, today, lg["roster_positions"], mine, my_m, rosters, tracker.eligible, tips)
     plan = wp.build(manual)
     waivers, worst = wp.waivers(sleeper.trending_adds())
+    # news + expert claims (AI extraction via OpenRouter when OPENROUTER_API_KEY is set)
+    news_out, claims_out = {"items": [], "mine": []}, {"experts": [], "consensus": {}, "recent": []}
+    try:
+        fa_ids = [w["pid"] for w in waivers]
+        items, claims = newsmod.collect(meta, mine.get("players") or [], fa_ids, today)
+        claims = newsmod.grade(claims, book, today)
+        table = newsmod.experts_table(claims)
+        cons = newsmod.consensus(claims, table, today)
+        news_out = {"items": [{k: n.get(k) for k in ("title", "summary", "source", "link", "at", "player", "status", "kind")}
+                              for n in reversed(items[-80:])],
+                    "mine": newsmod.impact(items, mine.get("players") or [], fa_ids, book)}
+        claims_out = {"experts": table, "consensus": cons, "recent": claims[-60:][::-1]}
+        for w in waivers:
+            c = cons.get(w["pid"])
+            w["experts"] = {"bull_share": c["bull_share"], "n": c["n"]} if c else None
+        print(f"news: {len(items)} items, {len(claims)} claims, {len(table)} experts")
+    except Exception as e:
+        print("news/experts failed:", e, file=sys.stderr)
+
     try:
         print("alerts sent:", send_alerts(plan, waivers, book, tips, today))
     except Exception as e:
@@ -77,6 +97,9 @@ def main():
     export_static(book, season, week, meta, lg)
     with open(os.path.join(ROOT, "site", "static", "experts.json"), "w") as f:
         json.dump({"weights": book.w, "sources": experts.table(scores, book.w)}, f, separators=(",", ":"))
+    for name, obj in (("news", news_out), ("claims", claims_out)):
+        with open(os.path.join(ROOT, "site", "static", f"{name}.json"), "w") as f:
+            json.dump(obj, f, separators=(",", ":"))
     with open(os.path.join(ROOT, "site", "static", "tips.json"), "w") as f:
         json.dump({f"{d}|{t}": v for (d, t), v in tips.items()}, f, separators=(",", ":"))
     with open(os.path.join(ROOT, "site", "data.json"), "w") as f:
