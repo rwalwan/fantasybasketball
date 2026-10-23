@@ -88,7 +88,7 @@ fetch("data.json", {cache: "no-store"}).then(r => r.json()).then(d => {
   render();
 
   const t = d.plan.today_lineup;
-  document.getElementById("tonight").innerHTML = t.slots.map(x => `<div><span><span class="pos">${esc(x.slot)}</span> ${esc(x.name)}</span><span class="pos">${x.pid ? "+" + x.gain.toFixed(1) + " option value" : ""}</span></div>`).join("")
+  document.getElementById("tonight").innerHTML = t.slots.map(x => `<div><span><span class="pos">${esc(x.slot)}</span> ${esc(x.name)}</span><span class="pos">${x.pid ? "worth " + x.gain.toFixed(1) + " to start today" : ""}</span></div>`).join("")
     + (t.playing_not_startable.length ? `<div><span class="pos">Also playing, no open slot: ${t.playing_not_startable.map(x => esc(x.name)).join(", ")}</span></div>` : "");
 
   const g = document.getElementById("grid");
