@@ -93,15 +93,35 @@ class WeekPlan:
             ups = self.upcoming(p)
             cont[p] = (continuation_values(ups)[0] if ups else 0.0, ups)
 
-        # assign each unlocked slot its best continuation candidate (scarcest slots first)
+        # Two passes: (1) a starter whose just-played game beats his own bar is a lock candidate;
+        # (2) every other open slot gets its best remaining candidate (scarcest slots first), and a lock
+        # candidate is dropped back to "pass" if a bench player's continuation value beats his score.
         open_slots = [(i, s) for i, (s, pid) in enumerate(zip(self.slots, starters)) if pid not in locked]
-        open_slots.sort(key=lambda x: sum(1 for p in cont if eligible(x[1], self.b.positions(p))))
-        taken, best_for_slot = set(), {}
+        pending = {}
         for i, s in open_slots:
-            cands = sorted(((cont[p][0], p) for p in cont if p not in taken and eligible(s, self.b.positions(p))), reverse=True)
-            if cands:
-                best_for_slot[i] = cands[0]
-                taken.add(cands[0][1])
+            pid = starters[i]
+            st, last = self.lock_state(pid)
+            if st == "open" and last is not None:
+                pending[pid] = last
+        will_lock = {p for p, last in pending.items() if last[1] >= lock_bar(cont.get(p, (0, []))[1])}
+        for _ in range(2):
+            pool = {p: v for p, v in cont.items() if p not in will_lock}
+            slots_left = [(i, s) for i, s in open_slots if starters[i] not in will_lock]
+            slots_left.sort(key=lambda x: sum(1 for p in pool if eligible(x[1], self.b.positions(p))))
+            taken, best_for_slot = set(), {}
+            for i, s in slots_left:
+                cands = sorted(((pool[p][0], p) for p in pool if p not in taken and eligible(s, self.b.positions(p))), reverse=True)
+                if cands:
+                    best_for_slot[i] = cands[0]
+                    taken.add(cands[0][1])
+            # a lock candidate's slot alternative = best pool player eligible for that slot not used elsewhere
+            for i, s in open_slots:
+                pid = starters[i]
+                if pid in will_lock:
+                    alt = max((pool[p][0] for p in pool if p not in taken and eligible(s, self.b.positions(p))), default=0.0)
+                    best_for_slot[i] = (alt, None)
+                    if pending[pid][1] < alt:
+                        will_lock.discard(pid)
 
         decisions = []
         for i, (slot, pid) in enumerate(zip(self.slots, starters)):
@@ -137,8 +157,9 @@ class WeekPlan:
                     action, why = "start", f"Next game {nxt.date} vs {nxt.opp}: {nxt.mu:.1f} projected ({lo}-{hi}), plays {int(nxt.q * 100)}%."
                 decisions.append(dict(slot=slot, pid=pid, name=name, action=action, detail=why, bar=round(bar, 1)))
 
+        fixed = {**locked, **{p: pending[p] for p in will_lock}}
         return dict(week=self.week, today=self.today, days=self.days, slots=decisions,
-                    today_lineup=self.today_lineup(starters, locked, cont),
+                    today_lineup=self.today_lineup(starters, fixed, {p: v for p, v in cont.items() if p not in will_lock}),
                     grid=self.grid(players, locked), unlocked=len(open_slots))
 
     def today_lineup(self, starters, locked, cont):
@@ -194,10 +215,13 @@ class WeekPlan:
                 continue
             if m.get("injury_status") in ("Out", "IR"):
                 continue
+            ups = self.upcoming(pid)
+            has_proj = any(self.b.proj.get((pid, g.date)) for g in ups)
+            if not self.b.games.get(pid) and not has_proj:
+                continue                     # no games and no projection: not in a rotation right now
             base = self.b.baseline(pid)
             if base < 15:
                 continue
-            ups = self.upcoming(pid)
             week_val = continuation_values(ups)[0] if ups else 0.0
             recent = [g[1] for g in self.b.games.get(pid, [])][-3:]
             out.append(dict(pid=pid, name=self.b.name(pid), team=m.get("team"), pos="/".join(m.get("fantasy_positions") or []),
