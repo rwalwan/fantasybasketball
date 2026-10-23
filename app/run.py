@@ -9,6 +9,7 @@ import requests
 
 from . import espn, sleeper
 from .alerts import send_alerts
+from . import experts
 from .engine import WeekPlan, team_game_dates, week_dates
 from .lineups import LineupTracker
 from .model import PlayerBook
@@ -54,6 +55,10 @@ def main():
                    lambda team: sorted(d for d in tg.get(team, {}) if d in days), tips)
 
     manual = {**load_manual_locks(week), **(backend.get("locks") or {})}
+
+    # grade projection sources and learn blend weights before planning
+    scores = experts.update(book, season, week, tips)
+    book.w = experts.weights(scores)
     wp = WeekPlan(book, sched, week, today, lg["roster_positions"], mine, my_m, rosters, tracker.eligible, tips)
     plan = wp.build(manual)
     waivers, worst = wp.waivers(sleeper.trending_adds())
@@ -70,6 +75,8 @@ def main():
                faab_left=lg["settings"].get("waiver_budget", 100) - (mine.get("settings") or {}).get("waiver_budget_used", 0))
     os.makedirs(os.path.join(ROOT, "site"), exist_ok=True)
     export_static(book, season, week, meta, lg)
+    with open(os.path.join(ROOT, "site", "static", "experts.json"), "w") as f:
+        json.dump({"weights": book.w, "sources": experts.table(scores, book.w)}, f, separators=(",", ":"))
     with open(os.path.join(ROOT, "site", "static", "tips.json"), "w") as f:
         json.dump({f"{d}|{t}": v for (d, t), v in tips.items()}, f, separators=(",", ":"))
     with open(os.path.join(ROOT, "site", "data.json"), "w") as f:

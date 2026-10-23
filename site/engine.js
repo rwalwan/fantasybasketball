@@ -50,8 +50,9 @@ const SHAKY = new Set(["Questionable", "Doubtful", "GTD", "Day-To-Day"]);
 export const B2B_FACTOR = 0.86, PRIOR_GAMES = 8;
 
 export class Book {
-  constructor({ scoring, players, priors, gamelog }) {
+  constructor({ scoring, players, priors, gamelog, weights }) {
     this.sc = scoring;
+    this.w = weights || { rotowire: 0.5, model: 0.5 };   // learned from graded accuracy (app/experts.py)
     this.meta = {};                    // pid -> {name, team, pos, status}
     for (const [pid, [name, team, pos, status]] of Object.entries(players || {}))
       this.meta[pid] = { name, team, pos, status };
@@ -104,7 +105,9 @@ export class Book {
   }
   gameMu(p, date) {
     const base = this.baseline(p), pr = this.proj[`${p}|${date}`];
-    return Math.round((pr > 0 ? 0.5 * base + 0.5 * pr : base) * 10) / 10;
+    if (!(pr > 0)) return Math.round(base * 10) / 10;
+    const wr = this.w.rotowire ?? 0.5, wm = this.w.model ?? 0.5;
+    return Math.round(((wr * pr + wm * base) / (wr + wm)) * 10) / 10;
   }
   playProb(p, daysAhead, b2b) {
     const st = this.status(p);

@@ -41,14 +41,14 @@ async function saveAnswer(kind, key, value) {
 // ---- data ---------------------------------------------------------------------------------------
 let base = null, live = null, tab = "locks";
 async function loadBase() {
-  const [Q, league, players, priors, gamelog, schedule, lg] = await Promise.all([
-    get("static/quantiles.json"), get(`${S1}/league/${LEAGUE}`), get("static/players.json"), get("static/priors.json"),
+  const [experts, Q, league, players, priors, gamelog, schedule, lg] = await Promise.all([
+    get("static/experts.json").catch(() => ({ weights: null, sources: [] })), get("static/quantiles.json"), get(`${S1}/league/${LEAGUE}`), get("static/players.json"), get("static/priors.json"),
     get("static/gamelog.json"), get(`${S2}/schedule/nba/regular/${new Date().getFullYear() - (new Date().getMonth() < 7 ? 1 : 0)}`),
     get(`${S1}/league/${LEAGUE}/users`)]);
   const today = etToday();
   const weeks = schedule.filter(g => g.week).map(g => [g.date, g.week]).sort();
   const week = (weeks.filter(([d]) => d <= today).at(-1) || weeks[0])[1];
-  base = { Q: Q.quantiles, league, players, priors, gamelog, schedule, users: Object.fromEntries(lg.map(u => [u.user_id, u.display_name])), week };
+  base = { experts, Q: Q.quantiles, league, players, priors, gamelog, schedule, users: Object.fromEntries(lg.map(u => [u.user_id, u.display_name])), week };
 }
 async function loadLive() {
   const { week, league } = base, season = league.season;
@@ -85,7 +85,8 @@ const isTipped = (pid, date) => { const t = live.tips[`${date}|${bookRef?.team(p
 
 // ---- compute + render ---------------------------------------------------------------------------
 function compute() {
-  const book = new Book({ scoring: base.league.scoring_settings, players: base.players, priors: base.priors, gamelog: base.gamelog.games });
+  const book = new Book({ scoring: base.league.scoring_settings, players: base.players, priors: base.priors,
+                          gamelog: base.gamelog.games, weights: base.experts.weights });
   bookRef = book;
   book.addStats(live.stats); book.addProjections(live.proj);
   const mine = live.rosters.find(r => r.owner_id === USER);
@@ -141,6 +142,7 @@ function render() {
     w.list.map(x => `<tr><td>${esc(x.name)}${x.status ? `<span class="st">${esc(x.status)}</span>` : ""}</td><td>${esc(x.team)}</td><td class="pos">${esc(x.pos)}</td><td class="n">${r1(x.fpg)}</td><td class="n">${x.over > 0 ? "+" : ""}${r1(x.over)}</td><td class="n">${x.left}</td><td class="n">${x.recent.map(r1).join(" / ") || "–"}</td><td class="n">${x.trend.toLocaleString()}</td><td class="n">$${x.bid}</td></tr>`).join("");
 
   renderTrades(c);
+  renderExperts();
   $("foot").textContent = `Recomputed every minute from Sleeper and ESPN. A game is lockable only if he was starting when it tipped; lineups are recorded by the scheduled job (every 15 min) and by this page while it's open. ${live.backend ? "Answers sync to your backend, and lineups are recorded every minute." : "Answers are saved in this browser only (backend not connected)."}`;
   $("dot").classList.toggle("stale", Date.now() - live.at > 5 * 60000);
 }
@@ -210,6 +212,16 @@ function renderTrades(c) {
   $("ideas").innerHTML = `<tr><th>With</th><th>You give</th><th>You get</th><th>You</th><th>Them</th></tr>` +
     renderTrades.cache.ideas.map(x => `<tr><td>${esc(base.users[x.r.owner_id] || "Team " + x.r.roster_id)}</td><td>${x.give.map(p => esc(book.name(p))).join(" + ")}</td><td>${x.get.map(p => esc(book.name(p))).join(" + ")}</td><td class="n good">+${r1(x.dm)}</td><td class="n">+${r1(x.dt)}</td></tr>`).join("") ||
     `<tr><td colspan="5" class="pos">No trades found that help both sides right now.</td></tr>`;
+}
+
+// ---- experts ----------------------------------------------------------------------------------------
+const SRC_NAME = { rotowire: "RotoWire per-game projections (via Sleeper)", model: "Lock Desk model (season avg shrunk to last season)" };
+function renderExperts() {
+  const ex = base.experts, rows = ex.sources || [];
+  const weeks = [...new Set(rows.flatMap(r => Object.keys(r.weekly || {})))].sort((a, b) => a - b);
+  $("experts").innerHTML = `<tr><th>Source</th><th>Graded games</th><th>Avg miss (FP)</th><th>RMSE</th><th>Bias</th><th>Weight now</th>${weeks.map(w => `<th>Wk ${w}</th>`).join("")}</tr>` +
+    (rows.map(r => `<tr><td>${esc(SRC_NAME[r.source] || r.source)}</td><td class="n">${r.games}</td><td class="n">${r1(r.mae)}</td><td class="n">${r1(r.rmse)}</td><td class="n">${r.bias > 0 ? "+" : ""}${r1(r.bias)}</td><td class="n">${r.weight != null ? Math.round(r.weight * 100) + "%" : "–"}</td>${weeks.map(w => `<td class="n">${r.weekly?.[w] != null ? r1(r.weekly[w]) : ""}</td>`).join("")}</tr>`).join("") ||
+     `<tr><td colspan="6" class="pos">Grading starts with tonight's games: each source's projection is logged before tip and scored once the box score is in.</td></tr>`);
 }
 
 // ---- events + loop --------------------------------------------------------------------------------

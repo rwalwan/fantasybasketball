@@ -20,6 +20,7 @@ class PlayerBook:
         self.games = defaultdict(list)      # pid -> [(date, fp, min, game_id)]
         self.prior = {}                      # pid -> last season FP/G
         self.proj = {}                       # (pid, date) -> projected FP from Sleeper/RotoWire
+        self.w = {"rotowire": 0.5, "model": 0.5}  # source weights, learned from graded accuracy (experts.py)
 
     def add_stat_rows(self, rows):
         seen = {(pid, g[3]) for pid, gs in self.games.items() for g in gs}
@@ -80,10 +81,13 @@ class PlayerBook:
         return (n * cur + PRIOR_GAMES * prior) / (n + PRIOR_GAMES)
 
     def game_mu(self, pid, date):
-        """Projected fantasy points for one game if he plays: half our baseline, half the per-game projection."""
+        """Projected fantasy points for one game if he plays: sources blended by their graded accuracy."""
         base = self.baseline(pid)
         p = self.proj.get((pid, date))
-        return round(0.5 * base + 0.5 * p, 1) if p is not None and p > 0 else round(base, 1)
+        if p is None or p <= 0:
+            return round(base, 1)
+        wr, wm = self.w.get("rotowire", 0.5), self.w.get("model", 0.5)
+        return round((wr * p + wm * base) / (wr + wm), 1)
 
     def play_prob(self, pid, date, days_ahead, b2b):
         st = self.status(pid)
