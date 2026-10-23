@@ -181,7 +181,7 @@ class WeekPlan:
                 else:
                     lo, hi = percentile_range(nxt.mu)
                     note = " His last game was played from your bench, so it can't be locked." if st == "bench" else ""
-                    action, why = "start", f"Next game {nxt.date} vs {nxt.opp}: {nxt.mu:.1f} projected ({lo}-{hi}), plays {int(nxt.q * 100)}%.{note}"
+                    action, why = "start", f"Next game {nxt.date} vs {nxt.opponent}: {nxt.mu:.1f} projected ({lo}-{hi}), plays {int(nxt.q * 100)}%.{note}"
                 decisions.append(dict(slot=slot, pid=pid, name=name, action=action, detail=why, bar=round(bar, 1)))
 
         fixed = {**locked, **{p: pending[p] for p in will_lock}}
