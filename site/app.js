@@ -129,7 +129,7 @@ function render() {
     let acts2 = "";
     if (s.action === "confirm") acts2 = `<button data-elig="${s.gameDate}|${s.pid}" data-v="1">He was starting</button><button data-elig="${s.gameDate}|${s.pid}" data-v="0">He was on my bench</button>`;
     if (["lock", "pass", "confirm", "keep"].includes(s.action)) acts2 += `<button data-lock="${s.pid}">I locked this</button>`;
-    if (s.action === "locked") acts2 = `<button data-unlock="${s.pid}">Undo</button>`;
+    if (s.action === "locked") acts2 = `<button data-unlock="${s.pid}">Not locked</button>`;
     return `<div class="slot ${s.action}"><div class="top"><span><span class="pos">${esc(s.slot)}</span> <span class="nm">${esc(s.name)}</span>${s.status ? `<span class="st">${esc(s.status)}</span>` : ""}</span><span class="tag">${LABEL[s.action] || s.action}</span></div><p>${esc(s.detail)}</p>${nums}${td}${acts2 ? `<div class="acts">${acts2}</div>` : ""}</div>`;
   }).join("");
 

@@ -200,15 +200,21 @@ export class WeekPlan {
   }
   lockState(p) {
     const pl = this.played(p);
-    if (this.locks[p]) return { st: "locked", g: pl.at(-1) || null };
+    if (this.locks[p] === true) return { st: "locked", g: pl.at(-1) || null };
     const lv = this.livePlayed(p);
     if (lv.length) return { st: "live", g: lv.at(-1) };
     const raw = this.matchup.players_points?.[p];
     if (!pl.length || raw == null) return { st: "none", g: null };
-    const pts = Math.round(raw) / 10, latest = pl.at(-1);
-    for (const g of pl.slice(0, -1)) if (Math.abs(g.fp - pts) < 0.01 && Math.abs(latest.fp - pts) >= 0.01) return { st: "locked", g };
-    const e = this.elig(p, latest.date);
-    return { st: e === true ? "open" : e === null ? "confirm" : "bench", g: latest };
+    const pts = Math.round(raw) / 10;
+    // Sleeper's points for a starter = his locked game, or else his latest COUNTABLE game. So an earlier game
+    // matching means "locked" only if his latest game was countable (played from a starting slot).
+    // locks[p] === false is the manager saying "not locked" (overrides the inference).
+    const countable = pl.filter(g => this.elig(p, g.date) !== false), latest = countable.at(-1) || pl.at(-1);
+    if (this.locks[p] !== false && countable.length && this.elig(p, pl.at(-1).date) !== false)
+      for (const g of countable.slice(0, -1)) if (Math.abs(g.fp - pts) < 0.01 && Math.abs(latest.fp - pts) >= 0.01) return { st: "locked", g, inferred: true };
+    const last = pl.at(-1), e = this.elig(p, last.date);
+    if (e === false) return { st: "bench", g: last };
+    return { st: e === true ? "open" : "confirm", g: last };
   }
   build() {
     const Q = this.Q, starters = this.matchup.starters || [], r1 = v => Math.round(v * 10) / 10;
@@ -311,7 +317,8 @@ export class WeekPlan {
     const slots = this.slots.map((slot, i) => {
       const p = starters[i], s = ls[p] || { st: "none" }, name = nm(p);
       const out = { slot, pid: p, name, status: this.b.status(p), today: null, later: null };
-      if (s.st === "locked") return { ...out, action: "locked", score: s.g?.fp ?? null, detail: s.g ? `Locked ${s.g.fp.toFixed(1)} (${s.g.date}).` : "Locked." };
+      if (s.st === "locked") return { ...out, action: "locked", score: s.g?.fp ?? null, inferred: !!s.inferred,
+        detail: s.g ? `Locked ${s.g.fp.toFixed(1)} (${s.g.date})${s.inferred ? " — read from Sleeper's score; tap Not locked if that's wrong" : ""}.` : "Locked." };
       if (s.st === "live") return { ...out, action: "live", score: s.g.fp, detail: `Game in progress: ${s.g.fp.toFixed(1)} so far. The lock call comes after the final buzzer.` };
 
       // today's sequence for this slot (empty if the slot is being locked)
