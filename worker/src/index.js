@@ -76,10 +76,21 @@ async function snapshot(env) {
 // minute cron kicks the workflow every 15 minutes instead. Needs the GH_TOKEN secret (fine-grained PAT,
 // this repo only, Actions: read & write).
 async function kickWorkflow(env) {
-  if (!env.GH_TOKEN) return;
-  await fetch("https://api.github.com/repos/rwalwan/fantasybasketball/actions/workflows/update.yml/dispatches", {
-    method: "POST", body: JSON.stringify({ ref: "main" }),
-    headers: { authorization: `Bearer ${env.GH_TOKEN}`, accept: "application/vnd.github+json", "user-agent": "lock-desk-worker" } });
+  let result;
+  if (!env.GH_TOKEN) result = { ok: false, status: "no GH_TOKEN secret on the worker" };
+  else {
+    try {
+      const r = await fetch("https://api.github.com/repos/rwalwan/fantasybasketball/actions/workflows/update.yml/dispatches", {
+        method: "POST", body: JSON.stringify({ ref: "main" }),
+        headers: { authorization: `Bearer ${env.GH_TOKEN}`, accept: "application/vnd.github+json",
+                   "x-github-api-version": "2022-11-28", "user-agent": "lock-desk-worker" } });
+      result = { ok: r.status === 204, status: r.status, body: r.status === 204 ? "" : (await r.text()).slice(0, 200) };
+    } catch (e) { result = { ok: false, status: "fetch error", body: e.message }; }
+  }
+  // record the outcome only when it changes (keeps KV writes tiny)
+  const prev = await kvGet(env, "kick", null);
+  if (!prev || prev.status !== result.status) await env.KV.put("kick", JSON.stringify({ ...result, at: new Date().toISOString() })).catch(() => {});
+  return result;
 }
 
 export default {
@@ -95,7 +106,8 @@ export default {
       const season = url.searchParams.get("season"), week = url.searchParams.get("week");
       const [elig, locks, lineups] = await Promise.all([kvGet(env, "elig", {}), kvGet(env, `locks_w${week}`, {}),
         kvGet(env, `lineups_${season}_w${week}`, {})]);
-      return json({ ok: true, elig, locks, lineups, now: new Date().toISOString() });
+      const kick = await kvGet(env, "kick", null);
+      return json({ ok: true, elig, locks, lineups, kick, now: new Date().toISOString() });
     }
     if (url.pathname === "/answer" && req.method === "POST") {
       if (req.headers.get("x-key") !== env.WRITE_KEY) return json({ error: "bad key" }, 401);
@@ -109,6 +121,7 @@ export default {
       return json({ ok: true });
     }
     if (url.pathname === "/run") return json(await snapshot(env));   // manual trigger / health check
+    if (url.pathname === "/kick" && req.headers.get("x-key") === env.WRITE_KEY) return json(await kickWorkflow(env));
     return json({ service: "lock-desk", ok: true });
   },
 };

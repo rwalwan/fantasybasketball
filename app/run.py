@@ -49,6 +49,10 @@ def main():
     slots = [s for s in lg["roster_positions"] if s not in ("BN", "IR")]
     tracker = LineupTracker(season, week)
     backend = fetch_backend(season, week)
+    if backend.get("kick"):
+        os.makedirs(os.path.join(ROOT, "data", "state"), exist_ok=True)
+        with open(os.path.join(ROOT, "data", "state", "kick.json"), "w") as f:
+            json.dump(backend["kick"], f)
     tracker.snaps.update(backend.get("lineups") or {})          # minute-level records win
     tracker.overrides.update(backend.get("elig") or {})
     tracker.record(slots, my_m.get("starters") or [], mine.get("players") or [], book.team,
