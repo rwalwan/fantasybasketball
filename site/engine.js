@@ -232,8 +232,8 @@ export class WeekPlan {
     for (const x of open) { const st = ls[x.p]?.st; if (st === "open" || st === "confirm") lockable[x.i] = ls[x.p].g; }
     const val = (x, p, allowLock = true) => {
       if (!fits(x.s, this.b.pos(p))) return null;
-      const W = cont[p].W;
-      return allowLock && p === x.p && lockable[x.i] ? Math.max(lockable[x.i].fp, W) : W;
+      const W = cont[p].W, stay = p === x.p ? 0.01 : 0;   // tie-break: don't shuffle players between equivalent slots
+      return (allowLock && p === x.p && lockable[x.i] ? Math.max(lockable[x.i].fp, W) : W) + stay;
     };
     const solve = (rows, cols, noLock = null) => {
       if (!rows.length) return { total: 0, pick: [] };
