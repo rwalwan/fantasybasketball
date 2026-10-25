@@ -381,7 +381,8 @@ export class WeekPlan {
       if (lockable[i]) {
         const sc = lockable[i].fp, bar = bars[i], m = mx[i];
         const range = cont[p]?.u[0] ? ` Waiting: ~${bar.toFixed(1)} expected (his next game ${range80(Q, cont[p].u[0].mu).join("–")}).` : "";
-        const wp = m ? ` Win chance: lock ${Math.round(m.pLock * 100)}% · wait ${Math.round(m.pPass * 100)}%.` : "";
+        const decided = m && Math.max(m.pLock, m.pPass) < 0.02 || m && Math.min(m.pLock, m.pPass) > 0.98;
+        const wp = !m ? "" : decided ? " (Matchup looks decided, so this call maximizes points.)" : ` Win chance: lock ${Math.round(m.pLock * 100)}% · wait ${Math.round(m.pPass * 100)}%.`;
         const base = { ...out, score: sc, bar: r1(bar), gameDate: lockable[i].date, deadline, matchup: m || null };
         const lockIt = willLock.has(p);
         if (s.st === "confirm" && lockIt)

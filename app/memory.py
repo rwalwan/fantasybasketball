@@ -73,6 +73,8 @@ def ingest(con, season, week_rows, schedule, scoring, projlog, prior_min, meta=N
     rows = []
     for r in week_rows:
         st = r.get("stats") or {}
+        if str(r.get("player_id", "")).startswith("TEAM_"):
+            continue                                     # team-total pseudo players
         if not r.get("date") or not (st.get("min") or 0) > 0 or (r.get("date"), r.get("team")) not in scores:
             continue                                     # final games only
         tp, op = scores[(r["date"], r["team"])]
@@ -87,6 +89,7 @@ def ingest(con, season, week_rows, schedule, scoring, projlog, prior_min, meta=N
           ast=excluded.ast, fp=excluded.fp, team_pts=excluded.team_pts, opp_pts=excluded.opp_pts, margin=excluded.margin,
           proj_rw=COALESCE(games.proj_rw, excluded.proj_rw), proj_model=COALESCE(games.proj_model, excluded.proj_model),
           proj_ctx=COALESCE(games.proj_ctx, excluded.proj_ctx)""", rows)
+    con.execute("DELETE FROM games WHERE pid LIKE 'TEAM_%'")
     _derive(con, season, prior_min, meta)
     con.commit()
     return len(rows)
@@ -244,11 +247,14 @@ def last_season_prior(fetch_week, prev_season, scoring, meta, baseline_prev):
         return json.load(open(path))
     acc = defaultdict(lambda: [0.0, 0])
     empty = 0
+    diag = {"weeks": {}, "baseline_n": len(baseline_prev)}
     for w in range(1, 30):
         try:
             rows = fetch_week(prev_season, w)
-        except Exception:
+            diag["weeks"][w] = len(rows)
+        except Exception as e:
             rows = []
+            diag["weeks"][w] = f"error: {e}"[:120]
         rows = [r for r in rows if r.get("date") and (r.get("stats") or {}).get("min")]
         if not rows:
             empty += 1
@@ -263,6 +269,9 @@ def last_season_prior(fetch_week, prev_season, scoring, meta, baseline_prev):
             a[0] += fantasy_points(r["stats"], scoring) / b
             a[1] += 1
     out = {k: round(v[0] / v[1], 4) for k, v in acc.items() if v[1] >= 30}
+    diag["pairs"] = len(acc)
     os.makedirs(STATE, exist_ok=True)
-    json.dump(out, open(path, "w"))
+    json.dump(diag, open(os.path.join(STATE, "diag_prior.json"), "w"))
+    if out:                                          # only cache a real result
+        json.dump(out, open(path, "w"))
     return out

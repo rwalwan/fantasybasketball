@@ -59,6 +59,11 @@ def main():
         projlog = json.load(open(os.path.join(ROOT, "data", "state", f"projlog_{season}.json")))
     except Exception:
         projlog = {}
+    with open(os.path.join(ROOT, "data", "state", "diag_run.json"), "w") as f:
+        sample = next((r for r in prev_rows if (r.get("stats") or {}).get("gp")), {}) if "prev_rows" in dir() else {}
+        json.dump({"prior_min_n": len(prior_min), "prior_fp_n": len(book.prior), "season_rows": len(season_rows),
+                   "prev_sample_keys": sorted((sample.get("stats") or {}).keys())[:40],
+                   "prior_min_top": sorted(prior_min.items(), key=lambda x: -x[1])[:5]}, f)
     n_ing = memory.ingest(con, season, season_rows, sched, lg["scoring_settings"], projlog, prior_min, meta)
     try:
         prior_ctx = memory.last_season_prior(lambda s_, w_: sleeper.week_stats(s_, w_, final=True), prev,
