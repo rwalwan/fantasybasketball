@@ -80,6 +80,8 @@ jobs:
             --virtual-time-budget=25000 --dump-dom "http://localhost:8099/#api=${{ vars.WORKER_URL }}" > /tmp/dom.html 2> /tmp/console.txt || true
           python3 tools/site_check.py /tmp/dom.html /tmp/console.txt > data/state/site_check.json || echo '{"error":"check failed"}' > data/state/site_check.json
           cat data/state/site_check.json
+          timeout 60 google-chrome --headless=new --disable-gpu --no-sandbox --hide-scrollbars --force-device-scale-factor=1 \
+            --window-size=390,3200 --virtual-time-budget=25000 --screenshot=data/state/mobile.png "http://localhost:8099/#api=${{ vars.WORKER_URL }}" >/dev/null 2>&1 || true
 
       - name: Save state to the state branch
         run: |

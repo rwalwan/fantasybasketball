@@ -13,8 +13,8 @@
 main{max-width:1080px;margin:0 auto;padding:20px 16px 60px}
 header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;border-bottom:2px solid var(--ink);padding-bottom:12px}
 h1{font-size:22px;margin:0;letter-spacing:-.01em}#meta{font-size:13px;color:var(--quiet);margin-top:2px}
-.live{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--lock);margin-right:6px;vertical-align:middle}
-.live.stale{background:var(--risk)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--lock);margin-right:6px;vertical-align:middle}
+.dot.stale{background:var(--risk)}
 .score{font-family:"IBM Plex Mono",monospace;font-size:20px;text-align:right}.score b{font-weight:600}.score span{color:var(--quiet);font-size:13px;display:block}
 nav{display:flex;gap:4px;margin:16px 0 0;flex-wrap:wrap}nav button{font:inherit;font-size:14px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:6px 12px;border-radius:99px;cursor:pointer}
 nav button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
@@ -36,7 +36,7 @@ h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--quie
 .nums{font-family:"IBM Plex Mono",monospace;font-size:12.5px;margin-top:6px}.nums b{font-weight:600}
 .acts{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}.acts button{font:inherit;font-size:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:3px 9px;border-radius:6px;cursor:pointer}
 .box{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:4px 12px}
-.row{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}.row:last-child{border:0}
+.row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}.row>.chip,.row>.tag{flex:none;margin-top:2px}.row:last-child{border:0}
 .mv{color:var(--start);font-weight:600}
 .wrap{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:8px}
 table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
@@ -56,7 +56,7 @@ select{font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);
 <body>
 <main>
 <header>
-  <div><h1>Lock Desk</h1><div id="meta"><span class="live" id="dot"></span><span id="metatext">loading live data…</span></div></div>
+  <div><h1>Lock Desk</h1><div id="meta"><span class="dot" id="dot"></span><span id="metatext">loading live data…</span></div></div>
   <div class="score" id="score"></div>
 </header>
 <div class="now" id="now">Loading…</div>
