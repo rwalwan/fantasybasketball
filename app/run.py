@@ -10,6 +10,7 @@ import requests
 from . import espn, sleeper
 from . import experts
 from . import news as newsmod
+from . import memory, insights
 from .engine import WeekPlan, team_game_dates, week_dates
 from .lineups import LineupTracker
 from .model import PlayerBook
@@ -34,13 +35,39 @@ def main():
     opp_m = next((m for m in mus if m["matchup_id"] == my_m["matchup_id"] and m["roster_id"] != mine["roster_id"]), None)
 
     book = PlayerBook(lg["scoring_settings"], meta)
+    season_rows = []
     for w in range(1, week + 1):
-        book.add_stat_rows(sleeper.week_stats(season, w, final=w < week))
+        rows = sleeper.week_stats(season, w, final=w < week)
+        season_rows += rows
+        book.add_stat_rows(rows)
     book.add_projections(sleeper.week_projections(season, week))
+    prev = str(int(season) - 1)
+    prior_min = {}
     try:
-        book.add_prior_season(sleeper.season_totals(str(int(season) - 1)))
+        prev_rows = sleeper.season_totals(prev)
+        book.add_prior_season(prev_rows)
+        for r in prev_rows:
+            st = r.get("stats") or {}
+            if (st.get("gp") or 0) >= 10:
+                prior_min[r["player_id"]] = (st.get("min") or 0) / st["gp"]
     except Exception as e:  # prior season is a nice-to-have
         print("prior season unavailable:", e, file=sys.stderr)
+
+    # memory: every final game with its context; then matchup context for every upcoming game
+    con = memory.connect()
+    try:
+        projlog = json.load(open(os.path.join(ROOT, "data", "state", f"projlog_{season}.json")))
+    except Exception:
+        projlog = {}
+    n_ing = memory.ingest(con, season, season_rows, sched, lg["scoring_settings"], projlog, prior_min, meta)
+    try:
+        prior_ctx = memory.last_season_prior(lambda s_, w_: sleeper.week_stats(s_, w_, final=True), prev,
+                                             lg["scoring_settings"], meta, book.prior)
+    except Exception as e:
+        print("last-season context unavailable:", e, file=sys.stderr)
+        prior_ctx = {}
+    ctx_out = build_context(con, season, meta, book, sched, week, today, prior_ctx, prior_min)
+    print(f"memory: {n_ing} final games stored, context for {len(ctx_out)} upcoming player-games")
 
     # record who is starting right now for every game that hasn't tipped (lock eligibility)
     days = week_dates(sched, week)
@@ -96,7 +123,24 @@ def main():
     export_static(book, season, week, meta, lg)
     with open(os.path.join(ROOT, "site", "static", "experts.json"), "w") as f:
         json.dump({"weights": book.w, "sources": experts.table(scores, book.w)}, f, separators=(",", ":"))
-    for name, obj in (("news", news_out), ("claims", claims_out)):
+    # insights: why games went the way they did, role trends, injury openings
+    ins_out = {"notes": [], "trends": [], "openings": []}
+    try:
+        mine_ids = set(mine.get("players") or [])
+        rostered = {p for r in rosters for p in (r.get("players") or [])}
+        watch = mine_ids | {w["pid"] for w in waivers[:15]}
+        llm = newsmod.llm_json if os.environ.get("OPENROUTER_API_KEY") else None
+        insights.why_notes(con, season, meta, watch, today, llm=llm)
+        tr = insights.trends(con, season, meta)
+        ins_out = {"notes": insights.recent_notes(con, watch, 40),
+                   "trends": [dict(t, mine=t["pid"] in mine_ids, rostered=t["pid"] in rostered) for t in tr
+                              if t["pid"] in mine_ids or t["pid"] not in rostered or len(tr) < 40][:60],
+                   "openings": insights.openings(con, season, meta, rostered)[:20]}
+    except Exception as e:
+        print("insights failed:", e, file=sys.stderr)
+    con.close()
+
+    for name, obj in (("news", news_out), ("claims", claims_out), ("insights", ins_out), ("context", ctx_out)):
         with open(os.path.join(ROOT, "site", "static", f"{name}.json"), "w") as f:
             json.dump(obj, f, separators=(",", ":"))
     with open(os.path.join(ROOT, "site", "static", "tips.json"), "w") as f:
@@ -135,6 +179,42 @@ def current_week(sched, today):
     weeks = sorted({(g["date"], g["week"]) for g in sched if g.get("week")})
     past = [w for d, w in weeks if d <= today]
     return past[-1] if past else weeks[0][1]
+
+
+def build_context(con, season, meta, book, sched, week, today, prior_ctx, prior_min):
+    """Matchup context factors for every projected game from today through the end of this week."""
+    days = set(week_dates(sched, week))
+    tg = team_game_dates(sched)
+    ctx = memory.Context(con, season, meta, book.baseline, prior_ctx, today)
+    avg_min = {}
+    for pid, rows in ctx.by_player.items():
+        avg_min[pid] = sum(r[4] for r in rows) / len(rows)
+    out_by_team = {}
+    for pid, m in meta.items():
+        t = m.get("team")
+        mm = avg_min.get(pid) or prior_min.get(pid) or 0
+        if t and m.get("injury_status") in ("Out", "Doubtful", "IR", "Suspended") and mm >= 20:
+            nm = f"{m.get('first_name', '')} {m.get('last_name', '')}".strip()
+            out_by_team.setdefault(t, []).append((pid, nm, mm))
+    out = {}
+    book.ctx = {}
+    for (pid, date) in list(book.proj):
+        if date not in days or date < today:
+            continue
+        team = book.team(pid)
+        info = (tg.get(team) or {}).get(date)
+        if not team or not info:
+            continue
+        team_days = sorted(tg.get(team, {}))
+        i = team_days.index(date)
+        rest = 4 if i == 0 else min(4, (dt.date.fromisoformat(date) - dt.date.fromisoformat(team_days[i - 1])).days)
+        mates = [x for x in out_by_team.get(team, []) if x[0] != pid]
+        if (meta.get(pid) or {}).get("injury_status") in ("Out", "IR"):
+            continue
+        f, parts = ctx.factors(pid, team, info["opp"], rest, mates)
+        book.ctx[(pid, date)] = f
+        out[f"{pid}|{date}"] = {"f": f, "parts": parts, "opp": info["opp"], "rest": rest}
+    return out
 
 
 def fetch_backend(season, week):

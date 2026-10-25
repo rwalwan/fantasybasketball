@@ -50,8 +50,9 @@ const SHAKY = new Set(["Questionable", "Doubtful", "GTD", "Day-To-Day"]);
 export const B2B_FACTOR = 0.86, PRIOR_GAMES = 8;
 
 export class Book {
-  constructor({ scoring, players, priors, gamelog, weights }) {
+  constructor({ scoring, players, priors, gamelog, weights, ctx }) {
     this.sc = scoring;
+    this.ctx = ctx || {};                                 // "pid|date" -> {f, parts} matchup context (app/memory.py)
     this.w = weights || { rotowire: 0.5, model: 0.5 };   // learned from graded accuracy (app/experts.py)
     this.meta = {};                    // pid -> {name, team, pos, status}
     for (const [pid, [name, team, pos, status]] of Object.entries(players || {}))
@@ -104,10 +105,13 @@ export class Book {
     return (g.length * cur + PRIOR_GAMES * prior) / (g.length + PRIOR_GAMES);
   }
   gameMu(p, date) {
-    const base = this.baseline(p), pr = this.proj[`${p}|${date}`];
-    if (!(pr > 0)) return Math.round(base * 10) / 10;
-    const wr = this.w.rotowire ?? 0.5, wm = this.w.model ?? 0.5;
-    return Math.round(((wr * pr + wm * base) / (wr + wm)) * 10) / 10;
+    // sources blended by graded accuracy: plain model, model x matchup context, RotoWire
+    const base = this.baseline(p), pr = this.proj[`${p}|${date}`], c = this.ctx?.[`${p}|${date}`];
+    const srcs = [[this.w.model ?? 1 / 3, base]];
+    if (c?.f) srcs.push([this.w.ctx ?? 1 / 3, base * c.f]);
+    if (pr > 0) srcs.push([this.w.rotowire ?? 1 / 3, pr]);
+    const tw = srcs.reduce((a, [w]) => a + w, 0);
+    return Math.round((srcs.reduce((a, [w, v]) => a + w * v, 0) / tw) * 10) / 10;
   }
   playProb(p, daysAhead, b2b) {
     const st = this.status(p);
@@ -216,7 +220,8 @@ export class WeekPlan {
     if (e === false) return { st: "bench", g: last };
     return { st: e === true ? "open" : "confirm", g: last };
   }
-  build() {
+  // opts.opp = the opponent's outlook ({mean, var}) -> matchup-aware lock calls
+  build(opts = {}) {
     const Q = this.Q, starters = this.matchup.starters || [], r1 = v => Math.round(v * 10) / 10;
     const reserve = new Set(this.roster.reserve || []);
     const players = (this.roster.players || []).filter(p => !reserve.has(p));
@@ -260,6 +265,42 @@ export class WeekPlan {
       altFor[x.i] = noLock.pick[open.indexOf(x)];
       if (g.fp >= bars[x.i] && (ls[x.p].st === "open" || ls[x.p].st === "confirm")) willLock.add(x.p);
     }
+
+    // ---- 1b) matchup outlook + matchup-aware lock calls ------------------------------------------
+    // Each slot: expected points (ev) and spread (sd). Locked = known. Waiting/open = ~30% sd (single-game
+    // spread, Lock-In best-of draws narrow it a little). Live games: points so far + the rest of his projection.
+    const SD = 0.3, evOf = {}, sdOf = {};
+    let M = 0, V = 0;
+    this.slots.forEach((slot, i) => {
+      const p = starters[i], st = ls[p]?.st;
+      let ev = 0, sd = 0;
+      if (st === "locked") ev = ls[p].g?.fp || 0;
+      else if (st === "live") {
+        const g = ls[p].g, t = this.tip(p, g.date), frac = t ? Math.min(1, Math.max(0, (this.now - new Date(t)) / (150 * 60000))) : 0.5;
+        const mu = this.b.gameMu(p, g.date);
+        ev = g.fp + (1 - frac) * mu * 0.95; sd = SD * mu * Math.sqrt(1 - frac);
+      } else {
+        const x = open.find(y => y.i === i);
+        if (x && willLock.has(p)) ev = lockable[i].fp;
+        else if (x) { const a = assignedTo[i]; ev = a ? Math.max(0, (val(x, a, false) ?? 0)) : 0; sd = SD * ev; }
+      }
+      evOf[i] = ev; sdOf[i] = sd; M += ev; V += sd * sd;
+    });
+    const Phi = z => 0.5 * (1 + Math.tanh(0.7978845608 * (z + 0.044715 * z ** 3)));
+    const pWin = (m, v) => opts.opp ? Phi((m - opts.opp.mean) / Math.sqrt(v + opts.opp.var + 1)) : null;
+    const mx = {};
+    if (opts.opp) for (const x of open) {
+      const g = lockable[x.i]; if (!g || !cont[x.p]?.u.length) continue;
+      const base = M - evOf[x.i], baseV = V - sdOf[x.i] ** 2, bar = bars[x.i];
+      const pL = pWin(base + g.fp, baseV), pP = pWin(base + bar, baseV + (SD * bar) ** 2);
+      const evCall = willLock.has(x.p) ? "lock" : "pass", call = pL >= pP ? "lock" : "pass";
+      mx[x.i] = { pLock: pL, pPass: pP, evCall, call, flipped: false };
+      if (call !== evCall && Math.abs(pL - pP) >= 0.02) {
+        mx[x.i].flipped = true;
+        if (call === "lock") willLock.add(x.p); else willLock.delete(x.p);
+      }
+    }
+    const outlook = { mean: M, var: V, sd: Math.sqrt(V), winProb: pWin(M, V), opp: opts.opp || null };
 
     // ---- 2) today's sequence per slot -------------------------------------------------------------
     // A slot can try several games in one day: if the first misses its keep-line, pass and slide in a
@@ -338,15 +379,20 @@ export class WeekPlan {
                     : out.later?.move ? ` Next: ${out.later.name} covers this slot (${day3(out.later.date)}).` : "";
 
       if (lockable[i]) {
-        const sc = lockable[i].fp, bar = bars[i];
-        const base = { ...out, score: sc, bar: r1(bar), gameDate: lockable[i].date, deadline };
-        if (s.st === "confirm" && sc >= bar)
-          return { ...base, action: "confirm", detail: `Was he in your starting lineup when his ${lockable[i].date} game (${sc.toFixed(1)}) tipped? If yes, lock it — it beats the best alternative (${bar.toFixed(1)}).` };
-        if (sc >= bar) {
+        const sc = lockable[i].fp, bar = bars[i], m = mx[i];
+        const range = cont[p]?.u[0] ? ` Waiting: ~${bar.toFixed(1)} expected (his next game ${range80(Q, cont[p].u[0].mu).join("–")}).` : "";
+        const wp = m ? ` Win chance: lock ${Math.round(m.pLock * 100)}% · wait ${Math.round(m.pPass * 100)}%.` : "";
+        const base = { ...out, score: sc, bar: r1(bar), gameDate: lockable[i].date, deadline, matchup: m || null };
+        const lockIt = willLock.has(p);
+        if (s.st === "confirm" && lockIt)
+          return { ...base, action: "confirm", detail: `Was he in your starting lineup when his ${lockable[i].date} game (${sc.toFixed(1)}) tipped? If yes, lock it.${wp}` };
+        if (lockIt) {
           if (!deadline) return { ...base, action: "keep", detail: `${sc.toFixed(1)} counts automatically: he has no games left and nothing else beats it.` };
-          return { ...base, action: "lock", detail: `${sc.toFixed(1)} beats the best alternative for this slot (${bar.toFixed(1)} expected). Lock before ${day3(deadline.date)}'s tip.` };
+          if (m?.flipped) return { ...base, action: "lock", detail: `Matchup call — lock the safe ${sc.toFixed(1)}: you're projected ahead, so protecting the floor raises your win chance (${Math.round(m.pPass * 100)}% → ${Math.round(m.pLock * 100)}%), even though waiting averages ${bar.toFixed(1)}.` };
+          return { ...base, action: "lock", detail: `${sc.toFixed(1)} beats the best alternative for this slot (${bar.toFixed(1)} expected). Lock before ${day3(deadline.date)}'s tip.${wp}` };
         }
-        return { ...base, action: "pass", detail: `Don't lock: ${sc.toFixed(1)} is under ${bar.toFixed(1)}, what this slot is expected to get by waiting.${planTxt}` };
+        if (m?.flipped) return { ...base, action: "pass", detail: `Matchup call — wait for upside: you're projected behind, so passing on ${sc.toFixed(1)} raises your win chance (${Math.round(m.pLock * 100)}% → ${Math.round(m.pPass * 100)}%).${planTxt}` };
+        return { ...base, action: "pass", detail: `Don't lock: ${sc.toFixed(1)} is under ${bar.toFixed(1)}, what this slot is expected to get by waiting.${planTxt}${wp}` };
       }
       if (!out.today && !out.later) return { ...out, action: "fallback-risk", detail: "Nobody eligible has a game left and nothing is locked: this slot scores its player's last game of the week." };
       const g = out.today || out.later;
@@ -399,7 +445,8 @@ export class WeekPlan {
     }).sort((a, b) => this.b.baseline(b.pid) - this.b.baseline(a.pid));
 
     const idle = pool.filter(p => !used.has(p) && todayGame(p)).map(p => ({ pid: p, name: this.b.name(p) }));
-    return { slots, actions, lineup, idle, grid, days: this.days, unlocked: open.length - willLock.size, expectedTotal: r1(main.total) };
+    for (const x of slots) { const i = this.slots.indexOf(x.slot) >= 0 ? slots.indexOf(x) : -1; x.ev = r1(evOf[i] || 0); x.sd = r1(sdOf[i] || 0); }
+    return { slots, actions, lineup, idle, grid, days: this.days, unlocked: open.length - willLock.size, expectedTotal: r1(main.total), outlook };
   }
 
   waivers(trending, limit = 30) {

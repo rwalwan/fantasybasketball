@@ -36,6 +36,9 @@ def source_projections(book, pid, date):
     if rw:
         out["rotowire"] = round(rw, 1)
     out["model"] = round(book.baseline(pid), 1)
+    f = getattr(book, "ctx", {}).get((pid, date))
+    if f:
+        out["ctx"] = round(book.baseline(pid) * f, 1)        # model x matchup context (memory.py)
     return out
 
 
@@ -82,7 +85,7 @@ def update(book, season, week, tips, now=None):
 
 def weights(scores):
     """Inverse-MSE weights, shrunk toward equal until SHRINK_N graded games."""
-    srcs = ["rotowire", "model"]
+    srcs = ["rotowire", "model", "ctx"]
     inv = {}
     for s in srcs:
         r = scores.get(s)

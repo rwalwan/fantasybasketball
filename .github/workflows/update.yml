@@ -28,6 +28,13 @@ jobs:
             git archive FETCH_HEAD | tar -x -C data/state
           fi
 
+      - name: Cache Sleeper data (finished weeks never change)
+        uses: actions/cache@v4
+        with:
+          path: data/cache
+          key: sleeper-${{ github.run_id }}
+          restore-keys: sleeper-
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -53,6 +60,11 @@ jobs:
           WORKER_URL: ${{ vars.WORKER_URL }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
+
+      - name: Decision log + grading
+        run: python -m app.learn || echo "learn step failed"
+        env:
+          WORKER_URL: ${{ vars.WORKER_URL }}
 
       - name: Phone alerts
         run: python -m app.alerts || echo "alerts step failed"

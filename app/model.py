@@ -84,10 +84,14 @@ class PlayerBook:
         """Projected fantasy points for one game if he plays: sources blended by their graded accuracy."""
         base = self.baseline(pid)
         p = self.proj.get((pid, date))
-        if p is None or p <= 0:
-            return round(base, 1)
-        wr, wm = self.w.get("rotowire", 0.5), self.w.get("model", 0.5)
-        return round((wr * p + wm * base) / (wr + wm), 1)
+        f = getattr(self, "ctx", {}).get((pid, date))
+        srcs = [(self.w.get("model", 1 / 3), base)]
+        if f:
+            srcs.append((self.w.get("ctx", 1 / 3), base * f))
+        if p is not None and p > 0:
+            srcs.append((self.w.get("rotowire", 1 / 3), p))
+        tw = sum(w for w, _ in srcs)
+        return round(sum(w * v for w, v in srcs) / tw, 1)
 
     def play_prob(self, pid, date, days_ahead, b2b):
         st = self.status(pid)

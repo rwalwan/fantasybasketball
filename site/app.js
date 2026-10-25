@@ -1,4 +1,4 @@
-import { Book, WeekPlan, weekDays, teamGames, fits, playerValue, teamValue } from "./engine.js";
+import { Book, WeekPlan, weekDays, teamGames, fits, playerValue, teamValue, range80 } from "./engine.js";
 
 // ---- config -----------------------------------------------------------------------------------
 const LEAGUE = "1400915575915491328", USER = "1388708038000533504";
@@ -54,7 +54,7 @@ async function loadLive() {
   const { week, league } = base, season = league.season;
   const days = weekDays(base.schedule, week), today = etToday();
   const tipDays = days.filter(d => d >= today || d === days.find(x => x >= today));
-  const [schedule, rosters, matchups, stats, proj, trending, snapsGh, overridesGh, locksGh, backend, tips, news, claims, moves] = await Promise.all([
+  const [schedule, rosters, matchups, stats, proj, trending, snapsGh, overridesGh, locksGh, backend, tips, news, claims, moves, context, insights, learning] = await Promise.all([
     get(`${S2}/schedule/nba/regular/${season}`).catch(() => base.schedule),
     get(`${S1}/league/${LEAGUE}/rosters`), get(`${S1}/league/${LEAGUE}/matchups/${week}`),
     get(`${S2}/stats/nba/${season}/${week}?season_type=regular`), get(`${S2}/projections/nba/${season}/${week}?season_type=regular`),
@@ -64,13 +64,16 @@ async function loadLive() {
     get(`static/tips.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({})),
     get(`static/news.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({ items: [], mine: [] })),
     get(`static/claims.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({ experts: [], consensus: {}, recent: [] })),
-    get(`static/moves.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({ adds: [], trades: [] }))]);
+    get(`static/moves.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({ adds: [], trades: [] })),
+    get(`static/context.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({})),
+    get(`static/insights.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({ notes: [], trends: [], openings: [] })),
+    get(`static/learning.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({}))]);
   // backend (minute-level lineup records, shared answers) wins over the 15-minute GitHub state branch
   const snaps = { ...snapsGh, ...(backend.lineups || {}) };
   const overrides = { ...overridesGh, ...(backend.elig || {}) };
   const locks = { ...locksGh, ...(backend.locks || {}) };
   base.schedule = schedule;
-  live = { rosters, matchups, stats, proj, trending, snaps, overrides, locks, tips, news, claims, moves, backend: !!backend.ok, at: new Date() };
+  live = { rosters, matchups, stats, proj, trending, snaps, overrides, locks, tips, news, claims, moves, context, insights, learning, backend: !!backend.ok, at: new Date() };
   void tipDays;
 }
 
@@ -91,7 +94,7 @@ const isTipped = (pid, date) => { const t = live.tips[`${date}|${bookRef?.team(p
 // ---- compute + render ---------------------------------------------------------------------------
 function compute() {
   const book = new Book({ scoring: base.league.scoring_settings, players: base.players, priors: base.priors,
-                          gamelog: base.gamelog.games, weights: base.experts.weights });
+                          gamelog: base.gamelog.games, weights: base.experts.weights, ctx: live.context || {} });
   bookRef = book;
   book.addStats(live.stats); book.addProjections(live.proj);
   const mine = live.rosters.find(r => r.owner_id === USER);
@@ -101,7 +104,16 @@ function compute() {
   const wp = new WeekPlan({ Q: base.Q, book, schedule: base.schedule, week: base.week, today: etToday(), now: new Date(),
     rosterPositions: base.league.roster_positions, roster: mine, matchup: my, rosters: live.rosters, tips: live.tips,
     elig: eligFn(my.starters), locks });
-  return { book, wp, plan: wp.build(), waivers: wp.waivers(live.trending), mine, my, opp };
+  // opponent's outlook from the same engine (their recent games assumed countable), then my matchup-aware plan
+  let oppOut = null, oppPlan = null;
+  const oppRoster = opp && live.rosters.find(r => r.roster_id === opp.roster_id);
+  if (oppRoster) {
+    oppPlan = new WeekPlan({ Q: base.Q, book, schedule: base.schedule, week: base.week, today: etToday(), now: new Date(),
+      rosterPositions: base.league.roster_positions, roster: oppRoster, matchup: opp, rosters: live.rosters, tips: live.tips,
+      elig: () => true, locks: {} }).build();
+    oppOut = { mean: oppPlan.outlook.mean, var: oppPlan.outlook.var };
+  }
+  return { book, wp, plan: wp.build({ opp: oppOut }), oppPlan, waivers: wp.waivers(live.trending), mine, my, opp };
 }
 
 const LABEL = { lock: "Lock", keep: "Counts", pass: "Pass", start: "Start", locked: "Locked", confirm: "Confirm", live: "Live", "fallback-risk": "Fallback" };
@@ -118,7 +130,9 @@ function render() {
   const when = a => a.kind === "relief" ? `between ${tipTime(a.from)} and ${tipTime(a.by)}`
     : a.kind === "move" ? `best ~${tipTime(a.best)}, by ${tipTime(a.by)}` : a.by ? `by ${tipTime(a.by)}` : "";
   const passes = acts.filter(a => a.kind === "pass");
-  $("now").innerHTML = (nextBy ? `<b>Next deadline:</b> <span class="when">${until(nextBy)}</span> (${esc(tipTime(nextBy))})` : "<b>No deadlines pending.</b>") +
+  const ol = plan.outlook;
+  const mline = ol?.opp ? `<div class="pos" style="margin-bottom:6px">Matchup: you <b>${r1(ol.mean)}</b> ± ${r1(ol.sd)} vs ${esc(base.users[oppOwner] || "opponent")} <b>${r1(ol.opp.mean)}</b> ± ${r1(Math.sqrt(ol.opp.var))} expected · win chance <b>${Math.round(ol.winProb * 100)}%</b></div>` : "";
+  $("now").innerHTML = mline + (nextBy ? `<b>Next deadline:</b> <span class="when">${until(nextBy)}</span> (${esc(tipTime(nextBy))})` : "<b>No deadlines pending.</b>") +
     `<ul>${acts.filter(a => a.kind !== "pass").map(a => { const [w, ...rest] = a.text.split(" "); return `<li><b>${esc(w)}</b> ${esc(rest.join(" "))} <span class="pos">· ${esc(when(a))}</span></li>`; }).join("")}` +
     (passes.length ? `<li><b>Pass</b> ${passes.map(a => esc(a.text.replace(/^Don't lock /, ""))).join(", ")} <span class="pos">· waiting is worth more</span></li>` : "") +
     (topAdd ? `<li><b>Waiver</b> add ${esc(topAdd.name)}, drop ${esc(topAdd.dropName)} — bid $${topAdd.bid} <span class="pos">· Moves tab</span></li>` : "") + `</ul>`;
@@ -162,6 +176,8 @@ function render() {
   renderExperts();
   renderNews();
   renderMoves();
+  renderResearch(c);
+  renderInsights(c);
   $("foot").textContent = `Plan's expected total from open slots: ${r1(plan.expectedTotal || 0)}. Recomputed every minute from Sleeper (scores, schedule, injuries). A game is lockable only if he was starting when it tipped; lineups are recorded by the scheduled job (every 15 min) and by this page while it's open. ${live.backend ? "Answers sync to your backend, and lineups are recorded every minute." : "Answers are saved in this browser only (backend not connected)."}`;
   $("dot").classList.toggle("stale", Date.now() - live.at > 5 * 60000);
 }
@@ -209,6 +225,53 @@ function renderMoves() {
     : `<div class="box"><div class="row"><span class="pos">No trades found that help both sides right now.</span></div></div>`;
 }
 
+// ---- research: every player, every game left this week -------------------------------------------
+const riskOf = (book, p) => { const g = book.games[p] || []; if (g.length < 4) return ["–", ""];
+  const m = g.reduce((a, x) => a + x.fp, 0) / g.length, cv = Math.sqrt(g.reduce((a, x) => a + (x.fp - m) ** 2, 0) / g.length) / Math.max(m, 1);
+  return cv < 0.22 ? ["steady", "safe floor"] : cv < 0.32 ? ["balanced", ""] : ["boom/bust", "big ceiling, low floor"]; };
+function researchRows(c, roster, who) {
+  const { book, wp } = c, trends = Object.fromEntries((live.insights?.trends || []).map(t => [t.pid, t]));
+  const rows = [];
+  for (const p of roster.players || []) {
+    const ups = wp.upcoming(p);
+    const [risk, riskWhy] = riskOf(book, p), tr = trends[p];
+    if (!ups.length) { rows.push(`<tr><td>${esc(book.name(p))}${book.status(p) ? `<span class="st">${esc(book.status(p))}</span>` : ""}</td><td class="pos">${esc(book.pos(p).join("/"))}</td><td colspan="6" class="pos">no games left this week</td></tr>`); continue; }
+    ups.forEach((g, k) => {
+      const cx = book.ctx?.[`${p}|${g.date}`], rw = book.proj[`${p}|${g.date}`], mdl = book.baseline(p);
+      const [lo, hi] = range80(base.Q, g.mu);
+      const chips = (cx?.parts || []).map(x => `<span class="chip ${x.f >= 1 ? "up" : "down"}" title="${esc(x.why)}">${esc(x.k)} ${x.f >= 1 ? "+" : ""}${Math.round((x.f - 1) * 100)}%</span>`).join(" ");
+      rows.push(`<tr><td>${k ? "" : esc(book.name(p))}${!k && book.status(p) ? `<span class="st">${esc(book.status(p))}</span>` : ""}${!k && tr ? ` <span class="chip ${tr.dir === "up" ? "up" : "down"}" title="${esc(tr.why)}">${tr.dir === "up" ? "▲" : "▼"} role</span>` : ""}</td>` +
+        `<td class="pos">${k ? "" : esc(book.pos(p).join("/"))}</td><td>${esc(day(g.date))} ${g.b2b ? '<span class="pos">b2b</span>' : ""} <span class="pos">vs ${esc(g.opp)}${g.tip ? " · " + esc(tipTime(g.tip)) : ""}</span></td>` +
+        `<td class="n"><b>${r1(g.mu)}</b></td><td class="n pos">${rw ? r1(rw) : "–"} / ${r1(mdl)} / ${cx ? r1(mdl * cx.f) : "–"}</td><td class="n">${lo}–${hi}</td>` +
+        `<td style="white-space:normal">${chips || '<span class="pos">neutral</span>'}</td><td class="pos" title="${esc(riskWhy)}">${k ? "" : risk} · ${Math.round(g.q * 100)}%</td></tr>`);
+    });
+  }
+  return `<tr><th>${esc(who)}</th><th>Pos</th><th>Game</th><th>Proj</th><th>RotoWire / model / matchup</th><th>Range (10–90%)</th><th>Matchup factors (hover for why)</th><th>Profile · plays</th></tr>` + rows.join("");
+}
+function renderResearch(c) {
+  $("research").innerHTML = researchRows(c, c.mine, "Your players");
+  const oppRoster = c.opp && live.rosters.find(r => r.roster_id === c.opp.roster_id);
+  $("research_opp").innerHTML = oppRoster ? researchRows(c, oppRoster, "Opponent's players") : "";
+}
+
+// ---- insights ----------------------------------------------------------------------------------------
+function renderInsights(c) {
+  const ins = live.insights || {}, lr = live.learning || {}, mine = new Set(c.mine.players || []);
+  const ol = c.plan.outlook;
+  $("outlook").innerHTML = ol?.opp ? `<div class="row"><span>You: <b>${r1(ol.mean)}</b> expected (± ${r1(ol.sd)}) · Opponent: <b>${r1(ol.opp.mean)}</b> (± ${r1(Math.sqrt(ol.opp.var))})</span><span><b>${Math.round(ol.winProb * 100)}%</b> win chance</span></div>` +
+    `<div class="row"><span class="pos">Lock calls compare your win chance if you lock vs wait. When they differ by 2+ points, the matchup decides: protect a lead with safe locks, chase upside when behind.</span></div>` : `<div class="row"><span class="pos">No matchup found.</span></div>`;
+  $("why").innerHTML = (ins.notes || []).map(n => `<div class="row"><span><b>${esc(n.player)}</b> <span class="pos">${esc(n.date)}</span> — ${esc(n.text)}</span><span class="chip ${n.tag === "signal" ? "up" : ""}">${esc(n.tag)}</span></div>`).join("") ||
+    `<div class="row"><span class="pos">Notes appear after games finish, for any game that lands well above or below its projection.</span></div>`;
+  $("trends").innerHTML = (ins.trends || []).slice(0, 25).map(t => `<div class="row"><span>${t.dir === "up" ? "▲" : "▼"} <b>${esc(t.player)}</b> <span class="pos">${esc(t.team)}</span> — ${esc(t.why)} · ${r1(t.fp4)} FP/G lately</span><span class="pos">${t.mine ? "your player" : t.rostered ? "rostered" : "free agent"}</span></div>`).join("") ||
+    `<div class="row"><span class="pos">No clear minutes trends yet (needs 5+ games).</span></div>`;
+  $("openings").innerHTML = (ins.openings || []).map(o => `<div class="row"><span><b>${esc(o.player)}</b> (${esc(o.team)}, ${esc(o.status)}, ${r1(o.min)} min) → ${o.gainers.map(g => `${esc(g.player)} +${r1(g.dfp)} FP${g.rostered ? "" : ' <span class="chip up">FA</span>'}${mine.has(g.pid) ? ' <span class="chip">yours</span>' : ""}`).join(", ")}</span><span class="pos">${esc(o.gainers[0]?.basis || "")}</span></div>`).join("") ||
+    `<div class="row"><span class="pos">No major rotation players out right now.</span></div>`;
+  $("scorecard").innerHTML = `<tr><th>Week</th><th>Calls graded</th><th>You followed</th><th>Right calls</th><th>Points saved</th><th>Points lost</th></tr>` +
+    ((lr.weeks || []).map(w => `<tr><td>${w.week}</td><td class="n">${w.graded}/${w.calls}</td><td class="n">${w.followed}</td><td class="n">${w.good}</td><td class="n good">+${r1(w.points_saved)}</td><td class="n bad">−${r1(w.points_lost)}</td></tr>`).join("") ||
+     `<tr><td colspan="6" class="pos">Calls are logged from now on and graded when each week is final.</td></tr>`);
+  $("graded").innerHTML = (lr.graded || []).slice(0, 30).map(g => `<tr><td>${g.week}</td><td>${esc(g.slot)}</td><td>${g.kind === "move" ? `start ${esc(g.name)} over ${esc(g.replaces)}` : `${esc(g.call)} ${esc(g.name)} ${r1(g.score)}`}</td><td class="n">${g.final != null ? r1(g.final) : "–"}</td><td class="n">${g.cf != null ? r1(g.cf) : "–"}</td><td class="n ${g.regret <= 0 ? "good" : "bad"}">${g.regret <= 0 ? "+" + r1(-g.regret) : "−" + r1(g.regret)}</td><td class="pos">${g.followed ? "followed" : "overrode"}</td></tr>`).join("");
+}
+
 const consCell = pid => { const c = live.claims?.consensus?.[pid]; return c && c.bull_share != null ? `<span title="${c.n} call(s) in the last 7 days, weighted by each expert's record">${Math.round(c.bull_share * 100)}% add</span>` : "–"; };
 
 // ---- news -------------------------------------------------------------------------------------------
@@ -222,7 +285,7 @@ function renderNews() {
 }
 
 // ---- experts ----------------------------------------------------------------------------------------
-const SRC_NAME = { rotowire: "RotoWire per-game projections (via Sleeper)", model: "Lock Desk model (season avg shrunk to last season)" };
+const SRC_NAME = { rotowire: "RotoWire per-game projections (via Sleeper)", model: "Lock Desk model (season avg shrunk to last season)", ctx: "Lock Desk matchup model (model × opponent, pace, minutes, injuries, rest)" };
 function renderExperts() {
   const ex = base.experts, rows = ex.sources || [];
   const weeks = [...new Set(rows.flatMap(r => Object.keys(r.weekly || {})))].sort((a, b) => a - b);

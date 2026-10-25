@@ -29,14 +29,20 @@ const ov = { ...readState("eligibility_overrides.json", {}), ...(backend.elig ||
 const snaps = { ...readState(`lineups_${season}_w${week}.json`, {}), ...(backend.lineups || {}) };
 const tipsRaw = st("tips");
 
-const book = new Book({ scoring: league.scoring_settings, players: st("players"), priors: st("priors"), gamelog: st("gamelog").games, weights: st("experts").weights });
+const ctxMap = (() => { try { return st("context"); } catch { return {}; } })();
+const book = new Book({ scoring: league.scoring_settings, players: st("players"), priors: st("priors"), gamelog: st("gamelog").games,
+  weights: st("experts").weights, ctx: ctxMap });
 book.addStats(stats); book.addProjections(proj);
 const mine = rosters.find(r => r.owner_id === USER), my = matchups.find(m => m.roster_id === mine.roster_id);
 const slots = league.roster_positions.filter(s => s !== "BN" && s !== "IR");
 const wp = new WeekPlan({ Q: st("quantiles").quantiles, book, schedule, week, today, rosterPositions: league.roster_positions,
   roster: mine, matchup: my, rosters, tips: tipsRaw, locks,
   elig: (p, d) => { const k = `${d}|${p}`; if (k in ov) return !!ov[k]; const s = snaps[k]; return s && s.frozen ? s.slot != null : null; } });
-const plan = wp.build();
+const opp = matchups.find(m => m.matchup_id === my.matchup_id && m.roster_id !== mine.roster_id);
+const oppRoster = opp && rosters.find(r => r.roster_id === opp.roster_id);
+const oppPlan = oppRoster ? new WeekPlan({ Q: st("quantiles").quantiles, book, schedule, week, today, rosterPositions: league.roster_positions,
+  roster: oppRoster, matchup: opp, rosters, tips: tipsRaw, locks: {}, elig: () => true }).build() : null;
+const plan = wp.build({ opp: oppPlan ? { mean: oppPlan.outlook.mean, var: oppPlan.outlook.var } : null });
 // never suggest dropping someone the plan is counting on: locked/kept games, today's starters and relief, next-up players
 const protect = new Set([...(mine.reserve || []),
   ...plan.slots.filter(s => ["locked", "lock", "keep", "live", "confirm"].includes(s.action)).map(s => s.pid),
@@ -87,10 +93,11 @@ const out = {
 fs.writeFileSync("site/static/moves.json", JSON.stringify(out));
 // the engine's plan, for phone alerts (app/alerts.py) — same numbers the site shows
 fs.writeFileSync("site/static/plan.json", JSON.stringify({ week, generated: out.generated,
-  slots: plan.slots, actions: plan.actions, lineup: plan.lineup }));
+  slots: plan.slots, actions: plan.actions, lineup: plan.lineup, outlook: plan.outlook,
+  oppName: oppRoster ? (userName[oppRoster.owner_id] || "Opponent") : null }));
 // full plan snapshot on the state branch, for debugging what the engine saw
 fs.writeFileSync(stateFile("plan_debug.json"), JSON.stringify({ at: new Date().toISOString(), today, week, expectedTotal: plan.expectedTotal,
-  slots: plan.slots, actions: plan.actions, idle: plan.idle,
+  slots: plan.slots, actions: plan.actions, idle: plan.idle, outlook: plan.outlook,
   grid: plan.grid.map(r => ({ name: r.name, pos: r.pos, starter: r.starter, locked: r.locked, status: r.status, cells: r.cells })) }, null, 1));
 console.log(`moves: ${out.adds.length} adds, ${out.trades.length} trades, ${items.length} new reasons requested`);
 void playerValue;
