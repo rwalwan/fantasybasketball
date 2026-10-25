@@ -98,7 +98,8 @@ fs.writeFileSync("site/static/plan.json", JSON.stringify({ week, generated: out.
   oppName: oppRoster ? (userName[oppRoster.owner_id] || "Opponent") : null }));
 // full plan snapshot on the state branch, for debugging what the engine saw
 fs.writeFileSync(stateFile("plan_debug.json"), JSON.stringify({ at: new Date().toISOString(), today, week, expectedTotal: plan.expectedTotal,
-  slots: plan.slots, actions: plan.actions, idle: plan.idle, outlook: plan.outlook,
+  slots: plan.slots, actions: plan.actions, idle: plan.idle, outlook: plan.outlook, adds: out.adds, trades: out.trades,
+  values: Object.fromEntries((mine.players || []).map(p => [book.name(p), Math.round(valuer.perWeek(p) * 10) / 10])),
   grid: plan.grid.map(r => ({ name: r.name, pos: r.pos, starter: r.starter, locked: r.locked, status: r.status, cells: r.cells })) }, null, 1));
 console.log(`moves: ${out.adds.length} adds, ${out.trades.length} trades, ${items.length} new reasons requested`);
 void playerValue;
