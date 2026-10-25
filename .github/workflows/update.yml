@@ -76,7 +76,7 @@ jobs:
           (cd site && python3 -m http.server 8099 >/dev/null 2>&1 &)
           sleep 1
           timeout 90 google-chrome --headless=new --disable-gpu --no-sandbox --enable-logging=stderr --v=0 \
-            --virtual-time-budget=25000 --dump-dom http://localhost:8099/ > /tmp/dom.html 2> /tmp/console.txt || true
+            --virtual-time-budget=25000 --dump-dom "http://localhost:8099/#api=${{ vars.WORKER_URL }}" > /tmp/dom.html 2> /tmp/console.txt || true
           python3 tools/site_check.py /tmp/dom.html /tmp/console.txt > data/state/site_check.json || echo '{"error":"check failed"}' > data/state/site_check.json
           cat data/state/site_check.json
 
