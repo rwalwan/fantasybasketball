@@ -18,19 +18,14 @@ import xml.etree.ElementTree as ET
 
 import requests
 
+from . import sources
+
 STATE = os.path.join(os.path.dirname(__file__), "..", "data", "state")
 UA = {"User-Agent": "we-back-lock-desk (personal fantasy assistant; github.com/rwalwan/fantasybasketball)"}
 MODEL = os.environ.get("OPENROUTER_MODEL") or "anthropic/claude-haiku-5.5"
 
-NEWS_FEEDS = {
-    "RotoWire": "https://www.rotowire.com/rss/news.php?sport=NBA",
-    "RealGM": "https://basketball.realgm.com/rss/wiretap/0/0.xml",
-}
-ARTICLE_FEEDS = {
-    "RotoBaller": "https://www.rotoballer.com/category/nba/feed",
-    "RotoBaller waivers": "https://www.rotoballer.com/category/nba/nba-waiver-wire/feed",
-    "Razzball": "https://basketball.razzball.com/feed/",
-}
+ADVICE_RE = re.compile(r"(?i)waiver|start|sit\b|pickup|pick-up|add|drop|sell|buy|trade|stream|sleeper|target|risers|fallers|week \d|rest of season|ros\b|must-|hold")
+DRAFT_TITLE_RE = re.compile(r"(?i)draft|adp|mock|preseason|auction|keeper|dynasty|cheat sheet")
 BULL = {"add", "start", "buy", "stream", "hold"}
 BEAR = {"drop", "sit", "sell", "avoid"}
 REPLACEMENT_FPG = 25.0      # research: player #180 averaged 23-26 FP/G in this scoring
@@ -113,12 +108,15 @@ NEWS_PROMPT = """You turn one NBA news blurb into JSON for a fantasy basketball 
  "summary": "<one short sentence in your own words>"}
 Use only what the text supports. Do not copy sentences from the source."""
 
-CLAIMS_PROMPT = """You extract fantasy basketball advice from one article for a tool that grades experts.
-Reply with ONE JSON object: {"claims": [{"player": "<full name>", "action": "add|drop|start|sit|buy|sell|stream|hold|avoid",
- "horizon": "day|week|season", "conviction": 1-3, "reason": "<under 15 words, your own words>"}]}
-Include only explicit IN-SEASON recommendations about specific NBA players: who to pick up, drop, start, sit, trade for
-or trade away now. Exclude draft advice (draft picks, ADP, "worth a late pick", keeper/dynasty stashes), rankings lists
-without advice, and general strategy. Points-league context is fine. If there are none, return {"claims": []}."""
+CLAIMS_PROMPT = """You read one fantasy basketball article or post for a tool that tracks expert opinion. Reply with ONE JSON object:
+{"claims": [{"player": "<full name>", "action": "add|drop|start|sit|buy|sell|stream|hold|avoid",
+             "horizon": "day|week|season", "conviction": 1-3, "reason": "<under 15 words, your own words>"}],
+ "takes":  [{"player": "<full name>", "lean": "up|down|neutral", "take": "<under 20 words, your own words>"}]}
+claims = explicit IN-SEASON recommendations (pick up, drop, start, sit, trade for, trade away now).
+takes  = any substantive opinion about a specific NBA player's outlook (role, minutes, usage, injury, matchup, trend),
+         even without a recommendation. One take per player, the most important point.
+Exclude draft advice (draft picks, ADP, "worth a late pick", keeper/dynasty stashes) and general strategy.
+Never copy sentences from the source. If there is nothing, return {"claims": [], "takes": []}."""
 
 
 def collect(meta, my_players, fa_ids, today):
@@ -130,23 +128,34 @@ def collect(meta, my_players, fa_ids, today):
     budget = MAX_LLM_ITEMS
     now = dt.datetime.now(dt.timezone.utc).isoformat(timespec="minutes")
 
-    for src, url in NEWS_FEEDS.items():
+    srcs, report = sources.active_sources()
+    takes = _load("expert_takes.json", [])
+    news_budget, advice_budget = MAX_LLM_ITEMS // 2, MAX_LLM_ITEMS - MAX_LLM_ITEMS // 2
+    advice_items = []
+    for src in srcs:
         try:
-            items = parse_feed(url)
+            items = sources.fetch_items(src)
         except Exception as e:
-            print("feed failed", src, e)
+            print("feed failed", src["name"], e)
             continue
         for it in items:
             if it["id"] in seen:
                 continue
+            is_advice = src["role"] == "advice" or (src["role"] == "mixed" and ADVICE_RE.search(it["title"]))
+            if is_advice:
+                advice_items.append((src, it))
+                continue
             seen[it["id"]] = today
             if re.search(r"(?i)how to watch|live stream|get your latest|tv channel|betting|odds|picks? &|prediction|wnba|viewers|revenue|ratings", it["title"]):
                 continue
-            rec = {"source": src, "title": it["title"], "link": it["link"], "at": now, "text": it["text"][:400]}
-            if budget > 0:
+            if src["role"] != "news" and not sources.NBA_WORDS.search(it["title"] + " " + it["text"]):
+                continue
+            rec = {"source": src["name"], "title": it["title"], "link": it["link"], "at": now, "text": it["text"][:400]}
+            if news_budget > 0 and os.environ.get("OPENROUTER_API_KEY"):
                 try:
                     x = llm_json(NEWS_PROMPT, f"Title: {it['title']}\n\n{it['text']}")
-                    budget -= 1
+                    news_budget -= 1
+                    rec["llm_tried"] = True
                     if x:
                         rec.update({k: x.get(k) for k in ("player", "team", "kind", "status", "games_out_estimate",
                                                           "minutes_effect", "beneficiaries", "summary")})
@@ -155,6 +164,7 @@ def collect(meta, my_players, fa_ids, today):
             rec["pid"] = names.pid(rec.get("player") or it["title"].split(":")[0])
             rec["beneficiary_pids"] = [p for p in (names.pid(b) for b in (rec.get("beneficiaries") or [])) if p]
             news.append(rec)
+    budget = news_budget
 
     # backfill: items collected before the AI key existed (or that failed) get processed now, newest first
     for rec in reversed(news):
@@ -174,40 +184,42 @@ def collect(meta, my_players, fa_ids, today):
         except Exception as e:
             print("llm backfill failed:", e)
 
-    for src, url in ARTICLE_FEEDS.items():
-        try:
-            items = parse_feed(url)
-        except Exception as e:
-            print("feed failed", src, e)
-            continue
-        for it in items:
-            if it["id"] in seen or budget <= 0 or not os.environ.get("OPENROUTER_API_KEY"):
-                continue                      # without a key, leave articles for when one is added
-            title = it["title"].lower()
-            if re.search(r"draft|adp|mock|preseason|auction|keeper|dynasty|cheat sheet|rankings", title):
-                seen[it["id"]] = today          # draft-season content: not in-season advice
-                continue
-            if not any(k in title for k in ("waiver", "start", "sit", "pickup", "add", "drop", "sell", "buy", "trade",
-                                            "stream", "sleeper", "target", "risers", "fallers", "week")):
-                seen[it["id"]] = today          # not an advice article
-                continue
+    # advice: newest first; each article once. Without an AI key, leave them for later.
+    advice_items.sort(key=lambda x: x[1]["published"] or dt.datetime.min.replace(tzinfo=dt.timezone.utc), reverse=True)
+    for src, it in advice_items:
+        if advice_budget <= 0 or not os.environ.get("OPENROUTER_API_KEY"):
+            break
+        title = it["title"]
+        if DRAFT_TITLE_RE.search(title):
             seen[it["id"]] = today
-            try:
-                text = article_text(it["link"])
-                x = llm_json(CLAIMS_PROMPT, f"Title: {it['title']}\nAuthor: {it['author']}\n\n{text}")
-                budget -= 1
-            except Exception as e:
-                print("article failed:", e)
+            continue
+        seen[it["id"]] = today
+        try:
+            text = it["text"] if len(it["text"]) > 900 else sources.article_text(it["link"])
+            x = llm_json(CLAIMS_PROMPT, f"Source: {src['name']}\nTitle: {title}\nAuthor: {it['author']}\n\n{text}")
+            advice_budget -= 1
+        except Exception as e:
+            print("article failed:", src["name"], e)
+            continue
+        expert = f"{it['author'] or 'Staff'} ({src['name']})" if not src["name"].startswith("Reddit") else "r/fantasybball community"
+        for c in (x or {}).get("claims", [])[:25]:
+            pid = names.pid(c.get("player", ""))
+            if not pid or c.get("action") not in BULL | BEAR:
                 continue
-            for c in (x or {}).get("claims", [])[:25]:
-                pid = names.pid(c.get("player", ""))
-                if not pid or c.get("action") not in BULL | BEAR:
-                    continue
-                claims.append({"expert": f"{it['author'] or 'Staff'} ({src.split()[0]})", "site": src.split()[0],
-                               "date": today, "pid": pid, "player": c.get("player"), "action": c["action"],
-                               "horizon": c.get("horizon") or "week", "conviction": c.get("conviction") or 2,
-                               "reason": (c.get("reason") or "")[:120], "title": it["title"], "link": it["link"]})
+            claims.append({"expert": expert, "site": src["name"], "date": today, "pid": pid, "player": c.get("player"),
+                           "action": c["action"], "horizon": c.get("horizon") or "week", "conviction": c.get("conviction") or 2,
+                           "reason": (c.get("reason") or "")[:120], "title": title, "link": it["link"]})
+        for t in (x or {}).get("takes", [])[:30]:
+            pid = names.pid(t.get("player", ""))
+            if not pid or not t.get("take"):
+                continue
+            takes.append({"pid": pid, "player": t.get("player"), "lean": t.get("lean") or "neutral", "take": t["take"][:160],
+                          "expert": expert, "source": src["name"], "date": today, "title": title, "link": it["link"]})
 
+    takes_cut = (dt.date.fromisoformat(today) - dt.timedelta(days=21)).isoformat()
+    takes = [t for t in takes if t["date"] >= takes_cut and not DRAFT_RE.search(t["take"])][-1500:]
+    _save("expert_takes.json", takes)
+    collect.report = report
     cutoff = (dt.date.fromisoformat(today) - dt.timedelta(days=21)).isoformat()
     seen = {k: v for k, v in seen.items() if v >= cutoff}
     news = [n for n in news if n["at"][:10] >= (dt.date.fromisoformat(today) - dt.timedelta(days=7)).isoformat()][-400:]

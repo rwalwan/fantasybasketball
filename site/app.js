@@ -231,11 +231,13 @@ const riskOf = (book, p) => { const g = book.games[p] || []; if (g.length < 4) r
   return cv < 0.22 ? ["steady", "safe floor"] : cv < 0.32 ? ["balanced", ""] : ["boom/bust", "big ceiling, low floor"]; };
 function researchRows(c, roster, who) {
   const { book, wp } = c, trends = Object.fromEntries((live.insights?.trends || []).map(t => [t.pid, t]));
+  const takes = live.claims?.takes || {};
+  const takeCell = p => (takes[p] || []).slice(0, 2).map(t => `<div class="take"><span class="chip ${t.lean === "up" ? "up" : t.lean === "down" ? "down" : ""}">${t.lean === "up" ? "▲" : t.lean === "down" ? "▼" : "•"}</span> ${esc(t.take)} <a class="pos" href="${esc(t.link)}" target="_blank" rel="noopener">${esc(t.expert)}</a></div>`).join("") || '<span class="pos">–</span>';
   const rows = [];
   for (const p of roster.players || []) {
     const ups = wp.upcoming(p);
     const [risk, riskWhy] = riskOf(book, p), tr = trends[p];
-    if (!ups.length) { rows.push(`<tr><td>${esc(book.name(p))}${book.status(p) ? `<span class="st">${esc(book.status(p))}</span>` : ""}</td><td class="pos">${esc(book.pos(p).join("/"))}</td><td colspan="6" class="pos">no games left this week</td></tr>`); continue; }
+    if (!ups.length) { rows.push(`<tr><td>${esc(book.name(p))}${book.status(p) ? `<span class="st">${esc(book.status(p))}</span>` : ""}</td><td class="pos">${esc(book.pos(p).join("/"))}</td><td colspan="6" class="pos">no games left this week</td><td style="white-space:normal;min-width:220px">${takeCell(p)}</td></tr>`); continue; }
     ups.forEach((g, k) => {
       const cx = book.ctx?.[`${p}|${g.date}`], rw = book.proj[`${p}|${g.date}`], mdl = book.baseline(p);
       const [lo, hi] = range80(base.Q, g.mu);
@@ -243,10 +245,11 @@ function researchRows(c, roster, who) {
       rows.push(`<tr><td>${k ? "" : esc(book.name(p))}${!k && book.status(p) ? `<span class="st">${esc(book.status(p))}</span>` : ""}${!k && tr ? ` <span class="chip ${tr.dir === "up" ? "up" : "down"}" title="${esc(tr.why)}">${tr.dir === "up" ? "▲" : "▼"} role</span>` : ""}</td>` +
         `<td class="pos">${k ? "" : esc(book.pos(p).join("/"))}</td><td>${esc(day(g.date))} ${g.b2b ? '<span class="pos">b2b</span>' : ""} <span class="pos">vs ${esc(g.opp)}${g.tip ? " · " + esc(tipTime(g.tip)) : ""}</span></td>` +
         `<td class="n"><b>${r1(g.mu)}</b></td><td class="n pos">${rw ? r1(rw) : "–"} / ${r1(mdl)} / ${cx ? r1(mdl * cx.f) : "–"}</td><td class="n">${lo}–${hi}</td>` +
-        `<td style="white-space:normal">${chips || '<span class="pos">neutral</span>'}</td><td class="pos" title="${esc(riskWhy)}">${k ? "" : risk} · ${Math.round(g.q * 100)}%</td></tr>`);
+        `<td style="white-space:normal">${chips || '<span class="pos">neutral</span>'}</td><td class="pos" title="${esc(riskWhy)}">${k ? "" : risk} · ${Math.round(g.q * 100)}%</td>` +
+        `<td style="white-space:normal;min-width:220px">${k ? "" : takeCell(p)}</td></tr>`);
     });
   }
-  return `<tr><th>${esc(who)}</th><th>Pos</th><th>Game</th><th>Proj</th><th>RotoWire / model / matchup</th><th>Range (10–90%)</th><th>Matchup factors (hover for why)</th><th>Profile · plays</th></tr>` + rows.join("");
+  return `<tr><th>${esc(who)}</th><th>Pos</th><th>Game</th><th>Proj</th><th>RotoWire / model / matchup</th><th>Range (10–90%)</th><th>Matchup factors (hover for why)</th><th>Profile · plays</th><th>What experts say</th></tr>` + rows.join("");
 }
 function renderResearch(c) {
   $("research").innerHTML = researchRows(c, c.mine, "Your players");
@@ -293,6 +296,11 @@ function renderExperts() {
     (rows.map(r => `<tr><td>${esc(SRC_NAME[r.source] || r.source)}</td><td class="n">${r.games}</td><td class="n">${r1(r.mae)}</td><td class="n">${r1(r.rmse)}</td><td class="n">${r.bias > 0 ? "+" : ""}${r1(r.bias)}</td><td class="n">${r.weight != null ? Math.round(r.weight * 100) + "%" : "–"}</td>${weeks.map(w => `<td class="n">${r.weekly?.[w] != null ? r1(r.weekly[w]) : ""}</td>`).join("")}</tr>`).join("") ||
      `<tr><td colspan="6" class="pos">Grading starts with tonight's games: each source's projection is logged before tip and scored once the box score is in.</td></tr>`);
   const cl = live.claims || { experts: [], recent: [] };
+  const sr = cl.sources || { rows: [] };
+  $("sources").innerHTML = `<tr><th>Source</th><th>Type</th><th>Status</th><th>Newest item</th><th>Takes (7d)</th><th>Calls (7d)</th></tr>` +
+    (sr.rows || []).sort((a, b) => (b.ok - a.ok) || (b.takes7 + b.calls7) - (a.takes7 + a.calls7)).map(r => `<tr><td><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.name)}</a></td><td class="pos">${esc(r.role)}</td>` +
+      `<td>${r.ok ? '<span class="good">active</span>' : `<span class="pos">${esc(r.why || "off")}</span>`}</td><td class="pos">${r.newest ? esc(new Date(r.newest).toLocaleDateString()) : "–"}</td><td class="n">${r.takes7 || 0}</td><td class="n">${r.calls7 || 0}</td></tr>`).join("");
+  $("sourcesmeta").textContent = sr.checked ? `Sources re-checked ${new Date(sr.checked).toLocaleString()} (every 3 days): reachable, allowed by the site's robots.txt, recent, and NBA-focused.` : "";
   $("pundits").innerHTML = `<tr><th>Expert</th><th>Calls</th><th>Graded</th><th>Hit rate</th><th>Weight</th></tr>` +
     (cl.experts.map(e => `<tr><td>${esc(e.expert)}</td><td class="n">${e.calls}</td><td class="n">${e.graded}</td><td class="n">${e.hit_rate != null ? Math.round(e.hit_rate * 100) + "%" : "–"}</td><td class="n">${Math.round(e.weight * 100)}%</td></tr>`).join("") ||
      `<tr><td colspan="5" class="pos">No expert calls collected yet. They appear as advice articles are published and read.</td></tr>`);

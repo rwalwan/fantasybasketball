@@ -110,6 +110,26 @@ def main():
                               for n in reversed(items[-80:])],
                     "mine": newsmod.impact(items, mine.get("players") or [], fa_ids, book)}
         claims_out = {"experts": table, "consensus": cons, "recent": claims[-60:][::-1]}
+        # what experts are saying about every player that matters this week (mine, opponent's, waiver targets)
+        takes = newsmod._load("expert_takes.json", [])
+        opp_ids = set(next((r.get("players") or [] for r in rosters if opp_m and r["roster_id"] == opp_m["roster_id"]), []))
+        focus = set(mine.get("players") or []) | opp_ids | set(fa_ids[:25])
+        tb = {}
+        for t in reversed(takes):
+            if t["pid"] in focus and len(tb.setdefault(t["pid"], [])) < 4:
+                tb[t["pid"]].append({k: t[k] for k in ("lean", "take", "expert", "date", "link")})
+        claims_out["takes"] = tb
+        rep = getattr(newsmod.collect, "report", None) or {}
+        since = (dt.date.fromisoformat(today) - dt.timedelta(days=7)).isoformat()
+        cnt = {}
+        for t in takes:
+            if t["date"] >= since:
+                cnt.setdefault(t["source"], [0, 0])[0] += 1
+        for c in claims:
+            if c["date"] >= since:
+                cnt.setdefault(c["site"], [0, 0])[1] += 1
+        claims_out["sources"] = {"checked": rep.get("at"), "rows": [dict(r, takes7=cnt.get(r["name"], [0, 0])[0],
+                                 calls7=cnt.get(r["name"], [0, 0])[1]) for r in rep.get("sources", [])]}
         for w in waivers:
             c = cons.get(w["pid"])
             w["experts"] = {"bull_share": c["bull_share"], "n": c["n"]} if c else None

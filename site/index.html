@@ -45,7 +45,7 @@ td.c{text-align:center;font-family:"IBM Plex Mono",monospace;font-size:12px}td.c
 td.today,th.today{background:var(--startbg)}
 .st{font-size:11px;color:var(--risk);margin-left:6px}
 .foot{margin-top:30px;font-size:12px;color:var(--quiet)}
-.hide{display:none}.chip{display:inline-block;font-size:11px;padding:1px 6px;border-radius:99px;background:var(--chip);color:var(--quiet);font-family:"IBM Plex Mono",monospace;white-space:nowrap}.chip.up{background:var(--lockbg);color:var(--lock)}.chip.down{background:var(--riskbg);color:var(--risk)}a{color:var(--start)}
+.hide{display:none}.take{font-size:12.5px;margin:2px 0;line-height:1.35}.chip{display:inline-block;font-size:11px;padding:1px 6px;border-radius:99px;background:var(--chip);color:var(--quiet);font-family:"IBM Plex Mono",monospace;white-space:nowrap}.chip.up{background:var(--lockbg);color:var(--lock)}.chip.down{background:var(--riskbg);color:var(--risk)}a{color:var(--start)}
 select{font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink)}
 .trade{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:700px){.trade{grid-template-columns:1fr}}
 .pick h3{font-size:13px;margin:8px 0 4px;color:var(--quiet);font-weight:500}
@@ -97,6 +97,7 @@ select{font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);
   <p class="foot" style="margin-top:0">Add/drop/start/sit/buy/sell calls pulled from bylined articles. A bullish call counts as right if the player then averaged above replacement level (25 FP/G) over its horizon; a start call is right if he beat his own average that game; bearish calls are the reverse. Weight = hit rate pulled toward 50% until an expert has a record.</p>
   <div class="wrap"><table id="pundits"></table></div>
   <h2>Latest calls</h2><div class="wrap"><table id="calls"></table></div>
+  <h2>Sources the bot reads</h2><p class="foot" id="sourcesmeta" style="margin-top:0"></p><div class="wrap"><table id="sources"></table></div>
 </section>
 <section data-p="research" class="hide">
   <h2>Every game left this week</h2>

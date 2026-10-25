@@ -32,7 +32,7 @@ class Count(HTMLParser):
 c = Count()
 c.feed(dom)
 ids = ["now", "slots", "lineup", "grid", "waivers", "adds", "ideas", "research", "research_opp", "outlook", "why", "trends",
-       "openings", "scorecard", "experts", "mynews"]
+       "openings", "scorecard", "experts", "mynews", "sources"]
 errors = [l.strip()[:300] for l in console.splitlines() if "CONSOLE" in l and re.search(r"Uncaught|Error|TypeError|ReferenceError", l)]
 out = {"errors": errors[:10], "sections": {i: c.counts.get(i, 0) for i in ids},
        "now_text": re.sub(r"\s+", " ", c.text.get("now", ""))[:300]}
