@@ -227,6 +227,11 @@ export class WeekPlan {
     if (this.locks[p] === true) return { st: "locked", g: pl.at(-1) || null };
     const lv = this.livePlayed(p);
     if (lv.length) return { st: "live", g: lv.at(-1) };
+    // tipped but no stat line yet (Sleeper's first box score row lags the tip by a few minutes): still live, 0 so far.
+    // Without this, a game in its first minutes vanished and the slot looked like it had nothing left.
+    const t = this.b.team(p), done = new Set((this.b.games[p] || []).map(g => g.date));
+    const fresh = this.teamDays(t).find(d => this.tipped(p, d) && !this.final(p, d) && !done.has(d));
+    if (fresh && !OUT.has(this.b.status(p)) && this.elig(p, fresh) !== false) return { st: "live", g: { date: fresh, fp: 0, min: 0, gid: null } };
     const raw = this.matchup.players_points?.[p];
     if (!pl.length || raw == null) return { st: "none", g: null };
     const pts = Math.round(raw) / 10;
