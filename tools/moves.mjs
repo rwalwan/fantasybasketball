@@ -41,21 +41,22 @@ const protect = new Set([...(mine.reserve || []), ...plan.slots.filter(s => s.ac
 
 const claims = (() => { try { return st("claims"); } catch { return { consensus: {} }; } })();
 const fa = wp.waivers(trending, 40).list;
-const adds = waiverMoves(book, mine, fa, slots, protect, 8).map(m => ({ ...m, experts: claims.consensus?.[m.pid] || null }));
+const adds = waiverMoves(book, mine, fa, slots, protect, 12).filter(m => m.gain >= 1.5).slice(0, 8).map(m => ({ ...m, experts: claims.consensus?.[m.pid] || null }));
 const trades = tradeIdeas(book, mine, rosters.filter(r => r.roster_id !== mine.roster_id), slots, 10)
   .map(t => ({ ...t, partner: userName[t.owner_id] || `Team ${t.roster_id}`,
                giveNames: t.give.map(p => book.name(p)), getNames: t.get.map(p => book.name(p)) }));
 
 // ---- short reasons from the AI model (cached per suggestion) ----
 const cache = readState("reasons.json", {});
-const fmtP = p => { const g = book.games[p] || []; return `${book.name(p)} (${book.team(p)}, ${book.pos(p).join("/")}, ${book.baseline(p).toFixed(1)} FP/G proj, ${g.length} games this season, last 3: ${g.slice(-3).map(x => x.fp).join("/") || "none"}${book.status(p) ? ", " + book.status(p) : ""})`; };
+const fmtP = p => { const g = book.games[p] || [], avg = book.avg(p), pri = book.prior[p];
+  return `${book.name(p)} (${book.team(p)}, ${book.pos(p).join("/")}, projection ${book.baseline(p).toFixed(1)} FP/G = ${g.length} games this season${avg != null ? ` at ${avg.toFixed(1)}` : ""} blended with ${pri != null ? `last season's ${pri.toFixed(1)}` : "preseason projections"}; last 3: ${g.slice(-3).map(x => x.fp).join("/") || "none"}${book.status(p) ? ", " + book.status(p) : ""})`; };
 const items = [
   ...adds.map(m => ({ key: `add|${m.pid}|${m.drop}|${today}`, text: `WAIVER: add ${fmtP(m.pid)}; drop ${fmtP(m.drop)}. Team value +${m.gain} locked pts/week. ${m.experts ? `Experts: ${Math.round(m.experts.bull_share * 100)}% bullish over ${m.experts.n} calls.` : ""} Sleeper adds last 24h: ${m.trend}.` })),
   ...trades.map(t => ({ key: `trade|${t.give.join("+")}|${t.get.join("+")}|${today}`, text: `TRADE with ${t.partner}: give ${t.give.map(fmtP).join(" + ")}; get ${t.get.map(fmtP).join(" + ")}. Our team +${t.dm.toFixed(1)}, theirs +${t.dt.toFixed(1)} locked pts/week.` })),
 ].filter(x => !cache[x.key]);
 
 if (items.length && process.env.OPENROUTER_API_KEY) {
-  const sys = "You write one-sentence reasons (max 25 words) for fantasy basketball moves in a 12-team head-to-head points league on Sleeper using Lock-In mode (each starter's weekly score is one game the manager locks; rebounds and assists are worth 2, steals/blocks 1.5, no turnover penalty, double-double +2, triple-double +3). Use only the numbers given. Reply as JSON: {\"reasons\": [{\"key\": \"...\", \"reason\": \"...\"}]}.";
+  const sys = "You write one-sentence reasons (max 25 words) for fantasy basketball moves in a 12-team head-to-head points league on Sleeper using Lock-In mode (each starter's weekly score is one game the manager locks; rebounds and assists are worth 2, steals/blocks 1.5, no turnover penalty, double-double +2, triple-double +3). Use only the numbers given. Early in the season the projection leans on last season, so a few hot or cold games matter less; say so when that's what drives the move. Reply as JSON: {\"reasons\": [{\"key\": \"...\", \"reason\": \"...\"}]}.";
   try {
     const r = await fetch("https://openrouter.ai/api/v1/chat/completions", { method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`, "x-title": "Lock Desk" },
@@ -81,5 +82,10 @@ const out = {
     reason: cache[`trade|${t.give.join("+")}|${t.get.join("+")}|${today}`] || null })),
 };
 fs.writeFileSync("site/static/moves.json", JSON.stringify(out));
+// the engine's plan, for phone alerts (app/alerts.py) — same numbers the site shows
+fs.writeFileSync("site/static/plan.json", JSON.stringify({ week, generated: out.generated,
+  slots: plan.slots.map(x => ({ slot: x.slot, pid: x.pid, name: x.name, status: x.status, action: x.action, score: x.score ?? null,
+    bar: x.bar ?? null, detail: x.detail, deadline: x.deadline || null })),
+  lineup: plan.lineup }));
 console.log(`moves: ${out.adds.length} adds, ${out.trades.length} trades, ${items.length} new reasons requested`);
 void playerValue;

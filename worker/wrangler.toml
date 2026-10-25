@@ -1,5 +1,6 @@
 name = "lock-desk"
 main = "src/index.js"
+account_id = "9c9ae6872597b6d0ff6246a94028ec4b"
 compatibility_date = "2026-10-01"
 
 [triggers]
@@ -10,4 +11,5 @@ crons = ["* * * * *"]
 binding = "KV"
 id = "175ebaf62ac64aae9e7f4f7a8538f8f1"
 
-# WRITE_KEY is a secret (npx wrangler secret put WRITE_KEY); the site sends it to save answers.
+# Secrets (set once, kept across deploys): WRITE_KEY (site uses it to save answers),
+# GH_TOKEN (optional: lets the minute cron trigger the GitHub workflow every 15 min).

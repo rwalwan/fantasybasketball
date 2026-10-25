@@ -116,8 +116,9 @@ Use only what the text supports. Do not copy sentences from the source."""
 CLAIMS_PROMPT = """You extract fantasy basketball advice from one article for a tool that grades experts.
 Reply with ONE JSON object: {"claims": [{"player": "<full name>", "action": "add|drop|start|sit|buy|sell|stream|hold|avoid",
  "horizon": "day|week|season", "conviction": 1-3, "reason": "<under 15 words, your own words>"}]}
-Include only explicit recommendations the author makes about specific NBA players (not rankings lists without advice,
-not general strategy). Points-league context is fine. If there are none, return {"claims": []}."""
+Include only explicit IN-SEASON recommendations about specific NBA players: who to pick up, drop, start, sit, trade for
+or trade away now. Exclude draft advice (draft picks, ADP, "worth a late pick", keeper/dynasty stashes), rankings lists
+without advice, and general strategy. Points-league context is fine. If there are none, return {"claims": []}."""
 
 
 def collect(meta, my_players, fa_ids, today):
@@ -183,6 +184,9 @@ def collect(meta, my_players, fa_ids, today):
             if it["id"] in seen or budget <= 0 or not os.environ.get("OPENROUTER_API_KEY"):
                 continue                      # without a key, leave articles for when one is added
             title = it["title"].lower()
+            if re.search(r"draft|adp|mock|preseason|auction|keeper|dynasty|cheat sheet|rankings", title):
+                seen[it["id"]] = today          # draft-season content: not in-season advice
+                continue
             if not any(k in title for k in ("waiver", "start", "sit", "pickup", "add", "drop", "sell", "buy", "trade",
                                             "stream", "sleeper", "target", "risers", "fallers", "week")):
                 seen[it["id"]] = today          # not an advice article
@@ -209,8 +213,16 @@ def collect(meta, my_players, fa_ids, today):
     news = [n for n in news if n["at"][:10] >= (dt.date.fromisoformat(today) - dt.timedelta(days=7)).isoformat()][-400:]
     _save("seen_items.json", seen)
     _save("news.json", news)
+    claims = purge_draft_claims(claims)
     _save("claims.json", claims)
     return news, claims
+
+
+DRAFT_RE = re.compile(r"(?i)\bdraft|\bpick\b|\badp\b|preseason|dynasty|stash|mock")
+
+
+def purge_draft_claims(claims):
+    return [c for c in claims if not (DRAFT_RE.search(c.get("reason", "")) or DRAFT_RE.search(c.get("title", "")))]
 
 
 def grade(claims, book, today):

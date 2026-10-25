@@ -67,22 +67,35 @@ async function snapshot(env) {
     const slot = slotOf[pid] ?? null;
     if (!cur || cur.slot !== slot) { snaps[k] = { slot, seen: stamp, frozen: false }; changed = true; }
   }
-  if (changed) await env.KV.put(key, JSON.stringify(snaps));   // KV writes only on change (free plan: 1k/day)
-  await env.KV.put("heartbeat", stamp, { expirationTtl: 3600 }).catch(() => {});
+  // KV free plan = 1,000 writes/day. Only write when a lineup actually changes (~10-40 writes on a game day).
+  if (changed) await env.KV.put(key, JSON.stringify(snaps));
   return { date, changed };
 }
 
+// GitHub throttles scheduled workflows on free repos (runs can be hours apart), so the Worker's reliable
+// minute cron kicks the workflow every 15 minutes instead. Needs the GH_TOKEN secret (fine-grained PAT,
+// this repo only, Actions: read & write).
+async function kickWorkflow(env) {
+  if (!env.GH_TOKEN) return;
+  await fetch("https://api.github.com/repos/rwalwan/fantasybasketball/actions/workflows/update.yml/dispatches", {
+    method: "POST", body: JSON.stringify({ ref: "main" }),
+    headers: { authorization: `Bearer ${env.GH_TOKEN}`, accept: "application/vnd.github+json", "user-agent": "lock-desk-worker" } });
+}
+
 export default {
-  async scheduled(_event, env, ctx) { ctx.waitUntil(snapshot(env)); },
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(snapshot(env).catch(e => console.log("snapshot failed", e.message)));
+    if (new Date(event.scheduledTime).getUTCMinutes() % 15 === 0) ctx.waitUntil(kickWorkflow(env).catch(() => {}));
+  },
 
   async fetch(req, env) {
     const url = new URL(req.url);
     if (req.method === "OPTIONS") return json({});
     if (url.pathname === "/state") {
       const season = url.searchParams.get("season"), week = url.searchParams.get("week");
-      const [elig, locks, lineups, heartbeat] = await Promise.all([kvGet(env, "elig", {}), kvGet(env, `locks_w${week}`, {}),
-        kvGet(env, `lineups_${season}_w${week}`, {}), env.KV.get("heartbeat")]);
-      return json({ elig, locks, lineups, heartbeat });
+      const [elig, locks, lineups] = await Promise.all([kvGet(env, "elig", {}), kvGet(env, `locks_w${week}`, {}),
+        kvGet(env, `lineups_${season}_w${week}`, {})]);
+      return json({ ok: true, elig, locks, lineups, now: new Date().toISOString() });
     }
     if (url.pathname === "/answer" && req.method === "POST") {
       if (req.headers.get("x-key") !== env.WRITE_KEY) return json({ error: "bad key" }, 401);
@@ -90,11 +103,12 @@ export default {
       const name = kind === "elig" ? "elig" : kind === "locks" ? `locks_w${Number(week)}` : null;
       if (!name || typeof key !== "string" || key.length > 64) return json({ error: "bad request" }, 400);
       const cur = await kvGet(env, name, {});
+      if (cur[key] === !!value) return json({ ok: true, unchanged: true });   // don't spend a write
       cur[key] = !!value;
-      await env.KV.put(name, JSON.stringify(cur));
+      try { await env.KV.put(name, JSON.stringify(cur)); } catch (e) { return json({ error: "storage limit reached", detail: e.message }, 503); }
       return json({ ok: true });
     }
     if (url.pathname === "/run") return json(await snapshot(env));   // manual trigger / health check
-    return json({ service: "lock-desk", heartbeat: await env.KV.get("heartbeat") });
+    return json({ service: "lock-desk", ok: true });
   },
 };

@@ -1,0 +1,29 @@
+name: Deploy backend (Cloudflare Worker)
+
+on:
+  push:
+    branches: [main]
+    paths: ["worker/**"]
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for Cloudflare token
+        id: tok
+        run: |
+          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then
+            echo "CLOUDFLARE_API_TOKEN secret not set; skipping deploy."; echo "skip=1" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.tok.outputs.skip != '1'
+        with:
+          node-version: "22"
+      - name: Deploy
+        if: steps.tok.outputs.skip != '1'
+        working-directory: worker
+        run: npx --yes wrangler@4 deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

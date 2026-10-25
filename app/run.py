@@ -8,7 +8,6 @@ from zoneinfo import ZoneInfo
 import requests
 
 from . import espn, sleeper
-from .alerts import send_alerts
 from . import experts
 from . import news as newsmod
 from .engine import WeekPlan, team_game_dates, week_dates
@@ -82,10 +81,6 @@ def main():
     except Exception as e:
         print("news/experts failed:", e, file=sys.stderr)
 
-    try:
-        print("alerts sent:", send_alerts(plan, waivers, book, tips, today))
-    except Exception as e:
-        print("alerts failed:", e, file=sys.stderr)
 
     opp_owner = next((r.get("owner_id") for r in rosters if opp_m and r["roster_id"] == opp_m["roster_id"]), None)
     out = dict(generated=dt.datetime.now(ZoneInfo("America/Los_Angeles")).strftime("%a %b %d, %I:%M %p PT"),

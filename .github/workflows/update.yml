@@ -54,6 +54,11 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
 
+      - name: Phone alerts
+        run: python -m app.alerts || echo "alerts step failed"
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+
       - name: Save state to the state branch
         run: |
           cd data/state

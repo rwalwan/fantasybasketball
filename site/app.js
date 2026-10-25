@@ -68,7 +68,7 @@ async function loadLive() {
   const snaps = { ...snapsGh, ...(backend.lineups || {}) };
   const overrides = { ...overridesGh, ...(backend.elig || {}) };
   const locks = { ...locksGh, ...(backend.locks || {}) };
-  live = { rosters, matchups, stats, proj, trending, snaps, overrides, locks, tips, news, claims, moves, backend: !!backend.heartbeat, at: new Date() };
+  live = { rosters, matchups, stats, proj, trending, snaps, overrides, locks, tips, news, claims, moves, backend: !!backend.ok, at: new Date() };
   void tipDays;
 }
 
