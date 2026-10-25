@@ -37,7 +37,10 @@ const wp = new WeekPlan({ Q: st("quantiles").quantiles, book, schedule, week, to
   roster: mine, matchup: my, rosters, tips: tipsRaw, locks,
   elig: (p, d) => { const k = `${d}|${p}`; if (k in ov) return !!ov[k]; const s = snaps[k]; return s && s.frozen ? s.slot != null : null; } });
 const plan = wp.build();
-const protect = new Set([...(mine.reserve || []), ...plan.slots.filter(s => s.action === "locked").map(s => s.pid)]);
+// never suggest dropping someone the plan is counting on: locked/kept games, today's starters and relief, next-up players
+const protect = new Set([...(mine.reserve || []),
+  ...plan.slots.filter(s => ["locked", "lock", "keep", "live", "confirm"].includes(s.action)).map(s => s.pid),
+  ...plan.slots.flatMap(s => [s.today?.pid, s.today?.relief?.pid, s.later?.pid]).filter(Boolean)]);
 
 const claims = (() => { try { return st("claims"); } catch { return { consensus: {} }; } })();
 const fa = wp.waivers(trending, 40).list;
@@ -84,12 +87,10 @@ const out = {
 fs.writeFileSync("site/static/moves.json", JSON.stringify(out));
 // the engine's plan, for phone alerts (app/alerts.py) — same numbers the site shows
 fs.writeFileSync("site/static/plan.json", JSON.stringify({ week, generated: out.generated,
-  slots: plan.slots.map(x => ({ slot: x.slot, pid: x.pid, name: x.name, status: x.status, action: x.action, score: x.score ?? null,
-    bar: x.bar ?? null, detail: x.detail, deadline: x.deadline || null })),
-  lineup: plan.lineup }));
+  slots: plan.slots, actions: plan.actions, lineup: plan.lineup }));
 // full plan snapshot on the state branch, for debugging what the engine saw
 fs.writeFileSync(stateFile("plan_debug.json"), JSON.stringify({ at: new Date().toISOString(), today, week, expectedTotal: plan.expectedTotal,
-  slots: plan.slots, lineup: plan.lineup, before: plan.before, idle: plan.idle,
+  slots: plan.slots, actions: plan.actions, idle: plan.idle,
   grid: plan.grid.map(r => ({ name: r.name, pos: r.pos, starter: r.starter, locked: r.locked, status: r.status, cells: r.cells })) }, null, 1));
 console.log(`moves: ${out.adds.length} adds, ${out.trades.length} trades, ${items.length} new reasons requested`);
 void playerValue;

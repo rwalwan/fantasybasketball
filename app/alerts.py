@@ -79,26 +79,17 @@ def main():
         m = (_ts(t) - now).total_seconds() / 60
         return lo < m <= hi
 
-    # 1) lock decisions: within 75 min of the player's next tip (the lock window closes at that tip)
-    for s in plan["slots"]:
-        tip = (s.get("deadline") or {}).get("tip")
-        if s["action"] == "lock" and within(tip, 0, 75):
-            once(f"lock|{s['pid']}|{tip}", f"Lock {s['name']} before {tip_pt(tip)}", f"{s['slot']}: {s['detail']}",
-                 priority="high", tags="lock")
-        if s["action"] == "confirm" and within(tip, 0, 75):
-            once(f"confirm|{s['pid']}|{tip}", f"Check {s['name']} before {tip_pt(tip)}",
-                 f"{s['detail']} Answer on the Locks tab.", priority="high", tags="question")
-        if s["action"] == "fallback-risk":
-            once(f"fallback|{s['pid']}|{plan.get('week')}", f"{s['slot']} slot has no games left",
-                 s["detail"], priority="high", tags="warning")
-
-    # 2) lineup moves (includes relief swaps once the first game is final): within 60 min of the new player's tip
-    for x in plan["lineup"]:
-        if x.get("move") and x.get("pid") and within(x.get("tip"), 0, 60):
-            who = f" (for {x['currentName']})" if x.get("currentName") and x.get("current") != x["pid"] else ""
-            once(f"move|{x['pid']}|{x['tip']}", f"Start {x['name']} at {x['slot']}",
-                 f"Put {x['name']} in {x['slot']}{who} before {tip_pt(x['tip'])} vs {x.get('opp', '')}.",
+    # 1) the engine's own action list (same list the site's top summary shows)
+    for x in plan.get("actions", []):
+        by = x.get("by")
+        if x["kind"] in ("lock", "confirm") and within(by, 0, 75):
+            once(f"{x['kind']}|{x['pid']}|{by}", f"{x['text'].split(' — ')[0]} before {tip_pt(by)}",
+                 x["text"] + ("" if x["kind"] == "lock" else ". Answer on the Locks tab."), priority="high", tags="lock")
+        elif x["kind"] == "move" and within(by, 0, 60):
+            once(f"move|{x['pid']}|{by}", f"{x['text'].split(' (')[0]} before {tip_pt(by)}", x["text"] + ".",
                  priority="high", tags="arrows_counterclockwise")
+        elif x["kind"] == "fallback":
+            once(f"fallback|{x['slot']}|{plan.get('week')}", "A slot has no games left", x["text"], priority="high", tags="warning")
 
     # 3) a starter ruled Out/Doubtful whose game is today and hasn't tipped
     for s in plan["slots"]:
@@ -112,15 +103,12 @@ def main():
     # 4) morning brief: once per Pacific day, only between 7 and 11 AM PT
     if 7 <= local.hour < 11:
         lines = []
-        dec = [s for s in plan["slots"] if s["action"] in ("lock", "confirm")]
+        dec = [s for s in plan["slots"] if s["action"] in ("lock", "confirm", "pass")]
         if dec:
-            lines.append("Decide: " + "; ".join(f"{s['action'].title()} {s['name']}" + (f" ({s['score']:.1f})" if s.get("score") else "") for s in dec))
-        mv = [x for x in plan["lineup"] if x.get("move") and x.get("pid")]
-        if mv:
-            lines.append("Lineup: " + ", ".join(f"{x['name']} → {x['slot']} ({tip_pt(x['tip'])})" for x in mv if x.get("tip")))
-        rel = [x for x in plan["lineup"] if x.get("relief")]
-        if rel:
-            lines.append("Relief: " + ", ".join(f"if {x['name']} < {x['keepBar']}, swap {x['relief']['name']}" for x in rel))
+            lines.append("Decide: " + "; ".join(("Don't lock" if s["action"] == "pass" else s["action"].title()) + f" {s['name']}" + (f" ({s['score']:.1f})" if s.get("score") else "") for s in dec))
+        for x in plan.get("actions", []):
+            if x["kind"] in ("move", "relief", "later"):
+                lines.append(x["text"] + (f" ({tip_pt(x['by'])})" if x.get("by") else ""))
         if moves.get("adds"):
             a = moves["adds"][0]
             lines.append(f"Waiver: add {a['name']}, drop {a['dropName']} (${a['bid']})")

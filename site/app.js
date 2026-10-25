@@ -104,49 +104,44 @@ function compute() {
   return { book, wp, plan: wp.build(), waivers: wp.waivers(live.trending), mine, my, opp };
 }
 
-const LABEL = { lock: "Lock", pass: "Pass", start: "Start", locked: "Locked", confirm: "Confirm", live: "Live", "fallback-risk": "Fallback" };
+const LABEL = { lock: "Lock", keep: "Counts", pass: "Pass", start: "Start", locked: "Locked", confirm: "Confirm", live: "Live", "fallback-risk": "Fallback" };
 function render() {
   const c = compute(), { plan, my, opp, mine } = c;
   const oppOwner = live.rosters.find(r => r.roster_id === opp?.roster_id)?.owner_id;
   $("score").innerHTML = `<b>${r1((my.points || 0) / 10)}</b> – ${r1((opp?.points || 0) / 10)}<span>vs ${esc(base.users[oppOwner] || "opponent")} · FAAB $${base.league.settings.waiver_budget - (mine.settings?.waiver_budget_used || 0)}</span>`;
   $("metatext").textContent = `${base.league.name} · week ${base.week} · live ${live.at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
 
-  // what to do next, in time order: locks, lineup changes, same-day relief swaps, top waiver move
-  const acts = [];
-  for (const x of plan.slots) {
-    if (x.action === "lock" && x.deadline?.tip) acts.push({ t: x.deadline.tip, html: `<b>Lock</b> ${esc(x.name)} (${esc(x.slot)}) — ${r1(x.score)}`, by: x.deadline.tip });
-    if (x.action === "confirm" && x.deadline?.tip) acts.push({ t: x.deadline.tip, html: `<b>Answer</b>: was ${esc(x.name)} starting on ${esc(x.gameDate)}? (see below)`, by: x.deadline.tip });
-    if (x.action === "fallback-risk") acts.push({ t: "9", html: `<b>Fix</b> ${esc(x.slot)}: ${esc(x.detail)}` });
-  }
-  for (const x of plan.lineup) {
-    if (x.move && x.pid) acts.push({ t: x.bestTime || x.tip, html: `<b>Move</b> ${esc(x.name)} into ${esc(x.slot)}${x.currentName && x.current !== x.pid ? ` (replacing ${esc(x.currentName)})` : ""} — best around ${esc(tipTime(x.bestTime))}, after final injury news`, by: x.changeBy });
-    if (x.relief) acts.push({ t: x.relief.swapAfter, html: `<b>If</b> ${esc(x.name)} scores under ${r1(x.keepBar)}, swap in ${esc(x.relief.name)} at ${esc(x.slot)}`, by: x.relief.tip, from: x.relief.swapAfter });
-  }
+  // ONE source: plan.actions (top summary), plan.slots (cards + table). Phone alerts read the same lists.
+  const acts = plan.actions.filter(a => !a.by || new Date(a.by) > new Date());
   const topAdd = live.moves?.adds?.[0];
-  if (topAdd) acts.push({ t: "8", html: `<b>Waiver</b>: add ${esc(topAdd.name)}, drop ${esc(topAdd.dropName)}, bid $${topAdd.bid} (Moves tab)` });
-  acts.sort((a, b) => String(a.t).localeCompare(String(b.t)));
-  const nextBy = acts.filter(a => a.by && new Date(a.by) > new Date()).map(a => a.by).sort()[0];
+  const nextBy = acts.filter(a => a.kind !== "pass" && a.by).map(a => a.by).sort()[0];
+  const when = a => a.kind === "relief" ? `between ${tipTime(a.from)} and ${tipTime(a.by)}`
+    : a.kind === "move" ? `best ~${tipTime(a.best)}, by ${tipTime(a.by)}` : a.by ? `by ${tipTime(a.by)}` : "";
+  const passes = acts.filter(a => a.kind === "pass");
   $("now").innerHTML = (nextBy ? `<b>Next deadline:</b> <span class="when">${until(nextBy)}</span> (${esc(tipTime(nextBy))})` : "<b>No deadlines pending.</b>") +
-    `<ul>${acts.map(a => `<li>${a.html}${a.by ? ` <span class="pos">· ${a.from ? `between ${esc(tipTime(a.from))} and ` : "by "}${esc(tipTime(a.by))}</span>` : ""}</li>`).join("")}</ul>`;
+    `<ul>${acts.filter(a => a.kind !== "pass").map(a => { const [w, ...rest] = a.text.split(" "); return `<li><b>${esc(w)}</b> ${esc(rest.join(" "))} <span class="pos">· ${esc(when(a))}</span></li>`; }).join("")}` +
+    (passes.length ? `<li><b>Pass</b> ${passes.map(a => esc(a.text.replace(/^Don't lock /, ""))).join(", ")} <span class="pos">· waiting is worth more</span></li>` : "") +
+    (topAdd ? `<li><b>Waiver</b> add ${esc(topAdd.name)}, drop ${esc(topAdd.dropName)} — bid $${topAdd.bid} <span class="pos">· Moves tab</span></li>` : "") + `</ul>`;
 
   $("slots").innerHTML = plan.slots.map(s => {
-    const nums = s.score != null ? `<div class="nums">game <b>${r1(s.score)}</b>${s.bar ? ` · bar ${r1(s.bar)}` : ""}${s.deadline ? ` · by ${esc(tipTime(s.deadline.tip) || day(s.deadline.date))}` : ""}</div>` : (s.bar ? `<div class="nums">lock bar after his next game: ${r1(s.bar)}</div>` : "");
-    let acts = "";
-    if (s.action === "confirm") acts = `<button data-elig="${s.gameDate}|${s.pid}" data-v="1">He was starting</button><button data-elig="${s.gameDate}|${s.pid}" data-v="0">He was on my bench</button>`;
-    if (["lock", "pass", "confirm"].includes(s.action)) acts += `<button data-lock="${s.pid}">I locked this</button>`;
-    if (s.action === "locked") acts = `<button data-unlock="${s.pid}">Undo</button>`;
-    return `<div class="slot ${s.action}"><div class="top"><span><span class="pos">${esc(s.slot)}</span> <span class="nm">${esc(s.name)}</span>${s.status ? `<span class="st">${esc(s.status)}</span>` : ""}</span><span class="tag">${LABEL[s.action] || s.action}</span></div><p>${esc(s.detail)}</p>${nums}${acts ? `<div class="acts">${acts}</div>` : ""}</div>`;
+    const nums = s.score != null && s.action !== "locked" && s.action !== "live" ? `<div class="nums">game <b>${r1(s.score)}</b>${s.bar != null ? ` · bar ${r1(s.bar)}` : ""}${s.deadline ? ` · decide by ${esc(tipTime(s.deadline.tip) || day(s.deadline.date))}` : ""}</div>` : "";
+    const td = s.today ? `<div class="nums">today: <b>${esc(s.today.name)}</b> ${esc(tipTime(s.today.tip))}${s.today.keepBar > 0.05 ? ` · keep if ≥ ${r1(s.today.keepBar)}` : ""}${s.today.relief ? ` · else ${esc(s.today.relief.name)}` : ""}</div>` : "";
+    let acts2 = "";
+    if (s.action === "confirm") acts2 = `<button data-elig="${s.gameDate}|${s.pid}" data-v="1">He was starting</button><button data-elig="${s.gameDate}|${s.pid}" data-v="0">He was on my bench</button>`;
+    if (["lock", "pass", "confirm", "keep"].includes(s.action)) acts2 += `<button data-lock="${s.pid}">I locked this</button>`;
+    if (s.action === "locked") acts2 = `<button data-unlock="${s.pid}">Undo</button>`;
+    return `<div class="slot ${s.action}"><div class="top"><span><span class="pos">${esc(s.slot)}</span> <span class="nm">${esc(s.name)}</span>${s.status ? `<span class="st">${esc(s.status)}</span>` : ""}</span><span class="tag">${LABEL[s.action] || s.action}</span></div><p>${esc(s.detail)}</p>${nums}${td}${acts2 ? `<div class="acts">${acts2}</div>` : ""}</div>`;
   }).join("");
 
-  const planBy = Object.fromEntries(plan.lineup.map(x => [x.k, x]));
-  let k = -1;
+  const STATE_TXT = { locked: "locked", live: "game in progress", lock: "lock this game", keep: "counts as is", confirm: "check, then lock" };
   $("lineup").innerHTML = `<div class="wrap" style="border:0"><table><tr><th>Slot</th><th>Now</th><th>Plan for today</th><th>Tip</th><th>Keep his game if ≥</th><th>If he misses it</th></tr>` +
-    plan.before.map(b => {
-      if (b.fixed) return `<tr><td class="pos">${esc(b.slot)}</td><td>${esc(b.name)}</td><td class="pos">${b.live ? "game in progress" : "locked"}</td><td></td><td></td><td></td></tr>`;
-      const x = planBy[++k] || {};
-      return `<tr><td class="pos">${esc(b.slot)}</td><td>${esc(b.name)}</td><td>${x.pid ? (x.move ? `<span class="mv">${esc(x.name)}</span>` : esc(x.name)) : '<span class="pos">nobody eligible plays today</span>'}</td>` +
-        `<td class="pos">${x.tip ? esc(tipTime(x.tip)) : ""}</td><td class="n">${x.pid ? (x.keepBar > 0.05 ? r1(x.keepBar) : "any score") : ""}</td>` +
-        `<td>${x.relief ? `${esc(x.relief.name)} <span class="pos">(tips ${esc(tipTime(x.relief.tip))})</span>` : ""}</td></tr>`;
+    plan.slots.map(x => {
+      const t = x.today;
+      const planCell = STATE_TXT[x.action] && !t ? `<span class="pos">${STATE_TXT[x.action]}</span>`
+        : t ? (t.move ? `<span class="mv">${esc(t.name)}</span>` : esc(t.name))
+        : x.later ? `<span class="pos">no game today · ${esc(x.later.name)} ${esc(day(x.later.date))}</span>` : `<span class="pos">nobody eligible plays</span>`;
+      return `<tr><td class="pos">${esc(x.slot)}</td><td>${esc(x.name)}</td><td>${planCell}</td><td class="pos">${t ? esc(tipTime(t.tip)) : ""}</td>` +
+        `<td class="n">${t ? (t.keepBar > 0.05 ? r1(t.keepBar) : "any score") : ""}</td><td>${t?.relief ? `${esc(t.relief.name)} <span class="pos">(tips ${esc(tipTime(t.relief.tip))})</span>` : ""}</td></tr>`;
     }).join("") + `</table></div>` +
     (plan.idle.length ? `<div class="row"><span class="pos">Also playing today without a slot: ${plan.idle.map(x => esc(x.name)).join(", ")}</span></div>` : "");
 

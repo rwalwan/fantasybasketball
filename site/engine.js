@@ -255,32 +255,6 @@ export class WeekPlan {
       if (g.fp >= bars[x.i] && (ls[x.p].st === "open" || ls[x.p].st === "confirm")) willLock.add(x.p);
     }
 
-    const slots = this.slots.map((slot, i) => {
-      const p = starters[i], name = p && p !== "0" ? this.b.name(p) : "(empty)", s = ls[p] || { st: "none" };
-      const base = { slot, pid: p, name, status: this.b.status(p) };
-      if (s.st === "locked") return { ...base, action: "locked", score: s.g?.fp ?? null, detail: s.g ? `Locked ${s.g.fp.toFixed(1)} (${s.g.date}).` : "Locked." };
-      if (s.st === "live") return { ...base, action: "live", score: s.g.fp, detail: `Game in progress: ${s.g.fp.toFixed(1)} so far. The lock call comes after the final buzzer.` };
-      const u = cont[p]?.u || [], nxt = u[0], deadline = nxt ? { date: nxt.date, tip: nxt.tip } : null;
-      const alt = altFor[i], altTxt = alt && alt !== p ? ` Better use of this slot: ${this.b.name(alt)}${cont[alt]?.u[0] ? ` (${day3(cont[alt].u[0].date)} vs ${cont[alt].u[0].opp}, ${cont[alt].u[0].mu.toFixed(1)} proj)` : ""}.` : "";
-      if (lockable[i]) {
-        const sc = lockable[i].fp, bar = bars[i];
-        if (s.st === "confirm" && sc < bar) return { ...base, action: "pass", score: sc, bar: r1(bar), deadline,
-          detail: `Pass either way: ${sc.toFixed(1)} is under the bar of ${bar.toFixed(1)}, so it doesn't matter whether that game was from your lineup.${altTxt}` };
-        if (s.st === "confirm") return { ...base, action: "confirm", score: sc, bar: r1(bar), gameDate: lockable[i].date, deadline,
-          detail: `Was he in your starting lineup when his ${lockable[i].date} game (${sc.toFixed(1)}) tipped? If yes, lock it (bar ${bar.toFixed(1)}).` };
-        if (sc >= bar) return { ...base, action: "lock", score: sc, bar: r1(bar), deadline,
-          detail: bar <= 0.05 ? "Nothing left this week beats it; this game counts either way." : `${sc.toFixed(1)} beats the best alternative for this slot (${bar.toFixed(1)} expected).` };
-        return { ...base, action: "pass", score: sc, bar: r1(bar), deadline, detail: `${sc.toFixed(1)} is under the bar of ${bar.toFixed(1)}; waiting is worth more.${altTxt}` };
-      }
-      const a = assignedTo[i];
-      if (!nxt && !(a && cont[a]?.u.length)) return { ...base, action: "fallback-risk", detail: "No games left for anyone eligible and nothing locked: this slot scores its player's last game of the week." };
-      if (!nxt) return { ...base, action: "start", detail: `${name} has no games left. Put ${this.b.name(a)} here before his next game (${day3(cont[a].u[0].date)}).` };
-      const [lo, hi] = range80(Q, nxt.mu);
-      const note = s.st === "bench" ? " His last game was played from your bench, so it can't count." : "";
-      return { ...base, action: "start", deadline,
-        detail: `Next: ${nxt.date} vs ${nxt.opp} · ${nxt.mu.toFixed(1)} projected (${lo}–${hi}) · plays ${Math.round(nxt.q * 100)}%.${note}${a && a !== p ? ` Plan: ${this.b.name(a)} covers this slot.` : ""}` };
-    });
-
     // ---- 2) today's sequence per slot -------------------------------------------------------------
     // A slot can try several games in one day: if the first misses its keep-line, pass and slide in a
     // player whose game tips >= 2.5 h later. Each open slot starts with its assigned player's games;
@@ -328,24 +302,81 @@ export class WeekPlan {
       if (!best) break;
       best.pl.draws = best.d; used.add(best.b);
     }
-    const lineup = plans.map(pl => {
-      const { x } = pl, cur = { current: x.p, currentName: x.p && x.p !== "0" ? this.b.name(x.p) : null };
-      if (!pl.draws.length) {
-        const later = pl.a && cont[pl.a]?.u[0];
-        return { slot: x.s, k: x.k, pid: null, ...cur, gain: 0,
-                 name: later ? `no game today · ${this.b.name(pl.a)} plays ${day3(later.date)}` : "nobody eligible plays today" };
+    const planByIdx = Object.fromEntries(plans.map(pl => [pl.x.i, pl]));
+    const tipOf = g => g?.tip || null;
+    const swapAfterOf = g => new Date(Date.parse(g.tip) + 135 * 60000).toISOString();
+    const nm = p => (p && p !== "0" ? this.b.name(p) : "(empty)");
+
+    // ---- 3) one plan per slot: the lock call + today's sequence, rendered everywhere from this ------
+    const slots = this.slots.map((slot, i) => {
+      const p = starters[i], s = ls[p] || { st: "none" }, name = nm(p);
+      const out = { slot, pid: p, name, status: this.b.status(p), today: null, later: null };
+      if (s.st === "locked") return { ...out, action: "locked", score: s.g?.fp ?? null, detail: s.g ? `Locked ${s.g.fp.toFixed(1)} (${s.g.date}).` : "Locked." };
+      if (s.st === "live") return { ...out, action: "live", score: s.g.fp, detail: `Game in progress: ${s.g.fp.toFixed(1)} so far. The lock call comes after the final buzzer.` };
+
+      // today's sequence for this slot (empty if the slot is being locked)
+      const pl = planByIdx[i];
+      if (pl && pl.draws.length) {
+        const { V, keep } = fold(pl.draws, pl.tail), f = pl.draws[0];
+        out.today = { pid: f.p, name: nm(f.p), tip: f.g.tip, opp: f.g.opp, mu: f.g.mu, keepBar: r1(keep[0]), move: f.p !== p,
+                      gain: r1(V - pl.tail), bestTime: f.p !== p ? new Date(Date.parse(f.g.tip) - 40 * 60000).toISOString() : null };
+        if (pl.draws[1]) { const r = pl.draws[1]; out.today.relief = { pid: r.p, name: nm(r.p), tip: r.g.tip, opp: r.g.opp, mu: r.g.mu, swapAfter: swapAfterOf(f.g), keepBar: r1(keep[1]) }; }
+      } else if (pl?.a && cont[pl.a]?.u[0]) {
+        const g = cont[pl.a].u[0];
+        out.later = { pid: pl.a, name: nm(pl.a), date: g.date, tip: g.tip, opp: g.opp, mu: g.mu, move: pl.a !== p };
       }
-      const { V, keep } = fold(pl.draws, pl.tail), first = pl.draws[0];
-      const row = { slot: x.s, k: x.k, pid: first.p, name: this.b.name(first.p), ...cur, move: first.p !== x.p,
-        gain: r1(V - pl.tail), tip: first.g.tip, opp: first.g.opp, mu: first.g.mu, keepBar: r1(keep[0]) };
-      if (pl.draws[1]) {
-        const r = pl.draws[1];
-        row.relief = { pid: r.p, name: this.b.name(r.p), tip: r.g.tip, opp: r.g.opp, mu: r.g.mu,
-                       swapAfter: new Date(Date.parse(first.g.tip) + 135 * 60000).toISOString(), keepBar: r1(keep[1]) };
+      const next = cont[p]?.u[0] || null;
+      const deadline = next ? { date: next.date, tip: next.tip } : null;
+      const planTxt = out.today ? (out.today.move ? ` Today: start ${out.today.name} here (${out.today.opp}, ${out.today.mu.toFixed(1)} proj).` : "")
+                    : out.later?.move ? ` Next: ${out.later.name} covers this slot (${day3(out.later.date)}).` : "";
+
+      if (lockable[i]) {
+        const sc = lockable[i].fp, bar = bars[i];
+        const base = { ...out, score: sc, bar: r1(bar), gameDate: lockable[i].date, deadline };
+        if (s.st === "confirm" && sc >= bar)
+          return { ...base, action: "confirm", detail: `Was he in your starting lineup when his ${lockable[i].date} game (${sc.toFixed(1)}) tipped? If yes, lock it — it beats the best alternative (${bar.toFixed(1)}).` };
+        if (sc >= bar) {
+          if (!deadline) return { ...base, action: "keep", detail: `${sc.toFixed(1)} counts automatically: he has no games left and nothing else beats it.` };
+          return { ...base, action: "lock", detail: `${sc.toFixed(1)} beats the best alternative for this slot (${bar.toFixed(1)} expected). Lock before ${day3(deadline.date)}'s tip.` };
+        }
+        return { ...base, action: "pass", detail: `Don't lock: ${sc.toFixed(1)} is under ${bar.toFixed(1)}, what this slot is expected to get by waiting.${planTxt}` };
       }
-      if (row.move && row.tip) { row.changeBy = row.tip; row.bestTime = new Date(Date.parse(row.tip) - 40 * 60000).toISOString(); }
-      return row;
+      if (!out.today && !out.later) return { ...out, action: "fallback-risk", detail: "Nobody eligible has a game left and nothing is locked: this slot scores its player's last game of the week." };
+      const g = out.today || out.later;
+      const note = s.st === "bench" ? " His last game was played from your bench, so it can't count." : "";
+      return { ...out, action: "start", deadline,
+        detail: out.today ? (out.today.move ? `Start ${out.today.name} here today (${out.today.opp}, ${out.today.mu.toFixed(1)} proj).${note}`
+                                            : `Plays today vs ${g.opp}: ${g.mu.toFixed(1)} projected (${range80(Q, g.mu).join("–")}).${note}`)
+                          : `${out.later.move ? `Put ${out.later.name} here` : `${name} plays next`} ${day3(out.later.date)} vs ${out.later.opp}.${note}` };
     });
+
+    // ---- 4) the time-ordered action list (top summary + phone alerts read this) ----------------------
+    const actions = [];
+    for (const x of slots) {
+      if (x.action === "lock") actions.push({ kind: "lock", slot: x.slot, pid: x.pid, by: x.deadline.tip, t: x.deadline.tip,
+        text: `Lock ${x.name} (${x.slot}) — ${x.score.toFixed(1)}` });
+      if (x.action === "confirm") actions.push({ kind: "confirm", slot: x.slot, pid: x.pid, by: x.deadline?.tip, t: x.deadline?.tip || "",
+        text: `Check ${x.name} (${x.slot}): was he starting on ${x.gameDate}? If yes, lock ${x.score.toFixed(1)}` });
+      if (x.action === "fallback-risk") actions.push({ kind: "fallback", slot: x.slot, pid: x.pid, t: "", text: `${x.slot}: ${x.detail}` });
+      if (x.action === "pass") actions.push({ kind: "pass", slot: x.slot, pid: x.pid, by: x.deadline?.tip, t: x.deadline?.tip || x.today?.tip || "",
+        text: `Don't lock ${x.name}'s ${x.score.toFixed(1)} (${x.slot})` });
+      const td = x.today;
+      if (td?.move) actions.push({ kind: "move", slot: x.slot, pid: td.pid, by: td.tip, t: td.bestTime, best: td.bestTime,
+        text: `Start ${td.name} at ${x.slot}${x.pid && x.pid !== "0" ? ` (bench ${x.name})` : ""}` });
+      if (td?.relief) actions.push({ kind: "relief", slot: x.slot, pid: td.relief.pid, from: td.relief.swapAfter, by: td.relief.tip, t: td.relief.swapAfter,
+        text: `If ${td.name} scores under ${td.keepBar.toFixed(1)}, swap ${td.relief.name} into ${x.slot}` });
+      if (!td && x.later?.move && x.later.tip) actions.push({ kind: "later", slot: x.slot, pid: x.later.pid, by: x.later.tip, t: x.later.tip,
+        text: `Put ${x.later.name} at ${x.slot} before ${day3(x.later.date)}'s game` });
+    }
+    // order by hard deadline (the tip that closes the decision); relief swaps sort by when they open
+    const key = a => (a.kind === "relief" ? a.from : a.by) || a.t || "9";
+    actions.sort((a, b) => String(key(a)).localeCompare(String(key(b))));
+
+    // compatibility views
+    const lineup = slots.filter(x => x.today).map(x => ({ slot: x.slot, pid: x.today.pid, name: x.today.name, current: x.pid, currentName: x.name,
+      move: x.today.move, tip: x.today.tip, opp: x.today.opp, mu: x.today.mu, keepBar: x.today.keepBar, relief: x.today.relief || null,
+      bestTime: x.today.bestTime, changeBy: x.today.move ? x.today.tip : null, gain: x.today.gain }));
+    void tipOf;
 
     const grid = players.map(p => {
       const t = this.b.team(p), pl = Object.fromEntries(this.played(p).map(g => [g.date, g.fp]));
@@ -360,10 +391,8 @@ export class WeekPlan {
                locked: locked.has(p), starter: starters.includes(p), cells, left: cells.filter(c => c?.kind === "upcoming").length };
     }).sort((a, b) => this.b.baseline(b.pid) - this.b.baseline(a.pid));
 
-    const before = this.slots.map((slot, i) => ({ slot, pid: starters[i], name: starters[i] && starters[i] !== "0" ? this.b.name(starters[i]) : "(empty)",
-      fixed: fixed.has(starters[i]), live: liveNow.has(starters[i]), plays: !!todayGame(starters[i]) }));
     const idle = pool.filter(p => !used.has(p) && todayGame(p)).map(p => ({ pid: p, name: this.b.name(p) }));
-    return { slots, lineup, before, idle, grid, days: this.days, unlocked: open.length - willLock.size, expectedTotal: r1(main.total) };
+    return { slots, actions, lineup, idle, grid, days: this.days, unlocked: open.length - willLock.size, expectedTotal: r1(main.total) };
   }
 
   waivers(trending, limit = 30) {
