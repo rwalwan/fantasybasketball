@@ -137,10 +137,41 @@ export function teamGames(schedule) {
 const addDays = (d, n) => { const x = new Date(d + "T12:00:00Z"); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
 const dayDiff = (a, b) => Math.round((new Date(a + "T12:00:00Z") - new Date(b + "T12:00:00Z")) / 864e5);
 
+const day3 = d => new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" });
+
+// Max-weight assignment of rows to columns (null = forbidden). Hungarian algorithm (O(n^3)) on
+// cost = -value, with one zero-value dummy column per row so any row may stay empty.
+export function maxAssign(value) {
+  const n = value.length; if (!n) return [];
+  const C = value[0].length, m = C + n, BIG = 1e7;
+  const cost = (i, j) => (j < C ? (value[i][j] == null ? BIG : -value[i][j]) : 0);
+  const u = new Float64Array(n + 1), v = new Float64Array(m + 1), p = new Int32Array(m + 1), way = new Int32Array(m + 1);
+  for (let i = 1; i <= n; i++) {
+    p[0] = i; let j0 = 0;
+    const minv = new Float64Array(m + 1).fill(Infinity), used = new Uint8Array(m + 1);
+    do {
+      used[j0] = 1; const i0 = p[j0]; let delta = Infinity, j1 = 0;
+      for (let j = 1; j <= m; j++) if (!used[j]) {
+        const cur = cost(i0 - 1, j - 1) - u[i0] - v[j];
+        if (cur < minv[j]) { minv[j] = cur; way[j] = j0; }
+        if (minv[j] < delta) { delta = minv[j]; j1 = j; }
+      }
+      for (let j = 0; j <= m; j++) { if (used[j]) { u[p[j]] += delta; v[j] -= delta; } else minv[j] -= delta; }
+      j0 = j1;
+    } while (p[j0] !== 0);
+    do { const j1 = way[j0]; p[j0] = p[j1]; j0 = j1; } while (j0);
+  }
+  const ans = new Array(n).fill(-1);
+  for (let j = 1; j <= m; j++) if (p[j] && j - 1 < C && value[p[j] - 1][j - 1] != null) ans[p[j] - 1] = j - 1;
+  return ans;
+}
+
 // ---------- the week plan ----------
 export class WeekPlan {
   constructor({ Q, book, schedule, week, today, now, rosterPositions, roster, matchup, rosters, tips, elig, locks }) {
     Object.assign(this, { Q, b: book, week, today, now: now || new Date(), roster, matchup, tips: tips || {} });
+    this.gstatus = {};
+    for (const g of schedule) for (const side of ["home", "away"]) if (g[side]?.team) this.gstatus[`${g.date}|${g[side].team}`] = g.status;
     this.days = weekDays(schedule, week);
     this.tg = teamGames(schedule);
     this.slots = rosterPositions.filter(s => s !== "BN" && s !== "IR");
@@ -149,7 +180,14 @@ export class WeekPlan {
     this.locks = locks || {};
   }
   teamDays(t) { return Object.keys(this.tg[t] || {}).filter(d => this.days.includes(d)).sort(); }
-  played(p) { return (this.b.games[p] || []).filter(g => this.days.includes(g.date)); }
+  // a game counts as played only once it's final (schedule says complete, or 4 h past tip if the schedule lags)
+  final(p, d) {
+    if (this.gstatus[`${d}|${this.b.team(p)}`] === "complete") return true;
+    const t = this.tip(p, d);
+    return t ? this.now - new Date(t) > 4 * 3600e3 : d < this.today;
+  }
+  played(p) { return (this.b.games[p] || []).filter(g => this.days.includes(g.date) && this.final(p, g.date)); }
+  livePlayed(p) { return (this.b.games[p] || []).filter(g => this.days.includes(g.date) && !this.final(p, g.date)); }
   tip(p, d) { return this.tips[`${d}|${this.b.team(p)}`]; }
   tipped(p, d) { const t = this.tip(p, d); return t ? new Date(t) <= this.now : d < this.today; }
   upcoming(p) {
@@ -163,6 +201,8 @@ export class WeekPlan {
   lockState(p) {
     const pl = this.played(p);
     if (this.locks[p]) return { st: "locked", g: pl.at(-1) || null };
+    const lv = this.livePlayed(p);
+    if (lv.length) return { st: "live", g: lv.at(-1) };
     const raw = this.matchup.players_points?.[p];
     if (!pl.length || raw == null) return { st: "none", g: null };
     const pts = Math.round(raw) / 10, latest = pl.at(-1);
@@ -171,114 +211,149 @@ export class WeekPlan {
     return { st: e === true ? "open" : e === null ? "confirm" : "bench", g: latest };
   }
   build() {
-    const Q = this.Q, starters = this.matchup.starters || [];
+    const Q = this.Q, starters = this.matchup.starters || [], r1 = v => Math.round(v * 10) / 10;
     const reserve = new Set(this.roster.reserve || []);
     const players = (this.roster.players || []).filter(p => !reserve.has(p));
     const ls = {}; for (const p of players) ls[p] = this.lockState(p);
     const locked = new Set(starters.filter(p => ls[p]?.st === "locked"));
+    const liveNow = new Set(starters.filter(p => ls[p]?.st === "live"));   // game in progress: slot committed today
     const cont = {};
     for (const p of players) if (!locked.has(p)) { const u = this.upcoming(p); cont[p] = { W: u.length ? contValues(Q, u)[0] : 0, u }; }
 
-    const open = this.slots.map((s, i) => ({ s, i, p: starters[i] })).filter(x => !locked.has(x.p));
-    const pending = {}; for (const x of open) if (ls[x.p]?.st === "open") pending[x.p] = ls[x.p].g;
-    const willLock = new Set(Object.keys(pending).filter(p => pending[p].fp >= lockBar(Q, cont[p]?.u || [])));
-    let best = {};
-    for (let pass = 0; pass < 2; pass++) {
-      const pool = Object.keys(cont).filter(p => !willLock.has(p));
-      const left = open.filter(x => !willLock.has(x.p)).sort((a, b) => pool.filter(p => fits(a.s, this.b.pos(p))).length - pool.filter(p => fits(b.s, this.b.pos(p))).length);
-      const taken = new Set(); best = {};
-      for (const x of left) {
-        const c = pool.filter(p => !taken.has(p) && fits(x.s, this.b.pos(p))).sort((a, b) => cont[b].W - cont[a].W)[0];
-        if (c) { best[x.i] = { W: cont[c].W, p: c }; taken.add(c); }
-      }
-      for (const x of open) if (willLock.has(x.p)) {
-        const alt = Math.max(0, ...pool.filter(p => !taken.has(p) && fits(x.s, this.b.pos(p))).map(p => cont[p].W));
-        best[x.i] = { W: alt, p: null };
-        if (pending[x.p].fp < alt) willLock.delete(x.p);
-      }
+    // ---- 1) rest-of-week assignment, solved jointly ---------------------------------------------
+    // Every open slot gets one player for the rest of the week (or its own pending game, locked in place).
+    // value(slot, p) = p's continuation value W_p; for the slot's own starter with a lockable game,
+    // max(score, W_p). Max-weight assignment picks the best combination across ALL slots at once, and a
+    // lock's bar is its true opportunity cost: (best total if this slot can't lock) - (best total of
+    // everything else without this slot and player).
+    const open = this.slots.map((s, i) => ({ s, i, p: starters[i] })).filter(x => !locked.has(x.p) && !liveNow.has(x.p));
+    const pool = Object.keys(cont).filter(p => !liveNow.has(p));
+    const lockable = {};
+    for (const x of open) { const st = ls[x.p]?.st; if (st === "open" || st === "confirm") lockable[x.i] = ls[x.p].g; }
+    const val = (x, p, allowLock = true) => {
+      if (!fits(x.s, this.b.pos(p))) return null;
+      const W = cont[p].W;
+      return allowLock && p === x.p && lockable[x.i] ? Math.max(lockable[x.i].fp, W) : W;
+    };
+    const solve = (rows, cols, noLock = null) => {
+      if (!rows.length) return { total: 0, pick: [] };
+      const m = rows.map(x => cols.map(p => val(x, p, x.i !== noLock)));
+      const pick = maxAssign(m);
+      let total = 0;
+      pick.forEach((c, r) => { if (c >= 0 && c < cols.length && m[r][c] != null) total += m[r][c]; });
+      return { total, pick: pick.map(c => (c >= 0 && c < cols.length ? cols[c] : null)) };
+    };
+    const main = solve(open, pool);
+    const assignedTo = {}; open.forEach((x, r) => { assignedTo[x.i] = main.pick[r]; });
+    const willLock = new Set(), bars = {}, altFor = {};
+    for (const x of open) {
+      const g = lockable[x.i]; if (!g) continue;
+      const noLock = solve(open, pool, x.i);
+      const rest = solve(open.filter(y => y.i !== x.i), pool.filter(p => p !== x.p));
+      bars[x.i] = Math.max(0, noLock.total - rest.total);
+      altFor[x.i] = noLock.pick[open.indexOf(x)];
+      if (g.fp >= bars[x.i] && (ls[x.p].st === "open" || ls[x.p].st === "confirm")) willLock.add(x.p);
     }
 
-    const r1 = v => Math.round(v * 10) / 10;
     const slots = this.slots.map((slot, i) => {
       const p = starters[i], name = p && p !== "0" ? this.b.name(p) : "(empty)", s = ls[p] || { st: "none" };
       const base = { slot, pid: p, name, status: this.b.status(p) };
       if (s.st === "locked") return { ...base, action: "locked", score: s.g?.fp ?? null, detail: s.g ? `Locked ${s.g.fp.toFixed(1)} (${s.g.date}).` : "Locked." };
-      const u = cont[p]?.u || [], own = lockBar(Q, u), alt = best[i] || { W: 0, p: null }, bar = Math.max(own, alt.W);
-      const nxt = u[0], deadline = nxt ? { date: nxt.date, tip: nxt.tip } : null;
-      if (s.st === "confirm" && s.g.fp < own) return { ...base, action: "pass", score: s.g.fp, bar: r1(own), deadline,
-        detail: `Pass either way: ${s.g.fp.toFixed(1)} is under his bar of ${own.toFixed(1)}, so it doesn't matter whether that game was from your lineup.` };
-      if (s.st === "confirm") return { ...base, action: "confirm", score: s.g.fp, bar: r1(own), gameDate: s.g.date, deadline,
-        detail: `Was he in your starting lineup when his ${s.g.date} game (${s.g.fp.toFixed(1)}) tipped? If yes, ${s.g.fp >= own ? "lock it" : "pass"} (bar ${own.toFixed(1)}).` };
-      if (s.st === "open") {
-        const sc = s.g.fp;
-        if (!u.length) return { ...base, action: "lock", score: sc, bar: 0, deadline, detail: "No games left this week; this game counts either way." };
-        if (sc >= bar) return { ...base, action: "lock", score: sc, bar: r1(bar), deadline, detail: `${sc.toFixed(1)} beats the bar of ${bar.toFixed(1)}.` };
-        const bench = alt.p && alt.p !== p && !starters.includes(alt.p) ? ` Bench option: ${this.b.name(alt.p)}.` : "";
-        return { ...base, action: "pass", score: sc, bar: r1(bar), deadline, detail: `${sc.toFixed(1)} is under the bar of ${bar.toFixed(1)}; waiting is worth more.${bench}` };
+      if (s.st === "live") return { ...base, action: "live", score: s.g.fp, detail: `Game in progress: ${s.g.fp.toFixed(1)} so far. The lock call comes after the final buzzer.` };
+      const u = cont[p]?.u || [], nxt = u[0], deadline = nxt ? { date: nxt.date, tip: nxt.tip } : null;
+      const alt = altFor[i], altTxt = alt && alt !== p ? ` Better use of this slot: ${this.b.name(alt)}${cont[alt]?.u[0] ? ` (${day3(cont[alt].u[0].date)} vs ${cont[alt].u[0].opp}, ${cont[alt].u[0].mu.toFixed(1)} proj)` : ""}.` : "";
+      if (lockable[i]) {
+        const sc = lockable[i].fp, bar = bars[i];
+        if (s.st === "confirm" && sc < bar) return { ...base, action: "pass", score: sc, bar: r1(bar), deadline,
+          detail: `Pass either way: ${sc.toFixed(1)} is under the bar of ${bar.toFixed(1)}, so it doesn't matter whether that game was from your lineup.${altTxt}` };
+        if (s.st === "confirm") return { ...base, action: "confirm", score: sc, bar: r1(bar), gameDate: lockable[i].date, deadline,
+          detail: `Was he in your starting lineup when his ${lockable[i].date} game (${sc.toFixed(1)}) tipped? If yes, lock it (bar ${bar.toFixed(1)}).` };
+        if (sc >= bar) return { ...base, action: "lock", score: sc, bar: r1(bar), deadline,
+          detail: bar <= 0.05 ? "Nothing left this week beats it; this game counts either way." : `${sc.toFixed(1)} beats the best alternative for this slot (${bar.toFixed(1)} expected).` };
+        return { ...base, action: "pass", score: sc, bar: r1(bar), deadline, detail: `${sc.toFixed(1)} is under the bar of ${bar.toFixed(1)}; waiting is worth more.${altTxt}` };
       }
-      if (!nxt) return { ...base, action: "fallback-risk", detail: "No games left and nothing locked: this slot scores his last game of the week." };
+      const a = assignedTo[i];
+      if (!nxt && !(a && cont[a]?.u.length)) return { ...base, action: "fallback-risk", detail: "No games left for anyone eligible and nothing locked: this slot scores its player's last game of the week." };
+      if (!nxt) return { ...base, action: "start", detail: `${name} has no games left. Put ${this.b.name(a)} here before his next game (${day3(cont[a].u[0].date)}).` };
       const [lo, hi] = range80(Q, nxt.mu);
       const note = s.st === "bench" ? " His last game was played from your bench, so it can't count." : "";
-      return { ...base, action: "start", bar: r1(own), deadline,
-        detail: `Next: ${nxt.date} vs ${nxt.opp} · ${nxt.mu.toFixed(1)} projected (${lo}–${hi}) · plays ${Math.round(nxt.q * 100)}%.${note}` };
+      return { ...base, action: "start", deadline,
+        detail: `Next: ${nxt.date} vs ${nxt.opp} · ${nxt.mu.toFixed(1)} projected (${lo}–${hi}) · plays ${Math.round(nxt.q * 100)}%.${note}${a && a !== p ? ` Plan: ${this.b.name(a)} covers this slot.` : ""}` };
     });
 
-    // TODAY's plan for each still-open slot. Only a starter's game can be locked, and a slot can try
-    // more than one player in a day: if the first game misses its keep-line, pass and slide in a player
-    // whose game tips >= 2.5 h later. For each slot we compare every single and pair (by tip order):
-    //   C      = value of the slot from tomorrow on (best eligible player's games after today)
-    //   V(b)   = q_b * E[max(X_b, C)] + (1 - q_b) * C
-    //   V(a,b) = q_a * E[max(X_a, V(b))] + (1 - q_a) * V(b)
-    // and assign slots greedily by largest gain V - C.
-    const fixed = new Set([...locked, ...willLock]);
-    const openToday = this.slots.map((s, i) => ({ s, p: starters[i] })).filter(x => !fixed.has(x.p)).map((x, k) => ({ ...x, k }));
-    const todayPl = Object.keys(cont).filter(p => !willLock.has(p) && cont[p].u.some(g => g.date === this.today));
-    const tipMs = p => { const t = cont[p]?.u[0]?.tip; return t ? Date.parse(t) : null; };
-    const afterToday = p => { const u = (cont[p]?.u || []).filter(g => g.date > this.today); return u.length ? contValues(Q, u)[0] : 0; };
+    // ---- 2) today's sequence per slot -------------------------------------------------------------
+    // A slot can try several games in one day: if the first misses its keep-line, pass and slide in a
+    // player whose game tips >= 2.5 h later. Each open slot starts with its assigned player's games;
+    // unassigned players who play today are inserted where they add the most expected value.
+    //   value(draws..., tail) folds from the end: V = q*E[max(X, V)] + (1-q)*V
+    const fixed = new Set([...locked, ...willLock, ...liveNow]);
     const GAME_MS = 150 * 60000;
-    const used = new Set(), assigned = {};
-    const chainVal = (a, b, C) => {
-      const ga = cont[a].u[0], vb = b ? cont[b].u[0].q * expectedMax(Q, cont[b].u[0].mu, C) + (1 - cont[b].u[0].q) * C : C;
-      return { V: ga.q * expectedMax(Q, ga.mu, vb) + (1 - ga.q) * vb, keep: vb };
+    const todayGame = p => { const g = cont[p]?.u[0]; return g && g.date === this.today && g.tip ? g : null; };
+    const afterToday = p => { const u = (cont[p]?.u || []).filter(g => g.date > this.today); return u.length ? contValues(Q, u)[0] : 0; };
+    const fold = (draws, tail) => {
+      let V = tail; const keep = [];
+      for (let k = draws.length - 1; k >= 0; k--) { keep[k] = V; const g = draws[k].g; V = g.q * expectedMax(Q, g.mu, V) + (1 - g.q) * V; }
+      return { V, keep };
     };
-    for (let round = 0; round < openToday.length; round++) {
+    const openToday = this.slots.map((s, i) => ({ s, i, p: starters[i] })).filter(x => !fixed.has(x.p)).map((x, k) => ({ ...x, k }));
+    const plans = openToday.map(x => {
+      const a = assignedTo[x.i] && !willLock.has(assignedTo[x.i]) ? assignedTo[x.i] : null;
+      const ga = a ? todayGame(a) : null;
+      return { x, a, draws: ga ? [{ p: a, g: ga }] : [], tail: a ? (ga ? afterToday(a) : cont[a].W) : 0 };
+    });
+    const used = new Set([...Object.values(assignedTo).filter(Boolean), ...willLock]);
+    const insertBest = (pl, b, gb) => {
       let best = null;
-      for (const x of openToday) {
-        if (assigned[x.k]) continue;
-        const elig = todayPl.filter(p => !used.has(p) && fits(x.s, this.b.pos(p)));
-        const C = Math.max(0, ...Object.keys(cont).filter(p => !willLock.has(p) && fits(x.s, this.b.pos(p))).map(afterToday));
-        for (const a of elig) {
-          const opts = [null, ...elig.filter(b => b !== a && tipMs(a) && tipMs(b) && tipMs(b) >= tipMs(a) + GAME_MS)];
-          for (const r of opts) {
-            const { V, keep } = chainVal(a, r, C);
-            if (!best || V - C > best.gain) best = { x, a, r, gain: V - C, keep, C };
-          }
+      for (let pos = 0; pos <= pl.draws.length; pos++) {
+        const d = [...pl.draws.slice(0, pos), { p: b, g: gb }, ...pl.draws.slice(pos)];
+        let ok = true;
+        for (let k = 1; k < d.length; k++) if (Date.parse(d[k].g.tip) < Date.parse(d[k - 1].g.tip) + GAME_MS) ok = false;
+        if (!ok) continue;
+        const v = fold(d, pl.tail).V;
+        if (!best || v > best.v) best = { v, d };
+      }
+      return best;
+    };
+    for (;;) {
+      let best = null;
+      for (const b of pool) {
+        if (used.has(b)) continue;
+        const gb = todayGame(b); if (!gb) continue;
+        for (const pl of plans) {
+          if (!fits(pl.x.s, this.b.pos(b))) continue;
+          const now = fold(pl.draws, pl.tail).V, ins = insertBest(pl, b, gb);
+          if (ins && ins.v - now > 0.05 && (!best || ins.v - now > best.gain)) best = { pl, b, d: ins.d, gain: ins.v - now };
         }
       }
-      if (!best || best.gain <= 0.05) break;
-      assigned[best.x.k] = best; used.add(best.a); if (best.r) used.add(best.r);
+      if (!best) break;
+      best.pl.draws = best.d; used.add(best.b);
     }
-    const lineup = openToday.map(x => {
-      const t = assigned[x.k];
-      if (!t) return { slot: x.s, k: x.k, pid: null, name: "nobody eligible plays today", current: x.p, currentName: x.p ? this.b.name(x.p) : null, gain: 0 };
-      const g = cont[t.a].u[0];
-      const row = { slot: x.s, k: x.k, pid: t.a, name: this.b.name(t.a), current: x.p, currentName: x.p ? this.b.name(x.p) : null,
-        move: t.a !== x.p, gain: r1(t.gain), tip: g.tip, opp: g.opp, mu: g.mu, keepBar: r1(t.keep) };
-      if (t.r) {
-        const rg = cont[t.r].u[0];
-        row.relief = { pid: t.r, name: this.b.name(t.r), tip: rg.tip, opp: rg.opp, mu: rg.mu, swapAfter: new Date(tipMs(t.a) + 135 * 60000).toISOString() };
+    const lineup = plans.map(pl => {
+      const { x } = pl, cur = { current: x.p, currentName: x.p && x.p !== "0" ? this.b.name(x.p) : null };
+      if (!pl.draws.length) {
+        const later = pl.a && cont[pl.a]?.u[0];
+        return { slot: x.s, k: x.k, pid: null, ...cur, gain: 0,
+                 name: later ? `no game today · ${this.b.name(pl.a)} plays ${day3(later.date)}` : "nobody eligible plays today" };
       }
-      // change as late as safely possible: final injury reports land ~30-60 min before tip
+      const { V, keep } = fold(pl.draws, pl.tail), first = pl.draws[0];
+      const row = { slot: x.s, k: x.k, pid: first.p, name: this.b.name(first.p), ...cur, move: first.p !== x.p,
+        gain: r1(V - pl.tail), tip: first.g.tip, opp: first.g.opp, mu: first.g.mu, keepBar: r1(keep[0]) };
+      if (pl.draws[1]) {
+        const r = pl.draws[1];
+        row.relief = { pid: r.p, name: this.b.name(r.p), tip: r.g.tip, opp: r.g.opp, mu: r.g.mu,
+                       swapAfter: new Date(Date.parse(first.g.tip) + 135 * 60000).toISOString(), keepBar: r1(keep[1]) };
+      }
       if (row.move && row.tip) { row.changeBy = row.tip; row.bestTime = new Date(Date.parse(row.tip) - 40 * 60000).toISOString(); }
       return row;
     });
 
     const grid = players.map(p => {
       const t = this.b.team(p), pl = Object.fromEntries(this.played(p).map(g => [g.date, g.fp]));
+      const lv = Object.fromEntries(this.livePlayed(p).map(g => [g.date, g.fp]));
       const cells = this.days.map(d => {
         const info = this.tg[t]?.[d]; if (!info) return null;
         if (d in pl) return { kind: "played", fp: r1(pl[d]), opp: info.opp, started: this.elig(p, d) };
-        if (this.tipped(p, d)) return { kind: "live", opp: info.opp };
+        if (d in lv || this.tipped(p, d)) return { kind: "live", opp: info.opp, fp: d in lv ? r1(lv[d]) : null };
         return { kind: "upcoming", mu: this.b.gameMu(p, d), opp: info.opp, tip: this.tips[`${d}|${t}`] };
       });
       return { pid: p, name: this.b.name(p), team: t, pos: this.b.pos(p).join("/"), status: this.b.status(p),
@@ -286,9 +361,9 @@ export class WeekPlan {
     }).sort((a, b) => this.b.baseline(b.pid) - this.b.baseline(a.pid));
 
     const before = this.slots.map((slot, i) => ({ slot, pid: starters[i], name: starters[i] && starters[i] !== "0" ? this.b.name(starters[i]) : "(empty)",
-      fixed: fixed.has(starters[i]), plays: !!cont[starters[i]]?.u.some(g => g.date === this.today) }));
-    return { slots, lineup, before, idle: todayPl.filter(p => !used.has(p)).map(p => ({ pid: p, name: this.b.name(p) })), grid,
-             days: this.days, unlocked: open.length - willLock.size };
+      fixed: fixed.has(starters[i]), live: liveNow.has(starters[i]), plays: !!todayGame(starters[i]) }));
+    const idle = pool.filter(p => !used.has(p) && todayGame(p)).map(p => ({ pid: p, name: this.b.name(p) }));
+    return { slots, lineup, before, idle, grid, days: this.days, unlocked: open.length - willLock.size, expectedTotal: r1(main.total) };
   }
 
   waivers(trending, limit = 30) {

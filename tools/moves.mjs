@@ -87,5 +87,9 @@ fs.writeFileSync("site/static/plan.json", JSON.stringify({ week, generated: out.
   slots: plan.slots.map(x => ({ slot: x.slot, pid: x.pid, name: x.name, status: x.status, action: x.action, score: x.score ?? null,
     bar: x.bar ?? null, detail: x.detail, deadline: x.deadline || null })),
   lineup: plan.lineup }));
+// full plan snapshot on the state branch, for debugging what the engine saw
+fs.writeFileSync(stateFile("plan_debug.json"), JSON.stringify({ at: new Date().toISOString(), today, week, expectedTotal: plan.expectedTotal,
+  slots: plan.slots, lineup: plan.lineup, before: plan.before, idle: plan.idle,
+  grid: plan.grid.map(r => ({ name: r.name, pos: r.pos, starter: r.starter, locked: r.locked, status: r.status, cells: r.cells })) }, null, 1));
 console.log(`moves: ${out.adds.length} adds, ${out.trades.length} trades, ${items.length} new reasons requested`);
 void playerValue;

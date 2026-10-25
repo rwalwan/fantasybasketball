@@ -54,7 +54,8 @@ async function loadLive() {
   const { week, league } = base, season = league.season;
   const days = weekDays(base.schedule, week), today = etToday();
   const tipDays = days.filter(d => d >= today || d === days.find(x => x >= today));
-  const [rosters, matchups, stats, proj, trending, snapsGh, overridesGh, locksGh, backend, tips, news, claims, moves] = await Promise.all([
+  const [schedule, rosters, matchups, stats, proj, trending, snapsGh, overridesGh, locksGh, backend, tips, news, claims, moves] = await Promise.all([
+    get(`${S2}/schedule/nba/regular/${season}`).catch(() => base.schedule),
     get(`${S1}/league/${LEAGUE}/rosters`), get(`${S1}/league/${LEAGUE}/matchups/${week}`),
     get(`${S2}/stats/nba/${season}/${week}?season_type=regular`), get(`${S2}/projections/nba/${season}/${week}?season_type=regular`),
     get(`${S1}/players/nba/trending/add?lookback_hours=24&limit=50`).catch(() => []),
@@ -68,6 +69,7 @@ async function loadLive() {
   const snaps = { ...snapsGh, ...(backend.lineups || {}) };
   const overrides = { ...overridesGh, ...(backend.elig || {}) };
   const locks = { ...locksGh, ...(backend.locks || {}) };
+  base.schedule = schedule;
   live = { rosters, matchups, stats, proj, trending, snaps, overrides, locks, tips, news, claims, moves, backend: !!backend.ok, at: new Date() };
   void tipDays;
 }
@@ -102,7 +104,7 @@ function compute() {
   return { book, wp, plan: wp.build(), waivers: wp.waivers(live.trending), mine, my, opp };
 }
 
-const LABEL = { lock: "Lock", pass: "Pass", start: "Start", locked: "Locked", confirm: "Confirm", "fallback-risk": "Fallback" };
+const LABEL = { lock: "Lock", pass: "Pass", start: "Start", locked: "Locked", confirm: "Confirm", live: "Live", "fallback-risk": "Fallback" };
 function render() {
   const c = compute(), { plan, my, opp, mine } = c;
   const oppOwner = live.rosters.find(r => r.roster_id === opp?.roster_id)?.owner_id;
@@ -140,10 +142,10 @@ function render() {
   let k = -1;
   $("lineup").innerHTML = `<div class="wrap" style="border:0"><table><tr><th>Slot</th><th>Now</th><th>Plan for today</th><th>Tip</th><th>Keep his game if ≥</th><th>If he misses it</th></tr>` +
     plan.before.map(b => {
-      if (b.fixed) return `<tr><td class="pos">${esc(b.slot)}</td><td>${esc(b.name)}</td><td class="pos">locked or decided</td><td></td><td></td><td></td></tr>`;
+      if (b.fixed) return `<tr><td class="pos">${esc(b.slot)}</td><td>${esc(b.name)}</td><td class="pos">${b.live ? "game in progress" : "locked"}</td><td></td><td></td><td></td></tr>`;
       const x = planBy[++k] || {};
       return `<tr><td class="pos">${esc(b.slot)}</td><td>${esc(b.name)}</td><td>${x.pid ? (x.move ? `<span class="mv">${esc(x.name)}</span>` : esc(x.name)) : '<span class="pos">nobody eligible plays today</span>'}</td>` +
-        `<td class="pos">${x.tip ? esc(tipTime(x.tip)) : ""}</td><td class="n">${x.keepBar ? r1(x.keepBar) : x.pid ? "his lock bar" : ""}</td>` +
+        `<td class="pos">${x.tip ? esc(tipTime(x.tip)) : ""}</td><td class="n">${x.pid ? (x.keepBar > 0.05 ? r1(x.keepBar) : "any score") : ""}</td>` +
         `<td>${x.relief ? `${esc(x.relief.name)} <span class="pos">(tips ${esc(tipTime(x.relief.tip))})</span>` : ""}</td></tr>`;
     }).join("") + `</table></div>` +
     (plan.idle.length ? `<div class="row"><span class="pos">Also playing today without a slot: ${plan.idle.map(x => esc(x.name)).join(", ")}</span></div>` : "");
@@ -154,7 +156,7 @@ function render() {
       r.cells.map((x, i) => { const td = plan.days[i] === today ? " today" : "";
         if (!x) return `<td class="c${td}"></td>`;
         if (x.kind === "played") return `<td class="c played${x.started === false ? " bench" : ""}${td}" title="vs ${esc(x.opp)} · ${x.started === false ? "from your bench: not lockable" : x.started ? "in your lineup" : "lineup at tip unknown"}">${r1(x.fp)}${x.started == null ? "?" : ""}</td>`;
-        if (x.kind === "live") return `<td class="c livec${td}" title="in progress or awaiting stats">live</td>`;
+        if (x.kind === "live") return `<td class="c livec${td}" title="in progress: not final yet">${x.fp != null ? r1(x.fp) + "…" : "live"}</td>`;
         return `<td class="c up${td}" title="vs ${esc(x.opp)}${x.tip ? " · " + esc(tipTime(x.tip)) : ""}">${Math.round(x.mu)}</td>`; }).join("") + `<td class="n">${r.left}</td></tr>`).join("");
 
   const w = c.waivers;
@@ -165,7 +167,7 @@ function render() {
   renderExperts();
   renderNews();
   renderMoves();
-  $("foot").textContent = `Recomputed every minute from Sleeper and ESPN. A game is lockable only if he was starting when it tipped; lineups are recorded by the scheduled job (every 15 min) and by this page while it's open. ${live.backend ? "Answers sync to your backend, and lineups are recorded every minute." : "Answers are saved in this browser only (backend not connected)."}`;
+  $("foot").textContent = `Plan's expected total from open slots: ${r1(plan.expectedTotal || 0)}. Recomputed every minute from Sleeper (scores, schedule, injuries). A game is lockable only if he was starting when it tipped; lineups are recorded by the scheduled job (every 15 min) and by this page while it's open. ${live.backend ? "Answers sync to your backend, and lineups are recorded every minute." : "Answers are saved in this browser only (backend not connected)."}`;
   $("dot").classList.toggle("stale", Date.now() - live.at > 5 * 60000);
 }
 
