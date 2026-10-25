@@ -35,6 +35,7 @@ CANDIDATES = [
     {"name": "RotoWire news", "kind": "rss", "role": "news", "url": "https://www.rotowire.com/rss/news.php?sport=NBA"},
     {"name": "RealGM", "kind": "rss", "role": "news", "url": "https://basketball.realgm.com/rss/wiretap/0/0.xml"},
     {"name": "HoopsHype", "kind": "rss", "role": "news", "url": "https://hoopshype.com/feed/"},
+    {"name": "Hoops Rumors", "kind": "rss", "role": "news", "url": "https://www.hoopsrumors.com/feed"},
     {"name": "ESPN NBA", "kind": "rss", "role": "news", "url": "https://www.espn.com/espn/rss/nba/news"},
     {"name": "Yahoo NBA", "kind": "rss", "role": "news", "url": "https://sports.yahoo.com/nba/rss/"},
     {"name": "CBS NBA", "kind": "rss", "role": "news", "url": "https://www.cbssports.com/rss/headlines/nba/"},
@@ -176,7 +177,8 @@ def active_sources(max_age_days=3):
     if os.path.exists(path):
         rep = json.load(open(path))
         age = dt.datetime.now(dt.timezone.utc) - dt.datetime.fromisoformat(rep["at"])
-        if age.days >= max_age_days:
+        tested = {r["name"] for r in rep["sources"]}
+        if age.days >= max_age_days or any(s["name"] not in tested for s in CANDIDATES):
             rep = None
     if rep is None:
         rep = health_check()
