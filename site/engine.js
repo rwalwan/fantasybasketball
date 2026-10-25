@@ -613,8 +613,13 @@ export function tradeIdeas(valuer, book, mine, others, limit = 15) {
   }
   ideas.sort((x, y) => (y.dm + 0.5 * y.dt) - (x.dm + 0.5 * x.dt));
   // keep variety: at most 2 ideas per target player
-  const per = {}, out = [];
-  for (const x of ideas) { const k = x.get.join(); if ((per[k] = (per[k] || 0) + 1) <= 2) out.push(x); if (out.length >= limit) break; }
+  const per = {}, team = {}, out = [];
+  for (const x of ideas) {
+    const k = x.get.join();
+    if ((per[k] || 0) >= 2 || (team[x.roster_id] || 0) >= 3) continue;      // variety: targets and partners
+    per[k] = (per[k] || 0) + 1; team[x.roster_id] = (team[x.roster_id] || 0) + 1; out.push(x);
+    if (out.length >= limit) break;
+  }
   return out;
 }
 
