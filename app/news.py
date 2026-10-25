@@ -22,7 +22,11 @@ from . import sources
 
 STATE = os.path.join(os.path.dirname(__file__), "..", "data", "state")
 UA = {"User-Agent": "we-back-lock-desk (personal fantasy assistant; github.com/rwalwan/fantasybasketball)"}
-MODEL = os.environ.get("OPENROUTER_MODEL") or "anthropic/claude-haiku-5.5"
+MODEL = os.environ.get("OPENROUTER_MODEL") or "anthropic/claude-haiku-5.5"                 # news, why-notes, reasons
+# Expert articles are ~7% of calls but feed expert grading, so they get the stronger model (~$7/month extra).
+# Model test on our own tasks (tools/llm_eval.py, Oct 2026): Haiku 5.5 was the most accurate on news blurbs; adding
+# reasoning made it worse; Sonnet 5.5 costs ~15x per call. Override either with the repo variables.
+ADVICE_MODEL = os.environ.get("OPENROUTER_MODEL_ADVICE") or "anthropic/claude-sonnet-5.5"
 
 ADVICE_RE = re.compile(r"(?i)waiver|start|sit\b|pickup|pick-up|add|drop|sell|buy|trade|stream|sleeper|target|risers|fallers|week \d|rest of season|ros\b|must-|hold")
 DRAFT_TITLE_RE = re.compile(r"(?i)draft|adp|mock|preseason|auction|keeper|dynasty|cheat sheet")
@@ -84,13 +88,13 @@ def article_text(url):
     return re.sub(r"\s+", " ", html.unescape(text)).strip()[:14000]
 
 
-def llm_json(system, user):
+def llm_json(system, user, model=None):
     key = os.environ.get("OPENROUTER_API_KEY")
     if not key:
         return None
     r = requests.post("https://openrouter.ai/api/v1/chat/completions", timeout=90,
                       headers={"Authorization": f"Bearer {key}", "X-Title": "Lock Desk", "HTTP-Referer": "https://rwalwan.github.io/fantasybasketball/"},
-                      json={"model": MODEL, "temperature": 0, "response_format": {"type": "json_object"},
+                      json={"model": model or MODEL, "temperature": 0, "response_format": {"type": "json_object"},
                             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]})
     r.raise_for_status()
     txt = r.json()["choices"][0]["message"]["content"]
@@ -196,7 +200,7 @@ def collect(meta, my_players, fa_ids, today):
         seen[it["id"]] = today
         try:
             text = it["text"] if len(it["text"]) > 900 else sources.article_text(it["link"])
-            x = llm_json(CLAIMS_PROMPT, f"Source: {src['name']}\nTitle: {title}\nAuthor: {it['author']}\n\n{text}")
+            x = llm_json(CLAIMS_PROMPT, f"Source: {src['name']}\nTitle: {title}\nAuthor: {it['author']}\n\n{text}", model=ADVICE_MODEL)
             advice_budget -= 1
         except Exception as e:
             print("article failed:", src["name"], e)
