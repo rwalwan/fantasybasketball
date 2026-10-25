@@ -31,6 +31,14 @@ DB = os.path.join(STATE, "memory.sqlite")
 GROUP = {"PG": "G", "SG": "G", "SF": "F", "PF": "F", "C": "C"}
 
 
+def minutes(st):
+    """Sleeper reports 'min' in some feeds and only 'sp' (seconds played) in others (e.g. last season)."""
+    m = st.get("min")
+    if m:
+        return float(m)
+    return float(st.get("sp") or 0) / 60.0
+
+
 def connect():
     os.makedirs(STATE, exist_ok=True)
     con = sqlite3.connect(DB)
@@ -75,12 +83,12 @@ def ingest(con, season, week_rows, schedule, scoring, projlog, prior_min, meta=N
         st = r.get("stats") or {}
         if str(r.get("player_id", "")).startswith("TEAM_"):
             continue                                     # team-total pseudo players
-        if not r.get("date") or not (st.get("min") or 0) > 0 or (r.get("date"), r.get("team")) not in scores:
+        if not r.get("date") or not minutes(st) > 0 or (r.get("date"), r.get("team")) not in scores:
             continue                                     # final games only
         tp, op = scores[(r["date"], r["team"])]
         pl = projlog.get(f"{r['date']}|{r['player_id']}") or {}
         rows.append((r["player_id"], r.get("game_id"), r["date"], season, r.get("team"), r.get("opponent"),
-                     1 if home_of.get((r["date"], r.get("team"))) else 0, float(st.get("min") or 0), float(st.get("fga") or 0),
+                     1 if home_of.get((r["date"], r.get("team"))) else 0, minutes(st), float(st.get("fga") or 0),
                      float(st.get("pf") or 0), float(st.get("pts") or 0), float(st.get("reb") or 0), float(st.get("ast") or 0),
                      fantasy_points(st, scoring), tp, op, (tp or 0) - (op or 0), pl.get("rotowire"), pl.get("model"), pl.get("ctx")))
     con.executemany("""INSERT INTO games(pid,gid,date,season,team,opp,home,min,fga,pf,pts,reb,ast,fp,team_pts,opp_pts,margin,proj_rw,proj_model,proj_ctx)
@@ -255,7 +263,7 @@ def last_season_prior(fetch_week, prev_season, scoring, meta, baseline_prev):
         except Exception as e:
             rows = []
             diag["weeks"][w] = f"error: {e}"[:120]
-        rows = [r for r in rows if r.get("date") and (r.get("stats") or {}).get("min")]
+        rows = [r for r in rows if r.get("date") and minutes(r.get("stats") or {}) > 0]
         if not rows:
             empty += 1
             if empty >= 2:
@@ -263,7 +271,7 @@ def last_season_prior(fetch_week, prev_season, scoring, meta, baseline_prev):
             continue
         for r in rows:
             b = baseline_prev.get(r["player_id"])
-            if not b or b < 8 or (r["stats"].get("min") or 0) < 10:
+            if not b or b < 8 or minutes(r["stats"]) < 10:
                 continue
             a = acc[f"{r.get('opponent')}|{group_of(meta, r['player_id'])}"]
             a[0] += fantasy_points(r["stats"], scoring) / b

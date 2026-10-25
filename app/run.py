@@ -49,7 +49,7 @@ def main():
         for r in prev_rows:
             st = r.get("stats") or {}
             if (st.get("gp") or 0) >= 10:
-                prior_min[r["player_id"]] = (st.get("min") or 0) / st["gp"]
+                prior_min[r["player_id"]] = memory.minutes(st) / st["gp"]
     except Exception as e:  # prior season is a nice-to-have
         print("prior season unavailable:", e, file=sys.stderr)
 

@@ -75,10 +75,11 @@ export class Book {
     for (const r of rows || []) {
       this._meta(r);
       const st = r.stats || {};
-      if (!r.date || !(Number(st.min) > 0)) continue;
+      const mins = Number(st.min) || Number(st.sp || 0) / 60;   // some feeds only report seconds played
+      if (!r.date || !(mins > 0)) continue;
       const list = this.games[r.player_id] || (this.games[r.player_id] = []);
       const i = list.findIndex(g => g.gid === r.game_id);
-      const g = { date: r.date, fp: fantasyPoints(st, this.sc), min: Number(st.min), gid: r.game_id };
+      const g = { date: r.date, fp: fantasyPoints(st, this.sc), min: mins, gid: r.game_id };
       if (i >= 0) list[i] = g; else list.push(g);
     }
     for (const l of Object.values(this.games)) l.sort((a, b) => a.date.localeCompare(b.date));

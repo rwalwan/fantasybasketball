@@ -26,13 +26,14 @@ class PlayerBook:
         seen = {(pid, g[3]) for pid, gs in self.games.items() for g in gs}
         for r in rows:
             st = r.get("stats") or {}
-            if not r.get("date") or not st or not (st.get("min") or 0) > 0:
+            mins = float(st.get("min") or 0) or float(st.get("sp") or 0) / 60.0
+            if not r.get("date") or not st or not mins > 0:
                 continue
             key = (r["player_id"], r.get("game_id"))
             if key in seen:
                 continue
             seen.add(key)
-            self.games[r["player_id"]].append((r["date"], fantasy_points(st, self.scoring), st.get("min"), r.get("game_id")))
+            self.games[r["player_id"]].append((r["date"], fantasy_points(st, self.scoring), mins, r.get("game_id")))
         for gs in self.games.values():
             gs.sort()
 
