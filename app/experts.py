@@ -15,6 +15,7 @@ import json
 import os
 
 STATE = os.path.join(os.path.dirname(__file__), "..", "data", "state")
+SCORES = "expert_scores_v2.json"   # v1 graded in-progress games (biased ~-12 FP); started over clean
 SHRINK_N = 300          # graded games before a source's own accuracy fully drives its weight
 
 
@@ -36,6 +37,7 @@ def source_projections(book, pid, date):
     if rw:
         out["rotowire"] = round(rw, 1)
     out["model"] = round(book.baseline(pid), 1)
+    out["blend"] = round(book.game_mu(pid, date), 1)             # what the engine actually used
     f = getattr(book, "ctx", {}).get((pid, date))
     if f:
         out["ctx"] = round(book.baseline(pid) * f, 1)        # model x matchup context (memory.py)
@@ -46,7 +48,10 @@ def update(book, season, week, tips, now=None):
     """Log projections for untipped games this week; grade finished ones. Returns the scores table."""
     now = now or dt.datetime.now(dt.timezone.utc)
     log = _load(f"projlog_{season}.json", {})
-    scores = _load("expert_scores.json", {})
+    scores = _load(SCORES, {})
+    book.w = weights(scores)                     # log the blend with today's weights
+    ratios = _load(RATIOS, {})
+    done = _load(f"projlog_done_{season}.json", {})
 
     # 1) log: every projected game for a player who has a scheduled game and hasn't tipped
     for (pid, date) in list(book.proj):
@@ -56,9 +61,9 @@ def update(book, season, week, tips, now=None):
             continue
         log[f"{date}|{pid}"] = source_projections(book, pid, date)
 
-    # 2) grade: entries whose game now has a stat line (or is 2+ days old with none: DNP, drop it)
-    played = {(pid, g[0]): g[1] for pid, gs in book.games.items() for g in gs}
-    today = now.date().isoformat()
+    # 2) grade: only FINAL games (grading a live stat line scored halftime numbers as misses). A final game with
+    #    no stat line is a DNP: projections are "if he plays", so drop it once the stats have had a day to land.
+    played = {(pid, g[0]): g[1] for pid in book.games for g in book.done(pid)}
     for key in list(log):
         date, pid = key.split("|")
         actual = played.get((pid, date))
@@ -66,6 +71,12 @@ def update(book, season, week, tips, now=None):
             if date < (now.date() - dt.timedelta(days=2)).isoformat():
                 del log[key]
             continue
+        b = log[key].get("blend")
+        if b and b > 3:
+            # actual / what we projected, by volatility tier: calibrates the lock-in spread curves (export_quantiles)
+            r = ratios.setdefault(tier_of(book.baseline(pid)), [])
+            r.append(round(actual / b, 3))
+            del r[:-RATIO_KEEP]
         for src, proj in log[key].items():
             s = scores.setdefault(src, {"n": 0, "sae": 0.0, "sse": 0.0, "bias": 0.0, "weekly": {}})
             err = actual - proj
@@ -76,11 +87,45 @@ def update(book, season, week, tips, now=None):
             w = s["weekly"].setdefault(str(week), {"n": 0, "sae": 0.0})
             w["n"] += 1
             w["sae"] += abs(err)
-        del log[key]
-    _ = today
+        done[key] = log.pop(key)
+    # graded entries stay 4 more days so the memory store can attach them once the schedule marks the game complete
+    cutoff = (now.date() - dt.timedelta(days=4)).isoformat()
+    _save(f"projlog_done_{season}.json", {k: v for k, v in done.items() if k.split("|")[0] >= cutoff})
     _save(f"projlog_{season}.json", log)
-    _save("expert_scores.json", scores)
+    _save(SCORES, scores)
+    _save(RATIOS, ratios)
     return scores
+
+
+TIER_MAX = [18, 26, 34, 42, None]          # must match app/data/game_ratio_quantiles.json tiers
+RATIOS, RATIO_KEEP, CAL_N = "proj_ratios.json", 6000, 600
+
+
+def tier_of(base):
+    for i, m in enumerate(TIER_MAX):
+        if m is None or base <= m:
+            return str(i)
+    return str(len(TIER_MAX) - 1)
+
+
+def calibrated_quantiles(hist):
+    """Historical tier curves, blended toward OUR projection errors as they accumulate: weight n/(n+600).
+    Shape only (rescaled to mean 1): bias belongs to the projection weights, not to the spread."""
+    import numpy as np
+    ratios = _load(RATIOS, {})
+    out = dict(hist, tiers=[])
+    probs = (np.arange(100) + 0.5) / 100
+    for i, t in enumerate(hist.get("tiers", [])):
+        r = np.array(ratios.get(str(i), []), dtype=float)
+        q = np.array(t["quantiles"])
+        a = len(r) / (len(r) + CAL_N) if len(r) >= 50 else 0.0
+        if a:
+            e = np.quantile(np.clip(r, 0, 6), probs)
+            e = e / max(e.mean(), 1e-6)
+            q = a * e + (1 - a) * q
+            q = q / q.mean()
+        out["tiers"].append(dict(t, quantiles=[round(float(x), 4) for x in q], calibrated_n=int(len(r)), own_weight=round(a, 3)))
+    return out
 
 
 def weights(scores):

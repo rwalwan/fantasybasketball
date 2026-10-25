@@ -30,17 +30,31 @@ export function expectedMax(Q, mu, floor) {
   for (const q of Q) s += Math.max(mu * q, floor);
   return s / Q.length;
 }
-// W[j] = value of arriving at game j unlocked; lock after game j iff score >= W[j+1]
-export function contValues(Q, games) {
-  const n = games.length, W = new Array(n + 1).fill(0);
+// W[j] = value of arriving at game j unlocked; lock after game j iff score >= W[j+1].
+// Each game may carry its own spread curve (g.Q: the player's volatility tier); Q is the fallback.
+export function contValues(Q, games) { return contStats(Q, games).W; }
+// Same recursion plus the second moment of the score you end up with, so the spread of a slot's outcome
+// comes from the actual stopping rule rather than a flat guess:
+//   M2[j] = q * (E[X^2; X >= W[j+1]] + P(X < W[j+1]) * M2[j+1]) + (1-q) * M2[j+1];  sd = sqrt(M2 - W^2)
+export function contStats(Q, games) {
+  const n = games.length, W = new Array(n + 1).fill(0), M2 = new Array(n + 1).fill(0);
   for (let j = n - 1; j >= 0; j--) {
-    const g = games[j];
-    W[j] = j === n - 1 ? g.q * g.mu : g.q * expectedMax(Q, g.mu, W[j + 1]) + (1 - g.q) * W[j + 1];
+    const g = games[j], qs = g.Q || Q, last = j === n - 1, floor = last ? -Infinity : W[j + 1];
+    let e = 0, e2 = 0;
+    for (const r of qs) { const x = g.mu * r; if (x >= floor) { e += x; e2 += x * x; } else { e += W[j + 1]; e2 += M2[j + 1]; } }
+    e /= qs.length; e2 /= qs.length;
+    W[j] = g.q * e + (1 - g.q) * W[j + 1];
+    M2[j] = g.q * e2 + (1 - g.q) * M2[j + 1];
   }
-  return W;
+  return { W, sd: W.map((w, j) => Math.sqrt(Math.max(0, M2[j] - w * w))) };
+}
+// volatility tier for a player whose typical game is `base` FP: bench guys swing far more than stars
+export function tierQ(tiers, base, fallback) {
+  if (!tiers?.length) return fallback;
+  return (tiers.find(t => t.max == null || base <= t.max) || tiers.at(-1)).quantiles;
 }
 export const lockBar = (Q, after) => (after.length ? contValues(Q, after)[0] : 0);
-export const range80 = (Q, mu) => [Math.round(mu * Q[10] * 10) / 10, Math.round(mu * Q[90] * 10) / 10];
+export const range80 = (Q, mu) => [Math.round(mu * Q[10] * 10) / 10, Math.round(mu * Q[89] * 10) / 10];
 
 // ---------- player book ----------
 const STATUS_Q = { Probable: 0.9, "Day-To-Day": 0.75, GTD: 0.6, Questionable: 0.55, Doubtful: 0.2,
@@ -94,9 +108,11 @@ export class Book {
   team(p) { return this.meta[p]?.team; }
   pos(p) { return this.meta[p]?.pos || []; }
   status(p) { return this.meta[p]?.status || null; }
-  avg(p) { const g = this.games[p] || []; return g.length ? g.reduce((a, x) => a + x.fp, 0) / g.length : null; }
+  // only FINAL games feed averages: a half-finished game would drag every projection down while it's live
+  done(p) { const g = this.games[p] || []; return this.isFinal ? g.filter(x => this.isFinal(p, x.date)) : g; }
+  avg(p) { const g = this.done(p); return g.length ? g.reduce((a, x) => a + x.fp, 0) / g.length : null; }
   baseline(p) {
-    const g = this.games[p] || [], cur = this.avg(p);
+    const g = this.done(p), cur = this.avg(p);
     let prior = this.prior[p];
     if (prior == null) {
       const f = Object.entries(this.proj).filter(([k]) => k.startsWith(p + "|")).map(([, v]) => v);
@@ -174,7 +190,8 @@ export function maxAssign(value) {
 // ---------- the week plan ----------
 export class WeekPlan {
   constructor({ Q, book, schedule, week, today, now, rosterPositions, roster, matchup, rosters, tips, elig, locks }) {
-    Object.assign(this, { Q, b: book, week, today, now: now || new Date(), roster, matchup, tips: tips || {} });
+    Object.assign(this, { Q: Array.isArray(Q) ? Q : Q.quantiles, QT: Array.isArray(Q) ? null : Q.tiers,
+                          b: book, week, today, now: now || new Date(), roster, matchup, tips: tips || {} });
     this.gstatus = {};
     for (const g of schedule) for (const side of ["home", "away"]) if (g[side]?.team) this.gstatus[`${g.date}|${g[side].team}`] = g.status;
     this.days = weekDays(schedule, week);
@@ -183,6 +200,7 @@ export class WeekPlan {
     this.rostered = new Set(rosters.flatMap(r => r.players || []));
     this.elig = elig || (() => null);
     this.locks = locks || {};
+    if (!book.isFinal) book.isFinal = (p, d) => this.final(p, d);
   }
   teamDays(t) { return Object.keys(this.tg[t] || {}).filter(d => this.days.includes(d)).sort(); }
   // a game counts as played only once it's final (schedule says complete, or 4 h past tip if the schedule lags)
@@ -194,12 +212,13 @@ export class WeekPlan {
   played(p) { return (this.b.games[p] || []).filter(g => this.days.includes(g.date) && this.final(p, g.date)); }
   livePlayed(p) { return (this.b.games[p] || []).filter(g => this.days.includes(g.date) && !this.final(p, g.date)); }
   tip(p, d) { return this.tips[`${d}|${this.b.team(p)}`]; }
+  qOf(p) { return tierQ(this.QT, this.b.baseline(p), this.Q); }
   tipped(p, d) { const t = this.tip(p, d); return t ? new Date(t) <= this.now : d < this.today; }
   upcoming(p) {
     const t = this.b.team(p), done = new Set(this.played(p).map(g => g.date)), all = Object.keys(this.tg[t] || {});
     return this.teamDays(t).filter(d => !done.has(d) && !this.tipped(p, d)).map(d => {
       const b2b = all.includes(addDays(d, -1));
-      return { date: d, mu: this.b.gameMu(p, d), q: this.b.playProb(p, dayDiff(d, this.today), b2b),
+      return { date: d, mu: this.b.gameMu(p, d), q: this.b.playProb(p, dayDiff(d, this.today), b2b), Q: this.qOf(p),
                opp: this.tg[t][d].opp, b2b, tip: this.tip(p, d) };
     });
   }
@@ -230,7 +249,10 @@ export class WeekPlan {
     const locked = new Set(starters.filter(p => ls[p]?.st === "locked"));
     const liveNow = new Set(starters.filter(p => ls[p]?.st === "live"));   // game in progress: slot committed today
     const cont = {};
-    for (const p of players) if (!locked.has(p)) { const u = this.upcoming(p); cont[p] = { W: u.length ? contValues(Q, u)[0] : 0, u }; }
+    for (const p of players) if (!locked.has(p)) {
+      const u = this.upcoming(p), cs = contStats(Q, u);
+      cont[p] = { W: u.length ? cs.W[0] : 0, sd: u.length ? cs.sd[0] : 0, u };
+    }
 
     // ---- 1) rest-of-week assignment, solved jointly ---------------------------------------------
     // Every open slot gets one player for the rest of the week (or its own pending game, locked in place).
@@ -268,9 +290,11 @@ export class WeekPlan {
     }
 
     // ---- 1b) matchup outlook + matchup-aware lock calls ------------------------------------------
-    // Each slot: expected points (ev) and spread (sd). Locked = known. Waiting/open = ~30% sd (single-game
-    // spread, Lock-In best-of draws narrow it a little). Live games: points so far + the rest of his projection.
-    const SD = 0.3, evOf = {}, sdOf = {};
+    // Each slot: expected points (ev) and spread (sd). Locked = known. Waiting/open = the spread of the score the
+    // stopping rule actually ends on (contStats), from the player's own volatility tier. Live games: points so
+    // far + the rest of his projection, with the single-game spread of his tier shrinking as the game runs.
+    const qsd = qs => { const m = qs.reduce((a, b) => a + b, 0) / qs.length; return Math.sqrt(qs.reduce((a, b) => a + (b - m) ** 2, 0) / qs.length); };
+    const evOf = {}, sdOf = {};
     let M = 0, V = 0;
     this.slots.forEach((slot, i) => {
       const p = starters[i], st = ls[p]?.st;
@@ -279,11 +303,11 @@ export class WeekPlan {
       else if (st === "live") {
         const g = ls[p].g, t = this.tip(p, g.date), frac = t ? Math.min(1, Math.max(0, (this.now - new Date(t)) / (150 * 60000))) : 0.5;
         const mu = this.b.gameMu(p, g.date);
-        ev = g.fp + (1 - frac) * mu * 0.95; sd = SD * mu * Math.sqrt(1 - frac);
+        ev = g.fp + (1 - frac) * mu * 0.95; sd = qsd(this.qOf(p)) * mu * Math.sqrt(1 - frac);
       } else {
         const x = open.find(y => y.i === i);
         if (x && willLock.has(p)) ev = lockable[i].fp;
-        else if (x) { const a = assignedTo[i]; ev = a ? Math.max(0, (val(x, a, false) ?? 0)) : 0; sd = SD * ev; }
+        else if (x) { const a = assignedTo[i]; ev = a ? Math.max(0, (val(x, a, false) ?? 0)) : 0; sd = a ? cont[a].sd : 0; }
       }
       evOf[i] = ev; sdOf[i] = sd; M += ev; V += sd * sd;
     });
@@ -293,7 +317,8 @@ export class WeekPlan {
     if (opts.opp) for (const x of open) {
       const g = lockable[x.i]; if (!g || !cont[x.p]?.u.length) continue;
       const base = M - evOf[x.i], baseV = V - sdOf[x.i] ** 2, bar = bars[x.i];
-      const pL = pWin(base + g.fp, baseV), pP = pWin(base + bar, baseV + (SD * bar) ** 2);
+      const alt = altFor[x.i], passSd = alt && cont[alt] ? cont[alt].sd : cont[x.p].sd;
+      const pL = pWin(base + g.fp, baseV), pP = pWin(base + bar, baseV + passSd ** 2);
       const evCall = willLock.has(x.p) ? "lock" : "pass", call = pL >= pP ? "lock" : "pass";
       mx[x.i] = { pLock: pL, pPass: pP, evCall, call, flipped: false };
       if (call !== evCall && Math.abs(pL - pP) >= 0.02) {
@@ -314,7 +339,7 @@ export class WeekPlan {
     const afterToday = p => { const u = (cont[p]?.u || []).filter(g => g.date > this.today); return u.length ? contValues(Q, u)[0] : 0; };
     const fold = (draws, tail) => {
       let V = tail; const keep = [];
-      for (let k = draws.length - 1; k >= 0; k--) { keep[k] = V; const g = draws[k].g; V = g.q * expectedMax(Q, g.mu, V) + (1 - g.q) * V; }
+      for (let k = draws.length - 1; k >= 0; k--) { keep[k] = V; const g = draws[k].g; V = g.q * expectedMax(g.Q || Q, g.mu, V) + (1 - g.q) * V; }
       return { V, keep };
     };
     const openToday = this.slots.map((s, i) => ({ s, i, p: starters[i] })).filter(x => !fixed.has(x.p)).map((x, k) => ({ ...x, k }));
@@ -381,7 +406,7 @@ export class WeekPlan {
 
       if (lockable[i]) {
         const sc = lockable[i].fp, bar = bars[i], m = mx[i];
-        const range = cont[p]?.u[0] ? ` Waiting: ~${bar.toFixed(1)} expected (his next game ${range80(Q, cont[p].u[0].mu).join("–")}).` : "";
+        const range = cont[p]?.u[0] ? ` Waiting: ~${bar.toFixed(1)} expected (his next game ${range80(cont[p].u[0].Q || Q, cont[p].u[0].mu).join("–")}).` : "";
         const decided = m && Math.max(m.pLock, m.pPass) < 0.02 || m && Math.min(m.pLock, m.pPass) > 0.98;
         const wp = !m ? "" : decided ? " (Matchup looks decided, so this call maximizes points.)" : ` Win chance: lock ${Math.round(m.pLock * 100)}% · wait ${Math.round(m.pPass * 100)}%.`;
         const base = { ...out, score: sc, bar: r1(bar), gameDate: lockable[i].date, deadline, matchup: m || null };
@@ -401,7 +426,7 @@ export class WeekPlan {
       const note = s.st === "bench" ? " His last game was played from your bench, so it can't count." : "";
       return { ...out, action: "start", deadline,
         detail: out.today ? (out.today.move ? `Start ${out.today.name} here today (${out.today.opp}, ${out.today.mu.toFixed(1)} proj).${note}`
-                                            : `Plays today vs ${g.opp}: ${g.mu.toFixed(1)} projected (${range80(Q, g.mu).join("–")}).${note}`)
+                                            : `Plays today vs ${g.opp}: ${g.mu.toFixed(1)} projected (${range80(g.Q || Q, g.mu).join("–")}).${note}`)
                           : `${out.later.move ? `Put ${out.later.name} here` : `${name} plays next`} ${day3(out.later.date)} vs ${out.later.opp}.${note}` };
     });
 
@@ -451,6 +476,26 @@ export class WeekPlan {
     return { slots, actions, lineup, idle, grid, days: this.days, unlocked: open.length - willLock.size, expectedTotal: r1(main.total), outlook };
   }
 
+  // expected locked points from the open slots for the rest of THIS week if the roster were `players`
+  // (same joint assignment as build(), without the lock-bar detail). Locked/live slots stay as they are.
+  weekTotal(players) {
+    const starters = this.matchup.starters || [], have = new Set(players);
+    this._ls ||= {}; this._W ||= {};
+    const ls = p => (this._ls[p] ||= this.lockState(p));
+    const fixed = new Set(starters.filter(p => have.has(p) && ["locked", "live"].includes(ls(p).st)));
+    const open = this.slots.map((s, i) => ({ s, i, p: starters[i] })).filter(x => !fixed.has(x.p));
+    const pool = players.filter(p => !fixed.has(p) && !(this.roster.reserve || []).includes(p));
+    const W = p => (this._W[p] ??= contValues(this.Q, this.upcoming(p))[0] || 0);
+    const m = open.map(x => pool.map(p => {
+      if (!fits(x.s, this.b.pos(p))) return null;
+      const st = p === x.p ? ls(p).st : null;
+      return (st === "open" || st === "confirm") && ls(p).g ? Math.max(ls(p).g.fp, W(p)) : W(p);
+    }));
+    let total = 0;
+    maxAssign(m).forEach((c, r) => { if (c >= 0 && c < pool.length && m[r][c] != null) total += m[r][c]; });
+    return total;
+  }
+
   waivers(trending, limit = 30) {
     const Q = this.Q, trend = Object.fromEntries((trending || []).map(t => [t.player_id, t.count]));
     const mine = this.roster.players || [];
@@ -478,8 +523,11 @@ export class WeekPlan {
 // A player's value = locked points per week: baseline x (best-of-~3.5-games gain, larger for streaky
 // players) x ~86% availability. A team's value = best positional fill of the 10 slots + a little for
 // bench depth (more lock options). Used for both trade grading and add/drop suggestions.
+// ---------- player & team value (waivers, trades) ------------------------------------------------
+// "Market" value: roughly how other managers see a player (per-game production, a bit extra for upside).
+// Used only for the realism check on trade offers, never to decide what helps YOUR team.
 export function playerValue(book, pid) {
-  const g = book.games[pid] || [], base = book.baseline(pid);
+  const g = book.done ? book.done(pid) : (book.games[pid] || []), base = book.baseline(pid);
   let cv = 0.3;
   if (g.length >= 5) {
     const m = g.reduce((a, x) => a + x.fp, 0) / g.length;
@@ -489,31 +537,79 @@ export function playerValue(book, pid) {
   const out = ["Out", "IR", "Suspended"].includes(book.status(pid)) ? 0.6 : 1;
   return base * (1 + 0.7 * cv) * 0.86 * out;
 }
-export function teamValue(book, players, slots) {
-  const vals = players.map(p => ({ p, v: playerValue(book, p) })).sort((a, b) => b.v - a.v);
-  const used = new Set(); let total = 0;
-  const order = [...slots].sort((a, b) => vals.filter(x => fits(a, book.pos(x.p))).length - vals.filter(x => fits(b, book.pos(x.p))).length);
-  for (const s of order) { const x = vals.find(x => !used.has(x.p) && fits(s, book.pos(x.p))); if (x) { used.add(x.p); total += x.v; } }
-  const bench = vals.filter(x => !used.has(x.p)).slice(0, 3).reduce((a, x) => a + x.v, 0);
-  return total + 0.12 * bench;
-}
-const swapIn = (roster, out, inn) => roster.filter(p => !out.includes(p)).concat(inn);
 
-export function tradeIdeas(book, mine, others, slots, limit = 15) {
-  const myB = teamValue(book, mine.players, slots), ideas = [];
+// What a roster is actually worth in Lock-In: for every remaining week, each player's lock-in value of THAT
+// week's games (more games = more chances to lock a big one; his own volatility tier), then the best way to
+// fill the starting slots. Future weeks are discounted 3%/week (rosters, roles and health change).
+// Missing roster spots are filled with the best free agent, so a 2-for-1 gets credit for the open spot.
+export class Valuer {
+  constructor({ book, schedule, Q, rosterPositions, week, freeAgents = [] }) {
+    Object.assign(this, { b: book, week, Q: Array.isArray(Q) ? Q : Q.quantiles, QT: Array.isArray(Q) ? null : Q.tiers });
+    this.slots = rosterPositions.filter(s => s !== "BN" && s !== "IR");
+    this.size = rosterPositions.filter(s => s !== "IR").length;
+    this.tg = teamGames(schedule);
+    const weeks = [...new Set(schedule.filter(g => g.week > week).map(g => g.week))].sort((a, b) => a - b);
+    this.weeks = weeks.map((w, i) => ({ w, days: weekDays(schedule, w), disc: 0.97 ** i }));
+    this.discSum = this.weeks.reduce((a, x) => a + x.disc, 0) || 1;
+    this.fa = freeAgents; this.memo = new Map();
+  }
+  // discounted sum over remaining weeks of the player's lock-in value; .perWeek for display
+  ros(p) {
+    if (this.memo.has(p)) return this.memo.get(p);
+    const t = this.b.team(p), st = this.b.status(p), base = this.b.baseline(p), Qp = tierQ(this.QT, base, this.Q);
+    const all = Object.keys(this.tg[t] || {});
+    let v = 0;
+    this.weeks.forEach(({ days, disc }, i) => {
+      const games = all.filter(d => days.includes(d)).sort().map(d => {
+        let q = 0.92;
+        if (OUT.has(st)) q = i === 0 ? 0.3 : 0.85;           // unknown return date
+        else if (SHAKY.has(st)) q = i === 0 ? 0.8 : 0.92;
+        const prev = new Date(d + "T12:00:00Z"); prev.setUTCDate(prev.getUTCDate() - 1);
+        if (all.includes(prev.toISOString().slice(0, 10))) q *= B2B_FACTOR;
+        return { mu: base, q, Q: Qp };
+      });
+      if (games.length) v += disc * contValues(this.Q, games)[0];
+    });
+    this.memo.set(p, v);
+    return v;
+  }
+  perWeek(p) { return this.ros(p) / this.discSum; }
+  // best lineup over the rest of the season, in points per week
+  team(players) {
+    let ps = [...new Set(players)];
+    if (ps.length < this.size) {
+      const have = new Set(ps), fill = this.fa.filter(p => !have.has(p)).sort((a, b) => this.ros(b) - this.ros(a));
+      ps = ps.concat(fill.slice(0, this.size - ps.length));
+    }
+    const m = this.slots.map(s => ps.map(p => (fits(s, this.b.pos(p)) ? this.ros(p) : null)));
+    const pick = maxAssign(m), used = new Set();
+    let total = 0;
+    pick.forEach((c, r) => { if (c >= 0 && m[r][c] != null) { total += m[r][c]; used.add(ps[c]); } });
+    // bench: injury cover and same-day relief are worth something, a little
+    const bench = ps.filter(p => !used.has(p)).map(p => this.ros(p)).sort((a, b) => b - a).slice(0, 3).reduce((a, b) => a + b, 0);
+    return (total + 0.1 * bench) / this.discSum;
+  }
+}
+
+const swapIn = (roster, out, inn) => roster.filter(p => !out.includes(p)).concat(inn);
+export const teamValue = (valuer, players) => valuer.team(players);
+
+export function tradeIdeas(valuer, book, mine, others, limit = 15) {
+  const myB = valuer.team(mine.players), ideas = [];
+  const raw = ps => ps.reduce((a, p) => a + playerValue(book, p), 0);
   for (const r of others) {
-    const tb = teamValue(book, r.players, slots), mp = mine.players, tp = r.players;
-    const raw = ps => ps.reduce((a, p) => a + playerValue(book, p), 0);
+    const tb = valuer.team(r.players), mp = mine.players, tp = r.players;
     const tryDeal = (give, get) => {
       // realism: managers judge by player value, so they must get back ~90%+ of what they give up
       if (raw(give) < 0.9 * raw(get)) return;
-      const dm = teamValue(book, swapIn(mp, give, get), slots) - myB;
+      const dm = valuer.team(swapIn(mp, give, get)) - myB;
       if (dm <= 0.5) return;
-      const dt = teamValue(book, swapIn(tp, get, give), slots) - tb;
+      const dt = valuer.team(swapIn(tp, get, give)) - tb;
       if (dt >= 0) ideas.push({ give, get, dm, dt, roster_id: r.roster_id, owner_id: r.owner_id });
     };
     for (const a of mp) for (const b of tp) tryDeal([a], [b]);
     for (let i = 0; i < mp.length; i++) for (let j = i + 1; j < mp.length; j++) for (const b of tp) tryDeal([mp[i], mp[j]], [b]);
+    for (const a of mp) for (let i = 0; i < tp.length; i++) for (let j = i + 1; j < tp.length; j++) tryDeal([a], [tp[i], tp[j]]);
   }
   ideas.sort((x, y) => (y.dm + 0.5 * y.dt) - (x.dm + 0.5 * x.dt));
   // keep variety: at most 2 ideas per target player
@@ -522,18 +618,22 @@ export function tradeIdeas(book, mine, others, slots, limit = 15) {
   return out;
 }
 
-export function waiverMoves(book, mine, candidates, slots, protect, limit = 8) {
-  // for each free agent, the drop that improves the team most; protected = locked/IR players
-  const base = teamValue(book, mine.players, slots), out = [];
+// For each free agent, the drop that gains the most: this week's expected locked total (the real plan: open
+// slots, today's games, locks already made) plus rest-of-season value. Protected = players the plan uses.
+export function waiverMoves(wp, valuer, mine, candidates, protect, limit = 8) {
+  const baseWeek = wp.weekTotal(mine.players), baseRos = valuer.team(mine.players), out = [];
   for (const fa of candidates) {
     let best = null;
     for (const d of mine.players) {
       if (protect.has(d)) continue;
-      const dv = teamValue(book, swapIn(mine.players, [d], [fa.pid]), slots) - base;
-      if (!best || dv > best.dv) best = { drop: d, dv };
+      const roster = swapIn(mine.players, [d], [fa.pid]);
+      const week = wp.weekTotal(roster) - baseWeek, perWeek = valuer.team(roster) - baseRos;
+      const gain = week + perWeek * valuer.discSum;
+      if (!best || gain > best.gain) best = { drop: d, gain, week, perWeek };
     }
-    if (best && best.dv > 0.3) out.push({ ...fa, drop: best.drop, dropName: book.name(best.drop), gain: Math.round(best.dv * 10) / 10,
-      bid: Math.min(40, Math.max(1, Math.round(best.dv * 2 + Math.min(fa.trend || 0, 20000) / 5000))) });
+    if (best && best.gain > 0.3) out.push({ ...fa, drop: best.drop, dropName: wp.b.name(best.drop),
+      gain: Math.round(best.gain * 10) / 10, weekGain: Math.round(best.week * 10) / 10, rosGain: Math.round(best.perWeek * 10) / 10,
+      bid: Math.min(40, Math.max(1, Math.round(best.perWeek * 3 + Math.max(0, best.week) * 0.5 + Math.min(fa.trend || 0, 20000) / 5000))) });
   }
   return out.sort((a, b) => b.gain - a.gain).slice(0, limit);
 }

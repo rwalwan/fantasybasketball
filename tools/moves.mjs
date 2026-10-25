@@ -3,7 +3,7 @@
 // the site, so the numbers match what you see there. Reasons are cached so each suggestion is only
 // written once (OpenRouter key stays server-side; never shipped to the browser).
 import fs from "node:fs";
-import { Book, WeekPlan, weekDays, tradeIdeas, waiverMoves, playerValue } from "../site/engine.js";
+import { Book, WeekPlan, Valuer, weekDays, tradeIdeas, waiverMoves, playerValue } from "../site/engine.js";
 
 const LEAGUE = "1400915575915491328", USER = "1388708038000533504";
 const S1 = "https://api.sleeper.app/v1", S2 = "https://api.sleeper.com";
@@ -35,12 +35,12 @@ const book = new Book({ scoring: league.scoring_settings, players: st("players")
 book.addStats(stats); book.addProjections(proj);
 const mine = rosters.find(r => r.owner_id === USER), my = matchups.find(m => m.roster_id === mine.roster_id);
 const slots = league.roster_positions.filter(s => s !== "BN" && s !== "IR");
-const wp = new WeekPlan({ Q: st("quantiles").quantiles, book, schedule, week, today, rosterPositions: league.roster_positions,
+const wp = new WeekPlan({ Q: st("quantiles"), book, schedule, week, today, rosterPositions: league.roster_positions,
   roster: mine, matchup: my, rosters, tips: tipsRaw, locks,
   elig: (p, d) => { const k = `${d}|${p}`; if (k in ov) return !!ov[k]; const s = snaps[k]; return s && s.frozen ? s.slot != null : null; } });
 const opp = matchups.find(m => m.matchup_id === my.matchup_id && m.roster_id !== mine.roster_id);
 const oppRoster = opp && rosters.find(r => r.roster_id === opp.roster_id);
-const oppPlan = oppRoster ? new WeekPlan({ Q: st("quantiles").quantiles, book, schedule, week, today, rosterPositions: league.roster_positions,
+const oppPlan = oppRoster ? new WeekPlan({ Q: st("quantiles"), book, schedule, week, today, rosterPositions: league.roster_positions,
   roster: oppRoster, matchup: opp, rosters, tips: tipsRaw, locks: {}, elig: () => true }).build() : null;
 const plan = wp.build({ opp: oppPlan ? { mean: oppPlan.outlook.mean, var: oppPlan.outlook.var } : null });
 // never suggest dropping someone the plan is counting on: locked/kept games, today's starters and relief, next-up players
@@ -50,8 +50,9 @@ const protect = new Set([...(mine.reserve || []),
 
 const claims = (() => { try { return st("claims"); } catch { return { consensus: {} }; } })();
 const fa = wp.waivers(trending, 40).list;
-const adds = waiverMoves(book, mine, fa, slots, protect, 12).filter(m => m.gain >= 1.5).slice(0, 8).map(m => ({ ...m, experts: claims.consensus?.[m.pid] || null }));
-const trades = tradeIdeas(book, mine, rosters.filter(r => r.roster_id !== mine.roster_id), slots, 10)
+const valuer = new Valuer({ book, schedule, Q: st("quantiles"), rosterPositions: league.roster_positions, week, freeAgents: fa.map(x => x.pid) });
+const adds = waiverMoves(wp, valuer, mine, fa, protect, 12).filter(m => m.gain >= 1.5).slice(0, 8).map(m => ({ ...m, experts: claims.consensus?.[m.pid] || null }));
+const trades = tradeIdeas(valuer, book, mine, rosters.filter(r => r.roster_id !== mine.roster_id), 10)
   .map(t => ({ ...t, partner: userName[t.owner_id] || `Team ${t.roster_id}`,
                giveNames: t.give.map(p => book.name(p)), getNames: t.get.map(p => book.name(p)) }));
 
@@ -60,8 +61,8 @@ const cache = readState("reasons.json", {});
 const fmtP = p => { const g = book.games[p] || [], avg = book.avg(p), pri = book.prior[p];
   return `${book.name(p)} (${book.team(p)}, ${book.pos(p).join("/")}, projection ${book.baseline(p).toFixed(1)} FP/G = ${g.length} games this season${avg != null ? ` at ${avg.toFixed(1)}` : ""} blended with ${pri != null ? `last season's ${pri.toFixed(1)}` : "preseason projections"}; last 3: ${g.slice(-3).map(x => x.fp).join("/") || "none"}${book.status(p) ? ", " + book.status(p) : ""})`; };
 const items = [
-  ...adds.map(m => ({ key: `add|${m.pid}|${m.drop}|${today}`, text: `WAIVER: add ${fmtP(m.pid)}; drop ${fmtP(m.drop)}. Team value +${m.gain} locked pts/week. ${m.experts ? `Experts: ${Math.round(m.experts.bull_share * 100)}% bullish over ${m.experts.n} calls.` : ""} Sleeper adds last 24h: ${m.trend}.` })),
-  ...trades.map(t => ({ key: `trade|${t.give.join("+")}|${t.get.join("+")}|${today}`, text: `TRADE with ${t.partner}: give ${t.give.map(fmtP).join(" + ")}; get ${t.get.map(fmtP).join(" + ")}. Our team +${t.dm.toFixed(1)}, theirs +${t.dt.toFixed(1)} locked pts/week.` })),
+  ...adds.map(m => ({ key: `add|${m.pid}|${m.drop}|${today}`, text: `WAIVER: add ${fmtP(m.pid)}; drop ${fmtP(m.drop)}. Gain: +${m.weekGain} locked pts this week, +${m.rosGain} per week after (${m.gain} total over the season). ${m.experts ? `Experts: ${Math.round(m.experts.bull_share * 100)}% bullish over ${m.experts.n} calls.` : ""} Sleeper adds last 24h: ${m.trend}.` })),
+  ...trades.map(t => ({ key: `trade|${t.give.join("+")}|${t.get.join("+")}|${today}`, text: `TRADE with ${t.partner}: give ${t.give.map(fmtP).join(" + ")}; get ${t.get.map(fmtP).join(" + ")}. Our team +${t.dm.toFixed(1)}, theirs +${t.dt.toFixed(1)} locked pts per week for the rest of the season.` })),
 ].filter(x => !cache[x.key]);
 
 if (items.length && process.env.OPENROUTER_API_KEY) {
@@ -84,7 +85,7 @@ fs.writeFileSync(stateFile("reasons.json"), JSON.stringify(cache));
 const out = {
   generated: new Date().toISOString(), week,
   adds: adds.map(m => ({ pid: m.pid, name: m.name, team: m.team, pos: m.pos, fpg: m.fpg, left: m.left, trend: m.trend,
-    drop: m.drop, dropName: m.dropName, gain: m.gain, bid: m.bid, experts: m.experts ? { bull_share: m.experts.bull_share, n: m.experts.n } : null,
+    drop: m.drop, dropName: m.dropName, gain: m.gain, weekGain: m.weekGain, rosGain: m.rosGain, bid: m.bid, experts: m.experts ? { bull_share: m.experts.bull_share, n: m.experts.n } : null,
     reason: cache[`add|${m.pid}|${m.drop}|${today}`] || null })),
   trades: trades.map(t => ({ partner: t.partner, roster_id: t.roster_id, give: t.give, get: t.get, giveNames: t.giveNames, getNames: t.getNames,
     dm: Math.round(t.dm * 10) / 10, dt: Math.round(t.dt * 10) / 10,

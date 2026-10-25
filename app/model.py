@@ -21,6 +21,7 @@ class PlayerBook:
         self.prior = {}                      # pid -> last season FP/G
         self.proj = {}                       # (pid, date) -> projected FP from Sleeper/RotoWire
         self.w = {"rotowire": 0.5, "model": 0.5}  # source weights, learned from graded accuracy (experts.py)
+        self.is_final = None                 # (date, team) -> bool; set by run.py. Live games never feed averages.
 
     def add_stat_rows(self, rows):
         seen = {(pid, g[3]) for pid, gs in self.games.items() for g in gs}
@@ -64,13 +65,21 @@ class PlayerBook:
     def status(self, pid):
         return self.meta.get(pid, {}).get("injury_status")
 
-    def season_avg(self, pid):
+    def done(self, pid):
+        """Final games only (a half-played game is not a data point)."""
         g = self.games.get(pid, [])
+        if not self.is_final:
+            return g
+        t = self.team(pid)
+        return [x for x in g if self.is_final(x[0], t)]
+
+    def season_avg(self, pid):
+        g = self.done(pid)
         return sum(x[1] for x in g) / len(g) if g else None
 
     def baseline(self, pid):
         """Shrunk per-game average: this season blended with last season (or projection if no history)."""
-        g = self.games.get(pid, [])
+        g = self.done(pid)
         cur = self.season_avg(pid)
         prior = self.prior.get(pid)
         if prior is None:

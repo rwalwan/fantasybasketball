@@ -1,4 +1,4 @@
-import { Book, WeekPlan, weekDays, teamGames, fits, playerValue, teamValue, range80 } from "./engine.js";
+import { Book, WeekPlan, Valuer, waiverMoves, weekDays, teamGames, fits, range80 } from "./engine.js";
 
 // ---- config -----------------------------------------------------------------------------------
 const LEAGUE = "1400915575915491328", USER = "1388708038000533504";
@@ -48,7 +48,7 @@ async function loadBase() {
   const today = etToday();
   const weeks = schedule.filter(g => g.week).map(g => [g.date, g.week]).sort();
   const week = (weeks.filter(([d]) => d <= today).at(-1) || weeks[0])[1];
-  base = { experts, Q: Q.quantiles, league, players, priors, gamelog, schedule, users: Object.fromEntries(lg.map(u => [u.user_id, u.display_name])), week };
+  base = { experts, Q: Q.quantiles, QS: Q, league, players, priors, gamelog, schedule, users: Object.fromEntries(lg.map(u => [u.user_id, u.display_name])), week };
 }
 async function loadLive() {
   const { week, league } = base, season = league.season;
@@ -101,19 +101,31 @@ function compute() {
   const my = live.matchups.find(m => m.roster_id === mine.roster_id);
   const opp = live.matchups.find(m => m.matchup_id === my.matchup_id && m.roster_id !== mine.roster_id);
   const locks = { ...live.locks, ...local.get(`locks_w${base.week}`) };
-  const wp = new WeekPlan({ Q: base.Q, book, schedule: base.schedule, week: base.week, today: etToday(), now: new Date(),
+  const wp = new WeekPlan({ Q: base.QS, book, schedule: base.schedule, week: base.week, today: etToday(), now: new Date(),
     rosterPositions: base.league.roster_positions, roster: mine, matchup: my, rosters: live.rosters, tips: live.tips,
     elig: eligFn(my.starters), locks });
   // opponent's outlook from the same engine (their recent games assumed countable), then my matchup-aware plan
   let oppOut = null, oppPlan = null;
   const oppRoster = opp && live.rosters.find(r => r.roster_id === opp.roster_id);
   if (oppRoster) {
-    oppPlan = new WeekPlan({ Q: base.Q, book, schedule: base.schedule, week: base.week, today: etToday(), now: new Date(),
+    oppPlan = new WeekPlan({ Q: base.QS, book, schedule: base.schedule, week: base.week, today: etToday(), now: new Date(),
       rosterPositions: base.league.roster_positions, roster: oppRoster, matchup: opp, rosters: live.rosters, tips: live.tips,
       elig: () => true, locks: {} }).build();
     oppOut = { mean: oppPlan.outlook.mean, var: oppPlan.outlook.var };
   }
-  return { book, wp, plan: wp.build({ opp: oppOut }), oppPlan, waivers: wp.waivers(live.trending), mine, my, opp };
+  const waivers = wp.waivers(live.trending);
+  const valuer = new Valuer({ book, schedule: base.schedule, Q: base.QS, rosterPositions: base.league.roster_positions, week: base.week,
+                              freeAgents: waivers.list.map(x => x.pid) });
+  const plan = wp.build({ opp: oppOut });
+  // every free agent scored the same way Moves does: best drop, this week's locked-points change + rest of season
+  const protect = new Set([...(mine.reserve || []),
+    ...plan.slots.filter(s => ["locked", "lock", "keep", "live", "confirm"].includes(s.action)).map(s => s.pid),
+    ...plan.slots.flatMap(s => [s.today?.pid, s.today?.relief?.pid, s.later?.pid]).filter(Boolean)]);
+  const best = Object.fromEntries(waiverMoves(wp, valuer, mine, waivers.list, protect, 999).map(m => [m.pid, m]));
+  for (const x of waivers.list) Object.assign(x, best[x.pid] ? { drop: best[x.pid].dropName, gain: best[x.pid].gain, weekGain: best[x.pid].weekGain,
+    rosGain: best[x.pid].rosGain, bid: best[x.pid].bid } : { drop: null, gain: 0, bid: 0 });
+  waivers.list.sort((a, b) => b.gain - a.gain);
+  return { book, wp, valuer, plan, oppPlan, waivers, mine, my, opp };
 }
 
 const LABEL = { lock: "Lock", keep: "Counts", pass: "Pass", start: "Start", locked: "Locked", confirm: "Confirm", live: "Live", "fallback-risk": "Fallback" };
@@ -169,8 +181,8 @@ function render() {
         return `<td class="c up${td}" title="vs ${esc(x.opp)}${x.tip ? " · " + esc(tipTime(x.tip)) : ""}">${Math.round(x.mu)}</td>`; }).join("") + `<td class="n">${r.left}</td></tr>`).join("");
 
   const w = c.waivers;
-  $("waivers").innerHTML = `<tr><th>Player</th><th>Team</th><th>Pos</th><th>FP/G</th><th>vs your worst (${r1(w.worst)})</th><th>Games left</th><th>Last 3</th><th>Adds 24h</th><th>Experts</th><th>Bid</th></tr>` +
-    w.list.map(x => `<tr><td>${esc(x.name)}${x.status ? `<span class="st">${esc(x.status)}</span>` : ""}</td><td>${esc(x.team)}</td><td class="pos">${esc(x.pos)}</td><td class="n">${r1(x.fpg)}</td><td class="n">${x.over > 0 ? "+" : ""}${r1(x.over)}</td><td class="n">${x.left}</td><td class="n">${x.recent.map(r1).join(" / ") || "–"}</td><td class="n">${x.trend.toLocaleString()}</td><td class="n">${consCell(x.pid)}</td><td class="n">$${x.bid}</td></tr>`).join("");
+  $("waivers").innerHTML = `<tr><th>Player</th><th>Team</th><th>Pos</th><th>FP/G</th><th>Games left</th><th title="Expected locked points gained this week with the best drop">This week</th><th title="Lock-in points per week after this one">Per week after</th><th>Drop</th><th>Last 3</th><th>Adds 24h</th><th>Experts</th><th>Bid</th></tr>` +
+    w.list.map(x => `<tr><td>${esc(x.name)}${x.status ? `<span class="st">${esc(x.status)}</span>` : ""}</td><td>${esc(x.team)}</td><td class="pos">${esc(x.pos)}</td><td class="n">${r1(x.fpg)}</td><td class="n">${x.left}</td><td class="n">${x.drop ? (x.weekGain >= 0 ? "+" : "") + r1(x.weekGain) : "–"}</td><td class="n">${x.drop ? (x.rosGain >= 0 ? "+" : "") + r1(x.rosGain) : "–"}</td><td class="pos">${x.drop ? esc(x.drop) : "no gain"}</td><td class="n">${x.recent.map(r1).join(" / ") || "–"}</td><td class="n">${x.trend.toLocaleString()}</td><td class="n">${consCell(x.pid)}</td><td class="n">${x.bid ? "$" + x.bid : "–"}</td></tr>`).join("");
 
   renderTrades(c);
   renderExperts();
@@ -185,7 +197,7 @@ function render() {
 // ---- trade assistant ------------------------------------------------------------------------------
 let tradeSel = { give: new Set(), get: new Set(), partner: null };
 function renderTrades(c) {
-  const { book, mine } = c, slots = base.league.roster_positions.filter(s => s !== "BN" && s !== "IR");
+  const { book, mine, valuer } = c;
   const others = live.rosters.filter(r => r.roster_id !== mine.roster_id);
   const sel = $("partner");
   if (!sel.options.length) {
@@ -194,16 +206,16 @@ function renderTrades(c) {
   }
   tradeSel.partner ||= +sel.value;
   const them = others.find(r => r.roster_id === tradeSel.partner);
-  const list = (r, side) => `<h3>${side === "give" ? "You give" : "You get"}</h3>` + [...(r.players || [])].sort((a, b) => playerValue(book, b) - playerValue(book, a))
-    .map(p => `<label><input type="checkbox" data-side="${side}" value="${p}" ${tradeSel[side].has(p) ? "checked" : ""}>${esc(book.name(p))} <span class="pos">${esc(book.pos(p).join("/"))}</span><span class="v">${r1(playerValue(book, p))}</span></label>`).join("");
+  const list = (r, side) => `<h3>${side === "give" ? "You give" : "You get"}</h3>` + [...(r.players || [])].sort((a, b) => valuer.perWeek(b) - valuer.perWeek(a))
+    .map(p => `<label><input type="checkbox" data-side="${side}" value="${p}" ${tradeSel[side].has(p) ? "checked" : ""}>${esc(book.name(p))} <span class="pos">${esc(book.pos(p).join("/"))}</span><span class="v" title="Lock-in value per remaining week (his schedule, volatility and health)">${r1(valuer.perWeek(p))}</span></label>`).join("");
   $("give").innerHTML = list(mine, "give"); $("get").innerHTML = list(them, "get");
   document.querySelectorAll("input[data-side]").forEach(el => el.onchange = () => { tradeSel[el.dataset.side][el.checked ? "add" : "delete"](el.value); render(); });
   const swap = (roster, out, inn) => roster.filter(p => !out.has(p)).concat([...inn]);
-  const myB = teamValue(book, mine.players, slots), thB = teamValue(book, them.players, slots);
+  const myB = valuer.team(mine.players), thB = valuer.team(them.players);
   if (tradeSel.give.size || tradeSel.get.size) {
-    const myA = teamValue(book, swap(mine.players, tradeSel.give, tradeSel.get), slots), thA = teamValue(book, swap(them.players, tradeSel.get, tradeSel.give), slots);
+    const myA = valuer.team(swap(mine.players, tradeSel.give, tradeSel.get)), thA = valuer.team(swap(them.players, tradeSel.get, tradeSel.give));
     const dm = myA - myB, dt = thA - thB;
-    $("verdict").innerHTML = `Your team: <b class="${dm >= 0 ? "good" : "bad"}">${dm >= 0 ? "+" : ""}${r1(dm)}</b> locked pts/week · theirs: <b class="${dt >= 0 ? "good" : "bad"}">${dt >= 0 ? "+" : ""}${r1(dt)}</b>. ` +
+    $("verdict").innerHTML = `Your team: <b class="${dm >= 0 ? "good" : "bad"}">${dm >= 0 ? "+" : ""}${r1(dm)}</b> locked pts per week, rest of season · theirs: <b class="${dt >= 0 ? "good" : "bad"}">${dt >= 0 ? "+" : ""}${r1(dt)}</b>. ` +
       (dm > 0 && dt >= 0 ? "Helps both of you — a realistic offer." : dm > 0 ? "Good for you, but they lose value, so expect pushback." : "This makes your team worse.");
   } else $("verdict").textContent = "";
   const sug = live.moves?.trades || [];
@@ -216,7 +228,7 @@ function renderMoves() {
   const m = live.moves || { adds: [], trades: [] };
   $("movesmeta").textContent = m.generated ? `Suggestions updated ${new Date(m.generated).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}; refreshed every 15 minutes.` : "";
   $("adds").innerHTML = (m.adds || []).length ? m.adds.map(x => `<div class="slot lock"><div class="top"><span><span class="nm">Add ${esc(x.name)}</span> <span class="pos">${esc(x.team)} ${esc(x.pos)}</span></span><span class="tag">bid $${x.bid}</span></div>` +
-      `<p>Drop <b>${esc(x.dropName)}</b>. Team +${r1(x.gain)} locked pts/week · ${r1(x.fpg)} FP/G · ${x.left} games left this week${x.experts ? ` · ${Math.round(x.experts.bull_share * 100)}% of experts say add` : ""}${x.trend ? ` · ${x.trend.toLocaleString()} adds in 24h` : ""}</p>` +
+      `<p>Drop <b>${esc(x.dropName)}</b>. ${x.weekGain != null ? `+${r1(x.weekGain)} locked pts this week, ${x.rosGain >= 0 ? "+" : ""}${r1(x.rosGain)}/week after` : `Team +${r1(x.gain)}`} · ${r1(x.fpg)} FP/G · ${x.left} games left this week${x.experts ? ` · ${Math.round(x.experts.bull_share * 100)}% of experts say add` : ""}${x.trend ? ` · ${x.trend.toLocaleString()} adds in 24h` : ""}</p>` +
       (x.reason ? `<p><i>${esc(x.reason)}</i></p>` : "") + `</div>`).join("")
     : `<div class="box"><div class="row"><span class="pos">No add/drop improves your team right now.</span></div></div>`;
   $("trades2").innerHTML = (m.trades || []).length ? m.trades.map((x, i) => `<div class="slot start"><div class="top"><span class="nm">${esc(x.partner)}</span><span class="tag">+${r1(x.dm)} you / +${r1(x.dt)} them</span></div>` +
@@ -226,7 +238,7 @@ function renderMoves() {
 }
 
 // ---- research: every player, every game left this week -------------------------------------------
-const riskOf = (book, p) => { const g = book.games[p] || []; if (g.length < 4) return ["–", ""];
+const riskOf = (book, p) => { const g = book.done(p); if (g.length < 4) return ["–", ""];
   const m = g.reduce((a, x) => a + x.fp, 0) / g.length, cv = Math.sqrt(g.reduce((a, x) => a + (x.fp - m) ** 2, 0) / g.length) / Math.max(m, 1);
   return cv < 0.22 ? ["steady", "safe floor"] : cv < 0.32 ? ["balanced", ""] : ["boom/bust", "big ceiling, low floor"]; };
 function researchRows(c, roster, who) {
@@ -240,7 +252,7 @@ function researchRows(c, roster, who) {
     if (!ups.length) { rows.push(`<tr><td>${esc(book.name(p))}${book.status(p) ? `<span class="st">${esc(book.status(p))}</span>` : ""}</td><td class="pos">${esc(book.pos(p).join("/"))}</td><td colspan="6" class="pos">no games left this week</td><td style="white-space:normal;min-width:220px">${takeCell(p)}</td></tr>`); continue; }
     ups.forEach((g, k) => {
       const cx = book.ctx?.[`${p}|${g.date}`], rw = book.proj[`${p}|${g.date}`], mdl = book.baseline(p);
-      const [lo, hi] = range80(base.Q, g.mu);
+      const [lo, hi] = range80(g.Q || base.Q, g.mu);
       const chips = (cx?.parts || []).map(x => `<span class="chip ${x.f >= 1 ? "up" : "down"}" title="${esc(x.why)}">${esc(x.k)} ${x.f >= 1 ? "+" : ""}${Math.round((x.f - 1) * 100)}%</span>`).join(" ");
       rows.push(`<tr><td>${k ? "" : esc(book.name(p))}${!k && book.status(p) ? `<span class="st">${esc(book.status(p))}</span>` : ""}${!k && tr ? ` <span class="chip ${tr.dir === "up" ? "up" : "down"}" title="${esc(tr.why)}">${tr.dir === "up" ? "▲" : "▼"} role</span>` : ""}</td>` +
         `<td class="pos">${k ? "" : esc(book.pos(p).join("/"))}</td><td>${esc(day(g.date))} ${g.b2b ? '<span class="pos">b2b</span>' : ""} <span class="pos">vs ${esc(g.opp)}${g.tip ? " · " + esc(tipTime(g.tip)) : ""}</span></td>` +
@@ -288,7 +300,7 @@ function renderNews() {
 }
 
 // ---- experts ----------------------------------------------------------------------------------------
-const SRC_NAME = { rotowire: "RotoWire per-game projections (via Sleeper)", model: "Lock Desk model (season avg shrunk to last season)", ctx: "Lock Desk matchup model (model × opponent, pace, minutes, injuries, rest)" };
+const SRC_NAME = { rotowire: "RotoWire per-game projections (via Sleeper)", model: "Lock Desk model (season avg shrunk to last season)", ctx: "Lock Desk matchup model (model × opponent, pace, minutes, injuries, rest)", blend: "Blend the engine uses (weighted mix of the above)" };
 function renderExperts() {
   const ex = base.experts, rows = ex.sources || [];
   const weeks = [...new Set(rows.flatMap(r => Object.keys(r.weekly || {})))].sort((a, b) => a - b);
@@ -301,9 +313,9 @@ function renderExperts() {
     (sr.rows || []).sort((a, b) => (b.ok - a.ok) || (b.takes7 + b.calls7) - (a.takes7 + a.calls7)).map(r => `<tr><td><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.name)}</a></td><td class="pos">${esc(r.role)}</td>` +
       `<td>${r.ok ? '<span class="good">active</span>' : `<span class="pos">${esc(r.why || "off")}</span>`}</td><td class="pos">${r.newest ? esc(new Date(r.newest).toLocaleDateString()) : "–"}</td><td class="n">${r.takes7 || 0}</td><td class="n">${r.calls7 || 0}</td></tr>`).join("");
   $("sourcesmeta").textContent = sr.checked ? `Sources re-checked ${new Date(sr.checked).toLocaleString()} (every 3 days): reachable, allowed by the site's robots.txt, recent, and NBA-focused.` : "";
-  $("pundits").innerHTML = `<tr><th>Expert</th><th>Calls</th><th>Graded</th><th>Hit rate</th><th>Weight</th></tr>` +
-    (cl.experts.map(e => `<tr><td>${esc(e.expert)}</td><td class="n">${e.calls}</td><td class="n">${e.graded}</td><td class="n">${e.hit_rate != null ? Math.round(e.hit_rate * 100) + "%" : "–"}</td><td class="n">${Math.round(e.weight * 100)}%</td></tr>`).join("") ||
-     `<tr><td colspan="5" class="pos">No expert calls collected yet. They appear as advice articles are published and read.</td></tr>`);
+  $("pundits").innerHTML = `<tr><th>Expert</th><th>Calls</th><th>Graded</th><th>Hit rate</th><th title="Hit rate minus what an average expert hits on the same kinds of calls">vs. average</th><th>Weight</th></tr>` +
+    (cl.experts.map(e => `<tr><td>${esc(e.expert)}</td><td class="n">${e.calls}</td><td class="n">${e.graded}</td><td class="n">${e.hit_rate != null ? Math.round(e.hit_rate * 100) + "%" : "–"}</td><td class="n">${e.hit_rate != null && e.base_rate != null ? (e.hit_rate >= e.base_rate ? "+" : "") + Math.round((e.hit_rate - e.base_rate) * 100) + " pts" : "–"}</td><td class="n">${Math.round(e.weight * 100)}%</td></tr>`).join("") ||
+     `<tr><td colspan="6" class="pos">No expert calls collected yet. They appear as advice articles are published and read.</td></tr>`);
   $("calls").innerHTML = `<tr><th>Date</th><th>Expert</th><th>Call</th><th>Player</th><th>Why</th><th>Result</th></tr>` +
     cl.recent.slice(0, 40).map(c => `<tr><td class="pos">${esc(c.date)}</td><td>${esc(c.expert)}</td><td>${esc(c.action)}</td><td>${esc(c.player)}</td><td class="pos" style="white-space:normal">${esc(c.reason)}</td><td class="n">${c.correct === true ? '<span class="good">right</span>' : c.correct === false ? '<span class="bad">wrong</span>' : "pending"}</td></tr>`).join("");
 }

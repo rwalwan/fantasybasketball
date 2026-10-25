@@ -35,6 +35,9 @@ def main():
     opp_m = next((m for m in mus if m["matchup_id"] == my_m["matchup_id"] and m["roster_id"] != mine["roster_id"]), None)
 
     book = PlayerBook(lg["scoring_settings"], meta)
+    days = week_dates(sched, week)
+    tips = espn.tip_times([d for d in days if d >= (dt.date.fromisoformat(today) - dt.timedelta(days=1)).isoformat()])
+    book.is_final = final_check(sched, tips, today)
     season_rows = []
     for w in range(1, week + 1):
         rows = sleeper.week_stats(season, w, final=w < week)
@@ -59,6 +62,10 @@ def main():
         projlog = json.load(open(os.path.join(ROOT, "data", "state", f"projlog_{season}.json")))
     except Exception:
         projlog = {}
+    try:   # projections already graded (kept a few days) still belong in the memory store
+        projlog = {**json.load(open(os.path.join(ROOT, "data", "state", f"projlog_done_{season}.json"))), **projlog}
+    except Exception:
+        pass
     with open(os.path.join(ROOT, "data", "state", "diag_run.json"), "w") as f:
         sample = next((r for r in prev_rows if (r.get("stats") or {}).get("gp")), {}) if "prev_rows" in dir() else {}
         json.dump({"prior_min_n": len(prior_min), "prior_fp_n": len(book.prior), "season_rows": len(season_rows),
@@ -75,8 +82,6 @@ def main():
     print(f"memory: {n_ing} final games stored, context for {len(ctx_out)} upcoming player-games")
 
     # record who is starting right now for every game that hasn't tipped (lock eligibility)
-    days = week_dates(sched, week)
-    tips = espn.tip_times([d for d in days if d >= (dt.date.fromisoformat(today) - dt.timedelta(days=1)).isoformat()])
     tg = team_game_dates(sched)
     slots = [s for s in lg["roster_positions"] if s not in ("BN", "IR")]
     tracker = LineupTracker(season, week)
@@ -190,7 +195,7 @@ def export_static(book, season, week, meta, lg):
         players[pid] = [f"{m.get('first_name', '')} {m.get('last_name', '')}".strip(), m.get("team"),
                         m.get("fantasy_positions") or [], m.get("injury_status")]
     with open(os.path.join(os.path.dirname(__file__), "data", "game_ratio_quantiles.json")) as f:
-        quantiles = json.load(f)
+        quantiles = experts.calibrated_quantiles(json.load(f))
     for name, obj in (("quantiles", quantiles),
                       ("gamelog", dict(season=season, week=week, games=gl)),
                       ("priors", {p: round(v, 1) for p, v in book.prior.items()}),
@@ -198,6 +203,21 @@ def export_static(book, season, week, meta, lg):
                       ("league", dict(scoring=lg["scoring_settings"], roster_positions=lg["roster_positions"]))):
         with open(os.path.join(out_dir, f"{name}.json"), "w") as f:
             json.dump(obj, f, separators=(",", ":"))
+
+
+def final_check(sched, tips, today, now=None):
+    """(date, team) -> game is over: schedule says complete, or 4 h past tip, or 2+ days old."""
+    done = {(g["date"], (g.get(side) or {}).get("team")) for g in sched if g.get("status") == "complete"
+            for side in ("home", "away")}
+    old = (dt.date.fromisoformat(today) - dt.timedelta(days=1)).isoformat()
+    now = now or dt.datetime.now(dt.timezone.utc)
+
+    def is_final(date, team):
+        if (date, team) in done or date < old:
+            return True
+        t = tips.get((date, team))
+        return bool(t) and (now - dt.datetime.fromisoformat(t.replace("Z", "+00:00"))).total_seconds() > 4 * 3600
+    return is_final
 
 
 def current_week(sched, today):

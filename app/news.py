@@ -237,24 +237,34 @@ def purge_draft_claims(claims):
     return [c for c in claims if not (DRAFT_RE.search(c.get("reason", "")) or DRAFT_RE.search(c.get("title", "")))]
 
 
+GRADE_V = 2   # v1 graded on live stat lines and gave bearish calls a free win when the player sat
+
+
 def grade(claims, book, today):
-    """Grade claims whose horizon has passed. Bullish calls are right if the player then produced above
-    replacement level (start: above his own average that day); bearish calls are right if he didn't."""
+    """Grade claims whose horizon has passed, on FINAL games only.
+    add/hold/buy/stream: right if he then averaged replacement level or better; drop/sell/avoid: right if he didn't.
+    start/sit: right if his next game beat (start) or missed (sit) his own average before the call.
+    No games in the window = ungradeable either way (sitting out proves nothing about the call)."""
     horizon_days = {"day": 2, "week": 8, "season": 21}
     for c in claims:
+        if c.get("graded_v") != GRADE_V:
+            c.pop("correct", None)
+            c.pop("outcome_fpg", None)
         if "correct" in c:
             continue
         end = (dt.date.fromisoformat(c["date"]) + dt.timedelta(days=horizon_days.get(c["horizon"], 8))).isoformat()
         if end > today:
             continue
-        games = [g for g in book.games.get(c["pid"], []) if c["date"] < g[0] <= end]
+        done = book.done(c["pid"])
+        games = [g for g in done if c["date"] < g[0] <= end]
+        c["graded_v"] = GRADE_V
         if not games:
-            c["correct"] = None if c["action"] in BULL else True   # no games: bullish ungradeable, bearish right
+            c["correct"] = None
             continue
         avg = sum(g[1] for g in games) / len(games)
         if c["action"] in ("start", "sit"):
-            prior = [g[1] for g in book.games.get(c["pid"], []) if g[0] <= c["date"]]
-            ref = sum(prior) / len(prior) if prior else REPLACEMENT_FPG
+            prior = [g[1] for g in done if g[0] <= c["date"]]
+            ref = sum(prior) / len(prior) if prior else (book.prior.get(c["pid"]) or REPLACEMENT_FPG)
             good = games[0][1] >= ref
         else:
             good = avg >= REPLACEMENT_FPG
@@ -264,29 +274,52 @@ def grade(claims, book, today):
     return claims
 
 
+def _kind(action):
+    return "startsit" if action in ("start", "sit") else ("bull" if action in BULL else "bear")
+
+
 def experts_table(claims):
-    """Per expert: graded calls, hit rate, and a weight = Bayesian hit rate (prior 50% over 10 calls)."""
+    """Per expert: hit rate AND edge over the base rate for the same kind of call.
+    "Add a decent player" is right most of the time for anyone, so raw hit rate rewards easy calls. Edge =
+    hits minus what an average expert would have hit on those same call types; weight = 50% + shrunk edge
+    (10 pseudo-calls of zero edge), clipped to 20-80%."""
+    graded = [c for c in claims if c.get("correct") is not None]
+    base = {}
+    for k in ("bull", "bear", "startsit"):
+        g = [c for c in graded if _kind(c["action"]) == k]
+        base[k] = (sum(1 for c in g if c["correct"]) + 5) / (len(g) + 10)     # shrunk toward 50%
     t = {}
     for c in claims:
-        e = t.setdefault(c["expert"], {"expert": c["expert"], "site": c["site"], "calls": 0, "graded": 0, "hits": 0})
+        e = t.setdefault(c["expert"], {"expert": c["expert"], "site": c["site"], "calls": 0, "graded": 0, "hits": 0, "exp": 0.0})
         e["calls"] += 1
-        if c.get("correct") is not None and "correct" in c:
+        if c.get("correct") is not None:
             e["graded"] += 1
             e["hits"] += 1 if c["correct"] else 0
+            e["exp"] += base[_kind(c["action"])]
     for e in t.values():
         e["hit_rate"] = round(e["hits"] / e["graded"], 3) if e["graded"] else None
-        e["weight"] = round((e["hits"] + 5) / (e["graded"] + 10), 3)
+        e["base_rate"] = round(e["exp"] / e["graded"], 3) if e["graded"] else None
+        edge = (e["hits"] - e["exp"]) / (e["graded"] + 10)
+        e["edge"] = round(edge, 3) if e["graded"] else None
+        e["weight"] = round(min(0.8, max(0.2, 0.5 + edge)), 3)
+        del e["exp"]
     return sorted(t.values(), key=lambda e: (-e["weight"], -e["calls"]))
 
 
 def consensus(claims, table, today, days=7):
-    """Weighted share of bullish vs bearish calls per player over the last `days`."""
+    """Weighted share of bullish vs bearish calls per player over the last `days`.
+    One vote per site per player (its latest call): a site repeating itself, or several writers on one site
+    echoing the same report, shouldn't count as several independent opinions."""
     w = {e["expert"]: e["weight"] for e in table}
     since = (dt.date.fromisoformat(today) - dt.timedelta(days=days)).isoformat()
-    out = {}
+    latest = {}
     for c in claims:
-        if c["date"] < since:
-            continue
+        if c["date"] >= since:
+            k = (c["pid"], c.get("site") or c["expert"])
+            if k not in latest or c["date"] >= latest[k]["date"]:
+                latest[k] = c
+    out = {}
+    for c in latest.values():
         o = out.setdefault(c["pid"], {"player": c["player"], "bull": 0.0, "bear": 0.0, "n": 0, "calls": []})
         weight = w.get(c["expert"], 0.5) * (0.6 + 0.2 * (c.get("conviction") or 2))
         o["bull" if c["action"] in BULL else "bear"] += weight
