@@ -132,7 +132,7 @@ const LABEL = { lock: "Lock", keep: "Counts", pass: "Pass", start: "Start", lock
 function render() {
   const c = compute(), { plan, my, opp, mine } = c;
   const oppOwner = live.rosters.find(r => r.roster_id === opp?.roster_id)?.owner_id;
-  $("score").innerHTML = `<b>${r1((my.points || 0) / 10)}</b> – ${r1((opp?.points || 0) / 10)}<span>vs ${esc(base.users[oppOwner] || "opponent")} · FAAB $${base.league.settings.waiver_budget - (mine.settings?.waiver_budget_used || 0)}</span>`;
+  $("score").innerHTML = `<b>${r1((my.points || 0) / 10)}</b> – ${r1((opp?.points || 0) / 10)}<span>score now vs ${esc(base.users[oppOwner] || "opponent")} · FAAB $${base.league.settings.waiver_budget - (mine.settings?.waiver_budget_used || 0)}</span>`;
   $("metatext").textContent = `${base.league.name} · week ${base.week} · live ${live.at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
 
   // ONE source: plan.actions (top summary), plan.slots (cards + table). Phone alerts read the same lists.
@@ -143,7 +143,9 @@ function render() {
     : a.kind === "move" ? `best ~${tipTime(a.best)}, by ${tipTime(a.by)}` : a.by ? `by ${tipTime(a.by)}` : "";
   const passes = acts.filter(a => a.kind === "pass");
   const ol = plan.outlook;
-  const mline = ol?.opp ? `<div class="pos" style="margin-bottom:6px">Matchup: you <b>${r1(ol.mean)}</b> ± ${r1(ol.sd)} vs ${esc(base.users[oppOwner] || "opponent")} <b>${r1(ol.opp.mean)}</b> ± ${r1(Math.sqrt(ol.opp.var))} expected · win chance <b>${Math.round(ol.winProb * 100)}%</b></div>` : "";
+  // projected FINAL totals; range = 80% band (±1.28 sd); win chance = P(your final > theirs), normal approximation
+  const band = (m, sd) => `${Math.round(m - 1.28 * sd)}–${Math.round(m + 1.28 * sd)}`, pct = p => p < 0.01 ? "<1%" : p > 0.99 ? ">99%" : Math.round(p * 100) + "%";
+  const mline = ol?.opp ? `<div class="pos" style="margin-bottom:6px" title="Projected final: locked games + live games' remaining projection + the expected value of every open slot. Range = 80% likely band. Win chance = probability your final beats theirs.">Projected final: you <b>${r1(ol.mean)}</b> <span class="pos">(${band(ol.mean, ol.sd)})</span> vs ${esc(base.users[oppOwner] || "opponent")} <b>${r1(ol.opp.mean)}</b> <span class="pos">(${band(ol.opp.mean, Math.sqrt(ol.opp.var))})</span> · win chance <b>${pct(ol.winProb)}</b></div>` : "";
   $("now").innerHTML = mline + (nextBy ? `<b>Next deadline:</b> <span class="when">${until(nextBy)}</span> (${esc(tipTime(nextBy))})` : "<b>No deadlines pending.</b>") +
     `<ul>${acts.filter(a => a.kind !== "pass").map(a => { const [w, ...rest] = a.text.split(" "); return `<li><b>${esc(w)}</b> ${esc(rest.join(" "))} <span class="pos">· ${esc(when(a))}</span></li>`; }).join("")}` +
     (passes.length ? `<li><b>Pass</b> ${passes.map(a => esc(a.text.replace(/^Don't lock /, ""))).join(", ")} <span class="pos">· waiting is worth more</span></li>` : "") +
@@ -273,7 +275,8 @@ function renderResearch(c) {
 function renderInsights(c) {
   const ins = live.insights || {}, lr = live.learning || {}, mine = new Set(c.mine.players || []);
   const ol = c.plan.outlook;
-  $("outlook").innerHTML = ol?.opp ? `<div class="row"><span>You: <b>${r1(ol.mean)}</b> expected (± ${r1(ol.sd)}) · Opponent: <b>${r1(ol.opp.mean)}</b> (± ${r1(Math.sqrt(ol.opp.var))})</span><span><b>${Math.round(ol.winProb * 100)}%</b> win chance</span></div>` +
+  $("outlook").innerHTML = ol?.opp ? `<div class="row"><span>Projected final — you: <b>${r1(ol.mean)}</b> (80% range ${Math.round(ol.mean - 1.28 * ol.sd)}–${Math.round(ol.mean + 1.28 * ol.sd)}) · opponent: <b>${r1(ol.opp.mean)}</b> (${Math.round(ol.opp.mean - 1.28 * Math.sqrt(ol.opp.var))}–${Math.round(ol.opp.mean + 1.28 * Math.sqrt(ol.opp.var))})</span><span><b>${ol.winProb < 0.01 ? "<1%" : ol.winProb > 0.99 ? ">99%" : Math.round(ol.winProb * 100) + "%"}</b> win chance</span></div>` +
+    `<div class="row"><span class="pos">Projected final = locked games + the rest of live games' projections + the expected value of each open slot (from the lock plan). Win chance = how often your final beats theirs given both ranges.</span></div>` +
     `<div class="row"><span class="pos">Lock calls compare your win chance if you lock vs wait. When they differ by 2+ points, the matchup decides: protect a lead with safe locks, chase upside when behind.</span></div>` : `<div class="row"><span class="pos">No matchup found.</span></div>`;
   $("why").innerHTML = (ins.notes || []).map(n => `<div class="row"><span><b>${esc(n.player)}</b> <span class="pos">${esc(n.date)}</span> — ${esc(n.text)}</span><span class="chip ${n.tag === "signal" ? "up" : ""}">${esc(n.tag)}</span></div>`).join("") ||
     `<div class="row"><span class="pos">Notes appear after games finish, for any game that lands well above or below its projection.</span></div>`;
