@@ -64,9 +64,14 @@ def build(book, meta, team_dates, today, is_final, pids):
         # hurt before this season's games began (no games yet): count the absence from Sleeper's injury start date,
         # at the league's pace of 82 games per ~174 days, so a long-term injury isn't treated like a fresh one
         isd = m.get("injury_start_date")
-        if last is None and isd and dates and isd < dates[0]:
+        opener = last is None and st in OUTISH and past
+        if opener and isd and isd < dates[0]:
             days_out = (dt.date.fromisoformat(today) - dt.date.fromisoformat(isd[:10])).days
             missed = max(missed, round(days_out * 82 / 174))
+        elif opener:
+            # out since opening night with no start date: these are long-term injuries (one-game rest/illness
+            # absences don't start a season), so use the long-absence return rate (13+ games missed)
+            missed = max(missed, 13)
         upcoming = [d for d in dates if d >= today and not is_final(d, team)]
         q, basis = {}, None
         if tl and (tl.get("out_min_days") is not None):
@@ -110,7 +115,8 @@ def build(book, meta, team_dates, today, is_final, pids):
             basis = (f"{st}: next game {round(M['designation'].get(DESIG.get(st, ''), 0) * 100) if st in DESIG else 0}% by designation, "
                      f"then the historical return rate after {missed} missed game(s)") if st in DESIG or st in OUTISH else None
         if q:
-            out[pid] = {"status": st, "missed": missed, "timeline": tl, "basis": basis, "q": q}
+            out[pid] = {"status": st, "missed": missed, "timeline": tl, "basis": basis, "q": q,
+                        "injury": {k: m.get(k) for k in ("injury_body_part", "injury_notes", "injury_start_date") if m.get(k)}}
     return out
 
 
