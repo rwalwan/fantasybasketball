@@ -103,3 +103,17 @@ fs.writeFileSync(stateFile("plan_debug.json"), JSON.stringify({ at: new Date().t
   grid: plan.grid.map(r => ({ name: r.name, pos: r.pos, starter: r.starter, locked: r.locked, status: r.status, cells: r.cells })) }, null, 1));
 console.log(`moves: ${out.adds.length} adds, ${out.trades.length} trades, ${items.length} new reasons requested`);
 void playerValue;
+
+// ---- valuation diagnostics (data/state/value_debug.json) ----
+{
+  const r1 = v => Math.round(v * 10) / 10;
+  const row = p => ({ name: book.name(p), team: book.team(p), pos: book.pos(p).join("/"), status: book.status(p),
+    perWeek: r1(valuer.perWeek(p)), market: r1(playerValue(book, p)), base: r1(book.baseline(p)), prior: book.prior[p] ?? null,
+    avg: book.avg(p) != null ? r1(book.avg(p)) : null, games: book.done(p).length });
+  const rostered = rosters.flatMap(r => (r.players || []).map(p => ({ ...row(p), owner: userName[r.owner_id] || r.roster_id })));
+  rostered.sort((a, b) => b.perWeek - a.perWeek);
+  const faRows = fa.map(x => row(x.pid)).sort((a, b) => b.perWeek - a.perWeek);
+  const teams = rosters.map(r => ({ owner: userName[r.owner_id] || r.roster_id, n: (r.players || []).length, value: r1(valuer.team(r.players || [])) }));
+  fs.writeFileSync(stateFile("value_debug.json"), JSON.stringify({ at: new Date().toISOString(), discSum: valuer.discSum, weeks: valuer.weeks.length,
+    size: valuer.size, teams, rostered, fa: faRows.slice(0, 40) }, null, 1));
+}
