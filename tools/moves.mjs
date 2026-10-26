@@ -62,7 +62,7 @@ const fmtP = p => { const g = book.games[p] || [], avg = book.avg(p), pri = book
   return `${book.name(p)} (${book.team(p)}, ${book.pos(p).join("/")}, projection ${book.baseline(p).toFixed(1)} FP/G = ${g.length} games this season${avg != null ? ` at ${avg.toFixed(1)}` : ""} blended with ${pri != null ? `last season's ${pri.toFixed(1)}` : "preseason projections"}; last 3: ${g.slice(-3).map(x => x.fp).join("/") || "none"}${book.status(p) ? ", " + book.status(p) : ""})`; };
 const items = [
   ...adds.map(m => ({ key: `add|${m.pid}|${m.drop}|${today}`, text: `WAIVER: add ${fmtP(m.pid)}; drop ${fmtP(m.drop)}. Gain: +${m.weekGain} locked pts this week, +${m.rosGain} per week after (${m.gain} total over the season). ${m.experts ? `Experts: ${Math.round(m.experts.bull_share * 100)}% bullish over ${m.experts.n} calls.` : ""} Sleeper adds last 24h: ${m.trend}.` })),
-  ...trades.map(t => ({ key: `trade|${t.give.join("+")}|${t.get.join("+")}|${today}`, text: `TRADE with ${t.partner}: give ${t.give.map(fmtP).join(" + ")}; get ${t.get.map(fmtP).join(" + ")}. Our team +${t.dm.toFixed(1)}, theirs +${t.dt.toFixed(1)} locked pts per week for the rest of the season.` })),
+  ...trades.map(t => ({ key: `trade|${t.give.join("+")}|${t.get.join("+")}|${today}`, text: `TRADE with ${t.partner}: give ${t.give.map(fmtP).join(" + ")}; get ${t.get.map(fmtP).join(" + ")}. Our team +${t.dm.toFixed(1)}, theirs +${t.dt.toFixed(1)} locked pts per week for the rest of the season. Their lineup change: ${(t.theirFit || []).map(f => `${f.inName} takes their ${f.slot} spot from ${f.outName} (${f.gain >= 0 ? "+" : ""}${f.gain}/wk)`).join("; ") || "depth only"}. Ours: ${(t.myFit || []).map(f => `${f.inName} replaces ${f.outName} at ${f.slot} (${f.gain >= 0 ? "+" : ""}${f.gain}/wk)`).join("; ") || "depth only"}. Mention what it fixes for them.` })),
 ].filter(x => !cache[x.key]);
 
 if (items.length && process.env.OPENROUTER_API_KEY) {
@@ -88,7 +88,8 @@ const out = {
     drop: m.drop, dropName: m.dropName, gain: m.gain, weekGain: m.weekGain, rosGain: m.rosGain, bid: m.bid, experts: m.experts ? { bull_share: m.experts.bull_share, n: m.experts.n } : null,
     reason: cache[`add|${m.pid}|${m.drop}|${today}`] || null })),
   trades: trades.map(t => ({ partner: t.partner, roster_id: t.roster_id, give: t.give, get: t.get, giveNames: t.giveNames, getNames: t.getNames,
-    dm: Math.round(t.dm * 10) / 10, dt: Math.round(t.dt * 10) / 10,
+    dm: Math.round(t.dm * 10) / 10, dt: Math.round(t.dt * 10) / 10, theirFit: t.theirFit, myFit: t.myFit,
+    marketGive: Math.round(t.marketGive), marketGet: Math.round(t.marketGet),
     reason: cache[`trade|${t.give.join("+")}|${t.get.join("+")}|${today}`] || null })),
 };
 fs.writeFileSync("site/static/moves.json", JSON.stringify(out));

@@ -238,7 +238,9 @@ function renderMoves() {
       (x.reason ? `<p><i>${esc(x.reason)}</i></p>` : "") + `</div>`).join("")
     : `<div class="box"><div class="row"><span class="pos">No add/drop improves your team right now.</span></div></div>`;
   $("trades2").innerHTML = (m.trades || []).length ? m.trades.map((x, i) => `<div class="slot start"><div class="top"><span class="nm">${esc(x.partner)}</span><span class="tag">+${r1(x.dm)} you / +${r1(x.dt)} them</span></div>` +
-      `<p>Give <b>${x.giveNames.map(esc).join(" + ")}</b>, get <b>${x.getNames.map(esc).join(" + ")}</b></p>` + (x.reason ? `<p><i>${esc(x.reason)}</i></p>` : "") +
+      `<p>Give <b>${x.giveNames.map(esc).join(" + ")}</b>, get <b>${x.getNames.map(esc).join(" + ")}</b></p>` +
+      ((x.theirFit || []).length ? `<p class="pos">For them: ${x.theirFit.map(f => `${esc(f.inName)} takes their ${esc(f.slot)} spot from ${esc(f.outName)} (${f.gain >= 0 ? "+" : ""}${r1(f.gain)}/wk)`).join("; ")}</p>` : "") +
+      ((x.myFit || []).length ? `<p class="pos">For you: ${x.myFit.map(f => `${esc(f.inName)} replaces ${esc(f.outName)} at ${esc(f.slot)} (${f.gain >= 0 ? "+" : ""}${r1(f.gain)}/wk)`).join("; ")}</p>` : "") + (x.reason ? `<p><i>${esc(x.reason)}</i></p>` : "") +
       `<div class="acts"><button data-loadtrade="${i}">Open in trade builder</button></div></div>`).join("")
     : `<div class="box"><div class="row"><span class="pos">No trades found that help both sides right now.</span></div></div>`;
 }

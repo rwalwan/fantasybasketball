@@ -547,6 +547,7 @@ export function playerValue(book, pid) {
 // week's games (more games = more chances to lock a big one; his own volatility tier), then the best way to
 // fill the starting slots. Future weeks are discounted 3%/week (rosters, roles and health change).
 // Missing roster spots are filled with the best free agent, so a 2-for-1 gets credit for the open spot.
+const NEAR = 4;   // weeks solved one by one in team valuation
 export class Valuer {
   constructor({ book, schedule, Q, rosterPositions, week, freeAgents = [] }) {
     Object.assign(this, { b: book, week, Q: Array.isArray(Q) ? Q : Q.quantiles, QT: Array.isArray(Q) ? null : Q.tiers });
@@ -559,12 +560,12 @@ export class Valuer {
     this.fa = freeAgents; this.memo = new Map();
   }
   // discounted sum over remaining weeks of the player's lock-in value; .perWeek for display
-  ros(p) {
+  // per-week lock-in value (undiscounted) for each remaining week: [w0, w1, ...]
+  weekly(p) {
     if (this.memo.has(p)) return this.memo.get(p);
     const t = this.b.team(p), st = this.b.status(p), base = this.b.baseline(p), Qp = tierQ(this.QT, base, this.Q);
     const all = Object.keys(this.tg[t] || {});
-    let v = 0;
-    this.weeks.forEach(({ days, disc }, i) => {
+    const out = this.weeks.map(({ days }, i) => {
       const games = all.filter(d => days.includes(d)).sort().map(d => {
         let q = 0.92;
         if (OUT.has(st)) q = i === 0 ? 0.3 : 0.85;           // unknown return date
@@ -573,11 +574,14 @@ export class Valuer {
         if (all.includes(prev.toISOString().slice(0, 10))) q *= B2B_FACTOR;
         return { mu: base, q, Q: Qp };
       });
-      if (games.length) v += disc * contValues(this.Q, games)[0];
+      return games.length ? contValues(this.Q, games)[0] : 0;
     });
-    this.memo.set(p, v);
-    return v;
+    this.memo.set(p, out);
+    return out;
   }
+  ros(p) { return this.weekly(p).reduce((a, v, i) => a + this.weeks[i].disc * v, 0); }
+  // value of the far weeks only (aggregated), used after the near weeks are solved one by one
+  far(p) { return this.weekly(p).reduce((a, v, i) => a + (i >= NEAR ? this.weeks[i].disc * v : 0), 0); }
   perWeek(p) { return this.ros(p) / this.discSum; }
   topFA() { return (this._fa ||= [...this.fa].sort((a, b) => this.ros(b) - this.ros(a))); }
   // replacement level: what any manager can pick up today (5th-best free agent's per-week value)
@@ -589,18 +593,37 @@ export class Valuer {
   // withFA: the team may also use the best free agents (anyone below waiver level is replaceable for free).
   // Trades MUST be judged this way: otherwise receiving two replacement-level bodies looks like a gain for a team
   // with weak starters, when it could fill those holes from waivers without giving anything up.
-  team(players, withFA = false) {
+  team(players, withFA = false) { return this.lineup(players, withFA).value; }
+  // Best lineups: each of the next NEAR weeks is solved on its own (so short injuries, light schedules and depth
+  // show up as real needs: a team missing a starter for two weeks values a replacement more), the rest of the
+  // season as one block. Returns value per week plus the season-long slot assignment (for "fit" notes).
+  lineup(players, withFA = false) {
     let ps = [...new Set(players)];
     const have = new Set(ps), fas = this.topFA().filter(p => !have.has(p));
     if (withFA) ps = ps.concat(fas.slice(0, 8));
     else if (ps.length < this.size) ps = ps.concat(fas.slice(0, this.size - ps.length));
-    const m = this.slots.map(s => ps.map(p => (fits(s, this.b.pos(p)) ? this.ros(p) : null)));
-    const pick = maxAssign(m), used = new Set();
+    const solve = val => {
+      const m = this.slots.map(s => ps.map(p => (fits(s, this.b.pos(p)) ? val(p) : null)));
+      const pick = maxAssign(m); let total = 0; const by = {};
+      pick.forEach((c, r) => { if (c >= 0 && m[r][c] != null) { total += m[r][c]; by[r] = ps[c]; } });
+      return { total, by };
+    };
     let total = 0;
-    pick.forEach((c, r) => { if (c >= 0 && m[r][c] != null) { total += m[r][c]; used.add(ps[c]); } });
+    for (let i = 0; i < Math.min(NEAR, this.weeks.length); i++) total += this.weeks[i].disc * solve(p => this.weekly(p)[i]).total;
+    const farSol = solve(p => this.far(p));
+    total += farSol.total;
+    const used = new Set(Object.values(farSol.by));
     // bench: injury cover and same-day relief are worth something, a little
     const bench = ps.filter(p => !used.has(p)).map(p => this.ros(p)).sort((a, b) => b - a).slice(0, 3).reduce((a, b) => a + b, 0);
-    return (total + 0.1 * bench) / this.discSum;
+    return { value: (total + 0.1 * bench) / this.discSum, slots: this.slots.map((s, r) => ({ slot: s, pid: farSol.by[r] || null })) };
+  }
+  // what a trade changes in a team's regular lineup: [{slot, out, in}], for "why it helps them" notes
+  fit(before, after) {
+    const a = this.lineup(before, true).slots, b = this.lineup(after, true).slots, inA = new Set(a.map(x => x.pid));
+    const added = b.filter(x => x.pid && !inA.has(x.pid));
+    const gone = new Set(b.map(x => x.pid)), dropped = a.filter(x => x.pid && !gone.has(x.pid));
+    return added.map((x, i) => ({ slot: x.slot, in: x.pid, out: dropped[i]?.pid || null,
+      gain: Math.round((this.perWeek(x.pid) - (dropped[i] ? this.perWeek(dropped[i].pid) : this.repl())) * 10) / 10 }));
   }
 }
 
@@ -619,7 +642,7 @@ export function tradeIdeas(valuer, book, mine, others, limit = 15) {
       const dm = valuer.team(swapIn(mp, give, get), true) - myB;
       if (dm <= 0.5) return;
       const dt = valuer.team(swapIn(tp, get, give), true) - tb;
-      if (dt >= 0) ideas.push({ give, get, dm, dt, marketGive: tg, marketGet: tt, roster_id: r.roster_id, owner_id: r.owner_id });
+      if (dt >= 0) ideas.push({ give, get, dm, dt, marketGive: tg, marketGet: tt, roster_id: r.roster_id, owner_id: r.owner_id, tp });
     };
     for (const a of mp) for (const b of tp) tryDeal([a], [b]);
     for (let i = 0; i < mp.length; i++) for (let j = i + 1; j < mp.length; j++) for (const b of tp) tryDeal([mp[i], mp[j]], [b]);
@@ -631,7 +654,11 @@ export function tradeIdeas(valuer, book, mine, others, limit = 15) {
   for (const x of ideas) {
     const k = x.get.join();
     if ((per[k] || 0) >= 2 || (team[x.roster_id] || 0) >= 3) continue;      // variety: targets and partners
-    per[k] = (per[k] || 0) + 1; team[x.roster_id] = (team[x.roster_id] || 0) + 1; out.push(x);
+    per[k] = (per[k] || 0) + 1; team[x.roster_id] = (team[x.roster_id] || 0) + 1;
+    // fit: which of THEIR lineup spots the players they receive take over (who they replace, per-week gain)
+    x.theirFit = valuer.fit(x.tp, swapIn(x.tp, x.get, x.give)).map(f => ({ ...f, inName: book.name(f.in), outName: f.out ? book.name(f.out) : "a waiver pickup" }));
+    x.myFit = valuer.fit(mine.players, swapIn(mine.players, x.give, x.get)).map(f => ({ ...f, inName: book.name(f.in), outName: f.out ? book.name(f.out) : "a waiver pickup" }));
+    delete x.tp; out.push(x);
     if (out.length >= limit) break;
   }
   return out;
