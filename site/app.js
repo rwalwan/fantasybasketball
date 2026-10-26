@@ -213,12 +213,16 @@ function renderTrades(c) {
   $("give").innerHTML = list(mine, "give"); $("get").innerHTML = list(them, "get");
   document.querySelectorAll("input[data-side]").forEach(el => el.onchange = () => { tradeSel[el.dataset.side][el.checked ? "add" : "delete"](el.value); render(); });
   const swap = (roster, out, inn) => roster.filter(p => !out.has(p)).concat([...inn]);
-  const myB = valuer.team(mine.players), thB = valuer.team(them.players);
+  const myB = valuer.team(mine.players, true), thB = valuer.team(them.players, true);
   if (tradeSel.give.size || tradeSel.get.size) {
-    const myA = valuer.team(swap(mine.players, tradeSel.give, tradeSel.get)), thA = valuer.team(swap(them.players, tradeSel.get, tradeSel.give));
+    const myA = valuer.team(swap(mine.players, tradeSel.give, tradeSel.get), true), thA = valuer.team(swap(them.players, tradeSel.get, tradeSel.give), true);
     const dm = myA - myB, dt = thA - thB;
+    const T = set => [...set].reduce((a, p) => a + valuer.tradeValue(p), 0), mg = T(tradeSel.give), mt = T(tradeSel.get);
+    const fair = mt === 0 ? 1 : mg / mt;
     $("verdict").innerHTML = `Your team: <b class="${dm >= 0 ? "good" : "bad"}">${dm >= 0 ? "+" : ""}${r1(dm)}</b> locked pts per week, rest of season · theirs: <b class="${dt >= 0 ? "good" : "bad"}">${dt >= 0 ? "+" : ""}${r1(dt)}</b>. ` +
-      (dm > 0 && dt >= 0 ? "Helps both of you — a realistic offer." : dm > 0 ? "Good for you, but they lose value, so expect pushback." : "This makes your team worse.");
+      (dm > 0 && dt >= 0 ? "Helps both of you." : dm > 0 ? "Good for you, but it makes their lineup worse." : "This makes your team worse.") +
+      ` Market value (above waiver level, stars weighted up): you give ${r1(mg)}, you get ${r1(mt)}` +
+      (fair < 0.9 ? " — <b class=\"bad\">lopsided, they'll likely decline</b>." : fair > 1.3 ? " — you're overpaying." : " — fair.");
   } else $("verdict").textContent = "";
   const sug = live.moves?.trades || [];
   $("ideas").innerHTML = `<tr><th>With</th><th>You give</th><th>You get</th><th>You</th><th>Them</th><th></th></tr>` +

@@ -579,13 +579,21 @@ export class Valuer {
     return v;
   }
   perWeek(p) { return this.ros(p) / this.discSum; }
+  topFA() { return (this._fa ||= [...this.fa].sort((a, b) => this.ros(b) - this.ros(a))); }
+  // replacement level: what any manager can pick up today (5th-best free agent's per-week value)
+  repl() { const f = this.topFA(); return this._repl ??= (f.length ? this.perWeek(f[Math.min(4, f.length - 1)]) : 0); }
+  // trade value as managers see it: only value ABOVE replacement counts, and stars are worth more than the sum of
+  // parts (convex), because a roster spot and a starting slot can only hold one player
+  tradeValue(p) { return Math.max(0, this.perWeek(p) - this.repl()) ** 1.5; }
   // best lineup over the rest of the season, in points per week
-  team(players) {
+  // withFA: the team may also use the best free agents (anyone below waiver level is replaceable for free).
+  // Trades MUST be judged this way: otherwise receiving two replacement-level bodies looks like a gain for a team
+  // with weak starters, when it could fill those holes from waivers without giving anything up.
+  team(players, withFA = false) {
     let ps = [...new Set(players)];
-    if (ps.length < this.size) {
-      const have = new Set(ps), fill = this.fa.filter(p => !have.has(p)).sort((a, b) => this.ros(b) - this.ros(a));
-      ps = ps.concat(fill.slice(0, this.size - ps.length));
-    }
+    const have = new Set(ps), fas = this.topFA().filter(p => !have.has(p));
+    if (withFA) ps = ps.concat(fas.slice(0, 8));
+    else if (ps.length < this.size) ps = ps.concat(fas.slice(0, this.size - ps.length));
     const m = this.slots.map(s => ps.map(p => (fits(s, this.b.pos(p)) ? this.ros(p) : null)));
     const pick = maxAssign(m), used = new Set();
     let total = 0;
@@ -600,24 +608,25 @@ const swapIn = (roster, out, inn) => roster.filter(p => !out.includes(p)).concat
 export const teamValue = (valuer, players) => valuer.team(players);
 
 export function tradeIdeas(valuer, book, mine, others, limit = 15) {
-  const myB = valuer.team(mine.players), ideas = [];
-  const raw = ps => ps.reduce((a, p) => a + playerValue(book, p), 0);
+  const T = ps => ps.reduce((a, p) => a + valuer.tradeValue(p), 0);
+  const myB = valuer.team(mine.players, true), ideas = [];
   for (const r of others) {
-    const tb = valuer.team(r.players), mp = mine.players, tp = r.players;
+    const tb = valuer.team(r.players, true), mp = mine.players, tp = r.players;
     const tryDeal = (give, get) => {
-      // realism: managers judge by player value, so they must get back ~90%+ of what they give up
-      if (raw(give) < 0.9 * raw(get)) return;
-      const dm = valuer.team(swapIn(mp, give, get)) - myB;
+      // realism: by market value (above replacement, stars convex) they must get back at least ~90% of what they give
+      const tg = T(give), tt = T(get);
+      if (tg < 0.9 * tt || tt === 0) return;
+      const dm = valuer.team(swapIn(mp, give, get), true) - myB;
       if (dm <= 0.5) return;
-      const dt = valuer.team(swapIn(tp, get, give)) - tb;
-      if (dt >= 0) ideas.push({ give, get, dm, dt, roster_id: r.roster_id, owner_id: r.owner_id });
+      const dt = valuer.team(swapIn(tp, get, give), true) - tb;
+      if (dt >= 0) ideas.push({ give, get, dm, dt, marketGive: tg, marketGet: tt, roster_id: r.roster_id, owner_id: r.owner_id });
     };
     for (const a of mp) for (const b of tp) tryDeal([a], [b]);
     for (let i = 0; i < mp.length; i++) for (let j = i + 1; j < mp.length; j++) for (const b of tp) tryDeal([mp[i], mp[j]], [b]);
     for (const a of mp) for (let i = 0; i < tp.length; i++) for (let j = i + 1; j < tp.length; j++) tryDeal([a], [tp[i], tp[j]]);
   }
+  // best for us, but only deals that are close to fair for them rank high (lopsided offers just get declined)
   ideas.sort((x, y) => (y.dm + 0.5 * y.dt) - (x.dm + 0.5 * x.dt));
-  // keep variety: at most 2 ideas per target player
   const per = {}, team = {}, out = [];
   for (const x of ideas) {
     const k = x.get.join();
