@@ -1,0 +1,25 @@
+{
+ "note": "P(plays next team game | has missed k straight), top-150 players 2021-24 (box-score panel; long absences spanning a stint's end are censored, season-opening absences excluded). k=1..8 individually, then pooled 9-12, 13-20, 21+.",
+ "by_k": [
+  0.544,
+  0.323,
+  0.273,
+  0.253,
+  0.228,
+  0.188,
+  0.156,
+  0.19
+ ],
+ "k9_12": 0.157,
+ "k13_20": 0.139,
+ "k21p": 0.212,
+ "designation": {
+  "Probable": 0.866,
+  "Questionable": 0.483,
+  "Doubtful": 0.042,
+  "Out": 0.0,
+  "_source": "isheplayingtonight.com: first official-report designation vs played, 2,007 player-games, Jan-Oct 2026"
+ },
+ "healthy": 0.92,
+ "b2b_factor": 0.86
+}

@@ -54,7 +54,7 @@ async function loadLive() {
   const { week, league } = base, season = league.season;
   const days = weekDays(base.schedule, week), today = etToday();
   const tipDays = days.filter(d => d >= today || d === days.find(x => x >= today));
-  const [schedule, rosters, matchups, stats, proj, trending, snapsGh, overridesGh, locksGh, backend, tips, news, claims, moves, context, insights, learning] = await Promise.all([
+  const [schedule, rosters, matchups, stats, proj, trending, snapsGh, overridesGh, locksGh, backend, tips, news, claims, moves, context, insights, learning, avail] = await Promise.all([
     get(`${S2}/schedule/nba/regular/${season}`).catch(() => base.schedule),
     get(`${S1}/league/${LEAGUE}/rosters`), get(`${S1}/league/${LEAGUE}/matchups/${week}`),
     get(`${S2}/stats/nba/${season}/${week}?season_type=regular`), get(`${S2}/projections/nba/${season}/${week}?season_type=regular`),
@@ -67,13 +67,14 @@ async function loadLive() {
     get(`static/moves.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({ adds: [], trades: [] })),
     get(`static/context.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({})),
     get(`static/insights.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({ notes: [], trends: [], openings: [] })),
-    get(`static/learning.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({}))]);
+    get(`static/learning.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({})),
+    get(`static/availability.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => null)]);
   // backend (minute-level lineup records, shared answers) wins over the 15-minute GitHub state branch
   const snaps = { ...snapsGh, ...(backend.lineups || {}) };
   const overrides = { ...overridesGh, ...(backend.elig || {}) };
   const locks = { ...locksGh, ...(backend.locks || {}) };
   base.schedule = schedule;
-  live = { rosters, matchups, stats, proj, trending, snaps, overrides, locks, tips, news, claims, moves, context, insights, learning, backend: !!backend.ok, at: new Date() };
+  live = { rosters, matchups, stats, proj, trending, snaps, overrides, locks, tips, news, claims, moves, context, insights, learning, avail, backend: !!backend.ok, at: new Date() };
   void tipDays;
 }
 
@@ -94,7 +95,7 @@ const isTipped = (pid, date) => { const t = live.tips[`${date}|${bookRef?.team(p
 // ---- compute + render ---------------------------------------------------------------------------
 function compute() {
   const book = new Book({ scoring: base.league.scoring_settings, players: base.players, priors: base.priors,
-                          gamelog: base.gamelog.games, weights: base.experts.weights, ctx: live.context || {} });
+                          gamelog: base.gamelog.games, weights: base.experts.weights, ctx: live.context || {}, avail: live.avail });
   bookRef = book;
   book.addStats(live.stats); book.addProjections(live.proj);
   const mine = live.rosters.find(r => r.owner_id === USER);
@@ -114,7 +115,7 @@ function compute() {
     oppOut = { mean: oppPlan.outlook.mean, var: oppPlan.outlook.var };
   }
   const waivers = wp.waivers(live.trending);
-  const valuer = new Valuer({ book, schedule: base.schedule, Q: base.QS, rosterPositions: base.league.roster_positions, week: base.week,
+  const valuer = new Valuer({ book, schedule: base.schedule, Q: base.QS, rosterPositions: base.league.roster_positions, week: base.week, today: etToday(),
                               freeAgents: waivers.list.map(x => x.pid) });
   const plan = wp.build({ opp: oppOut });
   // every free agent scored the same way Moves does: best drop, this week's locked-points change + rest of season
@@ -265,7 +266,7 @@ function researchRows(c, roster, who) {
       rows.push(`<tr><td>${k ? "" : esc(book.name(p))}${!k && book.status(p) ? `<span class="st">${esc(book.status(p))}</span>` : ""}${!k && tr ? ` <span class="chip ${tr.dir === "up" ? "up" : "down"}" title="${esc(tr.why)}">${tr.dir === "up" ? "▲" : "▼"} role</span>` : ""}</td>` +
         `<td class="pos">${k ? "" : esc(book.pos(p).join("/"))}</td><td>${esc(day(g.date))} ${g.b2b ? '<span class="pos">b2b</span>' : ""} <span class="pos">vs ${esc(g.opp)}${g.tip ? " · " + esc(tipTime(g.tip)) : ""}</span></td>` +
         `<td class="n"><b>${r1(g.mu)}</b></td><td class="n pos">${rw ? r1(rw) : "–"} / ${r1(mdl)} / ${cx ? r1(mdl * cx.f) : "–"}</td><td class="n">${lo}–${hi}</td>` +
-        `<td style="white-space:normal">${chips || '<span class="pos">neutral</span>'}</td><td class="pos" title="${esc(riskWhy)}">${k ? "" : risk} · ${Math.round(g.q * 100)}%</td>` +
+        `<td style="white-space:normal">${chips || '<span class="pos">neutral</span>'}</td><td class="pos" title="${esc((live.avail?.players?.[p]?.basis ? "Play chance: " + live.avail.players[p].basis + ". " : "") + riskWhy)}">${k ? "" : risk} · ${Math.round(g.q * 100)}%${!k && live.avail?.players?.[p]?.timeline ? " ⏱" : ""}</td>` +
         `<td style="white-space:normal;min-width:220px">${k ? "" : takeCell(p)}</td></tr>`);
     });
   }

@@ -64,7 +64,8 @@ const SHAKY = new Set(["Questionable", "Doubtful", "GTD", "Day-To-Day"]);
 export const B2B_FACTOR = 0.86, PRIOR_GAMES = 8;
 
 export class Book {
-  constructor({ scoring, players, priors, gamelog, weights, ctx }) {
+  constructor({ scoring, players, priors, gamelog, weights, ctx, avail }) {
+    this.avail = avail || null;          // {model, players: {pid: {status, q: {date: p}}}} (app/availability.py)
     this.sc = scoring;
     this.ctx = ctx || {};                                 // "pid|date" -> {f, parts} matchup context (app/memory.py)
     this.w = weights || { rotowire: 0.5, model: 0.5 };   // learned from graded accuracy (app/experts.py)
@@ -130,14 +131,34 @@ export class Book {
     const tw = srcs.reduce((a, [w]) => a + w, 0);
     return Math.round((srcs.reduce((a, [w, v]) => a + w * v, 0) / tw) * 10) / 10;
   }
-  playProb(p, daysAhead, b2b) {
-    const st = this.status(p);
-    let q = st == null || st === "" ? 0.92 : (STATUS_Q[st] ?? 0.85);
-    if (OUT.has(st) && daysAhead >= 3) q = 0.25;
-    else if (SHAKY.has(st) && daysAhead >= 2) q = Math.max(q, 0.75);
+  // P(he plays that game). From the job's availability model when it matches his current status (designation
+  // rates, reported return timelines, historical return hazard); otherwise the same model from status alone,
+  // j = how many of his team's games come before this one.
+  playProb(p, daysAhead, b2b, date, j = 0) {
+    const st = this.status(p), a = this.avail?.players?.[p], M = this.avail?.model || DEFAULT_AVAIL;
+    let q;
+    if (a && a.status === st && date && a.q[date] != null) q = a.q[date];
+    else if (!st || !M) q = !st ? 0.92 : (STATUS_Q[st] ?? 0.85);
+    else q = statusChain(M, st, j);
     if (b2b) q *= B2B_FACTOR;
     return Math.round(q * 100) / 100;
   }
+}
+
+// status-only version of app/availability.py (missed-so-far unknown -> 0); copy of app/data/availability_model.json
+const DEFAULT_AVAIL = {"by_k": [0.544, 0.323, 0.273, 0.253, 0.228, 0.188, 0.156, 0.19], "k9_12": 0.157, "k13_20": 0.139, "healthy": 0.92, "designation": {"Probable": 0.866, "Questionable": 0.483, "Doubtful": 0.042, "Out": 0.0}};
+const DESIG = { Probable: "Probable", Questionable: "Questionable", GTD: "Questionable", DTD: "Questionable", "Day-To-Day": "Questionable", Doubtful: "Doubtful" };
+function hazardK(M, k) { return k <= 8 ? M.by_k[k - 1] : k <= 12 ? M.k9_12 : M.k13_20; }
+function statusChain(M, st, j) {
+  let S = 1, k = 0;
+  for (let i = 0; i <= j; i++) {
+    let r;
+    if (i === 0) r = DESIG[st] ? M.designation[DESIG[st]] : OUT.has(st) ? 0 : 1;
+    else r = hazardK(M, Math.max(1, k));
+    if (i === 0 && DESIG[st] && j === 0) return r;
+    S *= 1 - r; k++;
+  }
+  return (1 - S) * M.healthy;
 }
 
 // ---------- schedule ----------
@@ -216,9 +237,9 @@ export class WeekPlan {
   tipped(p, d) { const t = this.tip(p, d); return t ? new Date(t) <= this.now : d < this.today; }
   upcoming(p) {
     const t = this.b.team(p), done = new Set(this.played(p).map(g => g.date)), all = Object.keys(this.tg[t] || {});
-    return this.teamDays(t).filter(d => !done.has(d) && !this.tipped(p, d)).map(d => {
+    return this.teamDays(t).filter(d => !done.has(d) && !this.tipped(p, d)).map((d, j) => {
       const b2b = all.includes(addDays(d, -1));
-      return { date: d, mu: this.b.gameMu(p, d), q: this.b.playProb(p, dayDiff(d, this.today), b2b), Q: this.qOf(p),
+      return { date: d, mu: this.b.gameMu(p, d), q: this.b.playProb(p, dayDiff(d, this.today), b2b, d, j), Q: this.qOf(p),
                opp: this.tg[t][d].opp, b2b, tip: this.tip(p, d) };
     });
   }
@@ -549,8 +570,8 @@ export function playerValue(book, pid) {
 // Missing roster spots are filled with the best free agent, so a 2-for-1 gets credit for the open spot.
 const NEAR = 4;   // weeks solved one by one in team valuation
 export class Valuer {
-  constructor({ book, schedule, Q, rosterPositions, week, freeAgents = [] }) {
-    Object.assign(this, { b: book, week, Q: Array.isArray(Q) ? Q : Q.quantiles, QT: Array.isArray(Q) ? null : Q.tiers });
+  constructor({ book, schedule, Q, rosterPositions, week, freeAgents = [], today }) {
+    Object.assign(this, { b: book, week, today: today || "0000-00-00", Q: Array.isArray(Q) ? Q : Q.quantiles, QT: Array.isArray(Q) ? null : Q.tiers });
     this.slots = rosterPositions.filter(s => s !== "BN" && s !== "IR");
     this.size = rosterPositions.filter(s => s !== "IR").length;
     this.tg = teamGames(schedule);
@@ -563,15 +584,12 @@ export class Valuer {
   // per-week lock-in value (undiscounted) for each remaining week: [w0, w1, ...]
   weekly(p) {
     if (this.memo.has(p)) return this.memo.get(p);
-    const t = this.b.team(p), st = this.b.status(p), base = this.b.baseline(p), Qp = tierQ(this.QT, base, this.Q);
-    const all = Object.keys(this.tg[t] || {});
-    const out = this.weeks.map(({ days }, i) => {
-      const games = all.filter(d => days.includes(d)).sort().map(d => {
-        let q = 0.92;
-        if (OUT.has(st)) q = i === 0 ? 0.3 : 0.85;           // unknown return date
-        else if (SHAKY.has(st)) q = i === 0 ? 0.8 : 0.92;
+    const t = this.b.team(p), base = this.b.baseline(p), Qp = tierQ(this.QT, base, this.Q);
+    const all = Object.keys(this.tg[t] || {}).sort(), ahead = all.filter(d => d >= this.today);
+    const out = this.weeks.map(({ days }) => {
+      const games = all.filter(d => days.includes(d)).map(d => {
         const prev = new Date(d + "T12:00:00Z"); prev.setUTCDate(prev.getUTCDate() - 1);
-        if (all.includes(prev.toISOString().slice(0, 10))) q *= B2B_FACTOR;
+        const q = this.b.playProb(p, null, all.includes(prev.toISOString().slice(0, 10)), d, ahead.indexOf(d));
         return { mu: base, q, Q: Qp };
       });
       return games.length ? contValues(this.Q, games)[0] : 0;

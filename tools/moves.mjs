@@ -31,7 +31,7 @@ const tipsRaw = st("tips");
 
 const ctxMap = (() => { try { return st("context"); } catch { return {}; } })();
 const book = new Book({ scoring: league.scoring_settings, players: st("players"), priors: st("priors"), gamelog: st("gamelog").games,
-  weights: st("experts").weights, ctx: ctxMap });
+  weights: st("experts").weights, ctx: ctxMap, avail: (() => { try { return st("availability"); } catch { return null; } })() });
 book.addStats(stats); book.addProjections(proj);
 const mine = rosters.find(r => r.owner_id === USER), my = matchups.find(m => m.roster_id === mine.roster_id);
 const slots = league.roster_positions.filter(s => s !== "BN" && s !== "IR");
@@ -50,7 +50,7 @@ const protect = new Set([...(mine.reserve || []),
 
 const claims = (() => { try { return st("claims"); } catch { return { consensus: {} }; } })();
 const fa = wp.waivers(trending, 40).list;
-const valuer = new Valuer({ book, schedule, Q: st("quantiles"), rosterPositions: league.roster_positions, week, freeAgents: fa.map(x => x.pid) });
+const valuer = new Valuer({ book, schedule, Q: st("quantiles"), rosterPositions: league.roster_positions, week, today, freeAgents: fa.map(x => x.pid) });
 const adds = waiverMoves(wp, valuer, mine, fa, protect, 12).filter(m => m.weekGain >= 2 || m.rosGain >= 1)   // a real edge: 2+ pts this week or 1+ pt every week after.slice(0, 8).map(m => ({ ...m, experts: claims.consensus?.[m.pid] || null }));
 const trades = tradeIdeas(valuer, book, mine, rosters.filter(r => r.roster_id !== mine.roster_id), 10)
   .map(t => ({ ...t, partner: userName[t.owner_id] || `Team ${t.roster_id}`,
@@ -110,7 +110,9 @@ void playerValue;
   const r1 = v => Math.round(v * 10) / 10;
   const row = p => ({ name: book.name(p), team: book.team(p), pos: book.pos(p).join("/"), status: book.status(p),
     perWeek: r1(valuer.perWeek(p)), market: r1(playerValue(book, p)), base: r1(book.baseline(p)), prior: book.prior[p] ?? null,
-    avg: book.avg(p) != null ? r1(book.avg(p)) : null, games: book.done(p).length });
+    avg: book.avg(p) != null ? r1(book.avg(p)) : null, games: book.done(p).length,
+    avail: book.avail?.players?.[p] ? { basis: book.avail.players[p].basis, missed: book.avail.players[p].missed,
+      next: Object.entries(book.avail.players[p].q).slice(0, 8).map(([d, q]) => `${d.slice(5)}:${q}`).join(" ") } : undefined });
   const rostered = rosters.flatMap(r => (r.players || []).map(p => ({ ...row(p), owner: userName[r.owner_id] || r.roster_id })));
   rostered.sort((a, b) => b.perWeek - a.perWeek);
   const faRows = fa.map(x => row(x.pid)).sort((a, b) => b.perWeek - a.perWeek);

@@ -107,9 +107,13 @@ NEWS_PROMPT = """You turn one NBA news blurb into JSON for a fantasy basketball 
  "kind": "injury|return|minutes|role|lineup|trade|signing|suspension|other",
  "status": "out|doubtful|questionable|probable|available|unknown",
  "games_out_estimate": <integer or null>,
+ "out_min_days": <integer or null>, "out_max_days": <integer or null>,
  "minutes_effect": "up|down|none|unknown",
  "beneficiaries": ["<teammates likely to gain minutes or usage, only if the blurb or obvious depth chart implies it>"],
  "summary": "<one short sentence in your own words>"}
+out_min_days / out_max_days = the reported absence timeline in DAYS from this report, only if the text gives one:
+"out 2-4 weeks" -> 14, 28; "at least a week" -> 7, null; "expected back Friday" -> both = days until then;
+"out for the season" -> 200, 200; "day-to-day" -> 0, 3; "indefinitely" or no timeline -> null, null.
 Use only what the text supports. Do not copy sentences from the source."""
 
 CLAIMS_PROMPT = """You read one fantasy basketball article or post for a tool that tracks expert opinion. Reply with ONE JSON object:
@@ -162,27 +166,29 @@ def collect(meta, my_players, fa_ids, today):
                     rec["llm_tried"] = True
                     if x:
                         rec.update({k: x.get(k) for k in ("player", "team", "kind", "status", "games_out_estimate",
-                                                          "minutes_effect", "beneficiaries", "summary")})
+                                                          "out_min_days", "out_max_days", "minutes_effect", "beneficiaries", "summary")})
                 except Exception as e:
                     print("llm news failed:", e)
             rec["pid"] = names.pid(rec.get("player") or it["title"].split(":")[0])
             rec["beneficiary_pids"] = [p for p in (names.pid(b) for b in (rec.get("beneficiaries") or [])) if p]
             news.append(rec)
-    budget = news_budget
+    budget = news_budget + 10
 
     # backfill: items collected before the AI key existed (or that failed) get processed now, newest first
     for rec in reversed(news):
         if budget <= 0 or not os.environ.get("OPENROUTER_API_KEY"):
             break
-        if rec.get("kind") or rec.get("llm_tried"):
+        # also re-read injury items processed before the prompt asked for a return timeline
+        needs_tl = rec.get("kind") == "injury" and "out_min_days" not in rec and not rec.get("tl_tried")
+        if (rec.get("kind") or rec.get("llm_tried")) and not needs_tl:
             continue
-        rec["llm_tried"] = True
+        rec["llm_tried"] = rec["tl_tried"] = True
         try:
             x = llm_json(NEWS_PROMPT, f"Title: {rec['title']}\n\n{rec.get('text', '')}")
             budget -= 1
             if x:
                 rec.update({k: x.get(k) for k in ("player", "team", "kind", "status", "games_out_estimate",
-                                                  "minutes_effect", "beneficiaries", "summary")})
+                                                  "out_min_days", "out_max_days", "minutes_effect", "beneficiaries", "summary")})
                 rec["pid"] = names.pid(rec.get("player") or "") or rec.get("pid")
                 rec["beneficiary_pids"] = [p for p in (names.pid(b) for b in (rec.get("beneficiaries") or [])) if p]
         except Exception as e:
@@ -226,6 +232,14 @@ def collect(meta, my_players, fa_ids, today):
     collect.report = report
     cutoff = (dt.date.fromisoformat(today) - dt.timedelta(days=21)).isoformat()
     seen = {k: v for k, v in seen.items() if v >= cutoff}
+    # injury timelines outlive the 7-day news window: keep the latest reported timeline per player (availability.py)
+    tl = _load("timelines.json", {})
+    for n in news:
+        if n.get("pid") and (n.get("out_min_days") is not None or n.get("out_max_days") is not None) \
+                and n["at"] >= (tl.get(n["pid"]) or {}).get("at", ""):
+            tl[n["pid"]] = {k: n.get(k) for k in ("at", "out_min_days", "out_max_days", "summary", "source", "player")}
+    cutoff = (dt.date.fromisoformat(today) - dt.timedelta(days=120)).isoformat()
+    _save("timelines.json", {k: v for k, v in tl.items() if v["at"][:10] >= cutoff})
     news = [n for n in news if n["at"][:10] >= (dt.date.fromisoformat(today) - dt.timedelta(days=7)).isoformat()][-400:]
     _save("seen_items.json", seen)
     _save("news.json", news)

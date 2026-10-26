@@ -10,7 +10,7 @@ import requests
 from . import espn, sleeper
 from . import experts
 from . import news as newsmod
-from . import memory, insights
+from . import memory, insights, availability
 from .engine import WeekPlan, team_game_dates, week_dates
 from .lineups import LineupTracker
 from .model import PlayerBook
@@ -142,6 +142,17 @@ def main():
     except Exception as e:
         print("news/experts failed:", e, file=sys.stderr)
 
+
+    # availability: per-game play probabilities (designation, return timelines from news, historical return rates)
+    try:
+        watch_av = {p for r in rosters for p in (r.get("players") or [])} | {w["pid"] for w in waivers}
+        av = availability.build(book, meta, team_game_dates(sched), today, book.is_final, watch_av)
+        cal = availability.log_and_grade(av, book, book.is_final, today)
+        with open(os.path.join(ROOT, "site", "static", "availability.json"), "w") as f:
+            json.dump({"model": availability.M, "players": av, "calibration": cal}, f, separators=(",", ":"))
+        print(f"availability: {len(av)} players modeled")
+    except Exception as e:
+        print("availability failed:", e, file=sys.stderr)
 
     opp_owner = next((r.get("owner_id") for r in rosters if opp_m and r["roster_id"] == opp_m["roster_id"]), None)
     out = dict(generated=dt.datetime.now(ZoneInfo("America/Los_Angeles")).strftime("%a %b %d, %I:%M %p PT"),
