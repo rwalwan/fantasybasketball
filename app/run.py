@@ -151,6 +151,8 @@ def main():
         with open(os.path.join(ROOT, "site", "static", "availability.json"), "w") as f:
             json.dump({"model": availability.M, "players": av, "calibration": cal}, f, separators=(",", ":"))
         print(f"availability: {len(av)} players modeled")
+        with open(os.path.join(ROOT, "data", "state", "availability_now.json"), "w") as f:
+            json.dump({"players": av, "calibration": cal}, f, indent=1)
     except Exception as e:
         print("availability failed:", e, file=sys.stderr)
 
