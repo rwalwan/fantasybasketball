@@ -154,7 +154,10 @@ def main():
         with open(os.path.join(ROOT, "data", "state", "availability_now.json"), "w") as f:
             json.dump({"players": av, "calibration": cal}, f, indent=1)
     except Exception as e:
+        import traceback
         print("availability failed:", e, file=sys.stderr)
+        with open(os.path.join(ROOT, "data", "state", "availability_err.txt"), "w") as f:
+            f.write(traceback.format_exc())
 
     opp_owner = next((r.get("owner_id") for r in rosters if opp_m and r["roster_id"] == opp_m["roster_id"]), None)
     out = dict(generated=dt.datetime.now(ZoneInfo("America/Los_Angeles")).strftime("%a %b %d, %I:%M %p PT"),
