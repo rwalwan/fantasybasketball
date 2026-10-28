@@ -233,11 +233,7 @@ def collect(meta, my_players, fa_ids, today):
     cutoff = (dt.date.fromisoformat(today) - dt.timedelta(days=21)).isoformat()
     seen = {k: v for k, v in seen.items() if v >= cutoff}
     # injury timelines outlive the 7-day news window: keep the latest reported timeline per player (availability.py)
-    tl = _load("timelines.json", {})
-    for n in news:
-        if n.get("pid") and (n.get("out_min_days") is not None or n.get("out_max_days") is not None) \
-                and n["at"] >= (tl.get(n["pid"]) or {}).get("at", ""):
-            tl[n["pid"]] = {k: n.get(k) for k in ("at", "out_min_days", "out_max_days", "summary", "source", "player")}
+    tl = update_timelines(_load("timelines.json", {}), news, lambda pid: (meta.get(pid) or {}).get("team"))
     cutoff = (dt.date.fromisoformat(today) - dt.timedelta(days=120)).isoformat()
     _save("timelines.json", {k: v for k, v in tl.items() if v["at"][:10] >= cutoff})
     news = [n for n in news if n["at"][:10] >= (dt.date.fromisoformat(today) - dt.timedelta(days=7)).isoformat()][-400:]
@@ -249,6 +245,68 @@ def collect(meta, my_players, fa_ids, today):
 
 
 DRAFT_RE = re.compile(r"(?i)\bdraft|\bpick\b|\badp\b|preseason|dynasty|stash|mock")
+
+
+def _window(n, team_of):
+    """Validated (min_days, max_days) from one extracted news item, or None. Rules (review finding 4):
+    injury/return items only; extracted team must match the player's team; max-only means out at least half the
+    max; a 0-day timeline counts only if the item says he's available; 0 <= min <= max <= 200."""
+    if n.get("kind") not in ("injury", "return"):
+        return None
+    t = team_of(n.get("pid"))
+    if t and n.get("team") and n["team"] != t:
+        return None
+    try:
+        mn = None if n.get("out_min_days") is None else int(n["out_min_days"])
+        mx = None if n.get("out_max_days") is None else int(n["out_max_days"])
+    except (TypeError, ValueError):
+        return None
+    if mn is None and mx is None:
+        return None
+    if mn is None:
+        mn = mx // 2
+    if not (0 <= mn <= 200) or (mx is not None and not (mn <= mx <= 200)):
+        return None
+    if mn == 0 and not mx and n.get("status") != "available":
+        return None
+    return mn, mx
+
+
+def update_timelines(tl, items, team_of, window_h=48):
+    """Latest reported injury timeline per player. Every validated report is kept; within 48 h of a player's
+    newest report the most-cited window wins (ties: the latest), so one outlet's wording can't flip it."""
+    for v in tl.values():                                   # entries saved before validation existed
+        if "reports" not in v:
+            w = _window(dict(v, kind="injury", pid=None), lambda _p: None)
+            v["reports"] = [{"at": v["at"], "w": list(w), "source": v.get("source"), "summary": v.get("summary"),
+                             "player": v.get("player"), "key": v["at"] + "|stored"}] if w else []
+    for n in sorted(items, key=lambda x: x.get("at", "")):
+        pid = n.get("pid")
+        w = _window(n, team_of) if pid else None
+        if not w:
+            continue
+        e = tl.setdefault(pid, {"reports": []})
+        key = f"{n['at']}|{n.get('source')}|{n.get('title', '')}"
+        if any(r["key"] == key for r in e["reports"]):
+            continue
+        e["reports"].append({"at": n["at"], "w": list(w), "source": n.get("source"), "summary": n.get("summary"),
+                             "player": n.get("player"), "key": key})
+    out = {}
+    for pid, e in tl.items():
+        reps = sorted(e.get("reports", []), key=lambda r: r["at"])
+        if not reps:
+            continue
+        newest = dt.datetime.fromisoformat(reps[-1]["at"])
+        recent = [r for r in reps if (newest - dt.datetime.fromisoformat(r["at"])).total_seconds() <= window_h * 3600]
+        count = {}
+        for r in recent:
+            count[tuple(r["w"])] = count.get(tuple(r["w"]), 0) + 1
+        best = max(count.values())
+        pick = [r for r in recent if count[tuple(r["w"])] == best][-1]
+        out[pid] = {"at": pick["at"], "out_min_days": pick["w"][0], "out_max_days": pick["w"][1],
+                    "summary": pick["summary"], "source": pick["source"], "player": pick["player"],
+                    "cited": best, "reports": recent[-30:]}
+    return out
 
 
 def purge_draft_claims(claims):
