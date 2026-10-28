@@ -127,6 +127,7 @@ def verify(con, week, stat_rows):
         one = tot = 0
         for st_json, sp_json in con.execute("SELECT starters, starters_points FROM snap WHERE league=? AND week=? AND final=1", (lid, week)):
             for p, s in zip(json.loads(st_json), json.loads(sp_json)):
+                s = (s or 0) / 10                         # Sleeper stores NBA points x10
                 g = [fantasy_points(x, sc) for x in games.get(p, [])]
                 if len(g) < 2 or not s:
                     continue

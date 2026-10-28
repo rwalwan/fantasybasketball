@@ -63,6 +63,7 @@ def study(con, weeks, stats_by_week, prior_rows, boot=400, seed=7):
         for w in weeks:
             for st_json, sp_json in con.execute("SELECT starters, starters_points FROM snap WHERE league=? AND week=? AND final=1", (lid, w)):
                 for p, s in zip(json.loads(st_json), json.loads(sp_json)):
+                    s = (s or 0) / 10                     # Sleeper stores NBA points x10
                     g = games.get((w, p))
                     if not g or len(g) < 2 or not s or p not in prior:
                         continue

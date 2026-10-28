@@ -17,7 +17,7 @@ prior = [{"player_id": p, "stats": {"gp": 50, "pts": 40 * 50}} for p in pids]
 for lid, final_pts in (("LOCK", lambda i: 50), ("DAILY", lambda i: 20 + i + 50 + 30)):
     con.execute("INSERT INTO league VALUES(?,?,?,?,?,?)", (lid, 10, json.dumps(sc), "[]", None, None))
     con.execute("INSERT INTO snap VALUES(?,?,?,?,?,?,?,?,?,?)", (lid, 1, "final", 1, 1, 1, json.dumps(pids), "{}",
-                json.dumps([final_pts(i) for i in range(25)]), 0))
+                json.dumps([final_pts(i) * 10 for i in range(25)]), 0))   # Sleeper stores x10
 leagues.verify(con, 1, stats[1])
 ver = dict(con.execute("SELECT league, verified FROM league").fetchall())
 assert ver == {"LOCK": 1, "DAILY": 0}, ver
