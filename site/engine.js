@@ -340,26 +340,35 @@ export class WeekPlan {
       return { total, pick: pick.map(c => (c >= 0 && c < cols.length ? cols[c] : null)) };
     };
     // A slot isn't limited to one player's games: on days its player doesn't play, an eligible player the
-    // solution leaves idle can take the slot (rotate in, lock or pass, rotate back). Value of that stream =
-    // stopping value over the merged games, one per day (the better one when two play the same day).
-    const streamW = (x, sol) => {
-      const a = sol.pick[open.indexOf(x)]; if (!a) return 0;
-      const busy = new Set(sol.pick.filter(p => p && p !== a)), byDay = {};
-      for (const p of pool) {
-        if (busy.has(p) || !fits(x.s, this.b.pos(p))) continue;
-        for (const g of cont[p].u) if (!byDay[g.date] || g.mu * g.q > byDay[g.date].mu * byDay[g.date].q) byDay[g.date] = g;
+    // solution leaves idle can take the slot (rotate in, lock or pass, rotate back). Value of a stream = stopping
+    // value over the merged games, one per day (the better one when two play the same day). Each idle player's
+    // games go to ONE slot only (review 2, finding 1): greedily, the (player, slot) pair with the largest gain.
+    const merged = (ds, extra) => { const byDay = {}; for (const g of [...ds, ...extra]) if (!byDay[g.date] || g.mu * g.q > byDay[g.date].mu * byDay[g.date].q) byDay[g.date] = g; return Object.keys(byDay).sort().map(d => byDay[d]); };
+    const streams = (rows, sol) => {
+      const games = {}, Wr = {}, gain = {};
+      rows.forEach((x, r) => { const a = sol.pick[r]; games[x.i] = a ? cont[a].u : []; Wr[x.i] = a ? cont[a].W : 0; gain[x.i] = 0; });
+      const used = new Set(sol.pick.filter(Boolean)), idle = pool.filter(p => !used.has(p) && cont[p].u.length);
+      for (;;) {
+        let best = null;
+        for (const p of idle) for (const x of rows) {
+          if (!sol.pick[rows.indexOf(x)] || !fits(x.s, this.b.pos(p))) continue;
+          const ds = merged(games[x.i], cont[p].u), w = contStats(Q, ds).W[0] || 0, d = w - Wr[x.i];
+          if (d > 1e-9 && (!best || d > best.d)) best = { p, x, ds, w, d };
+        }
+        if (!best) break;
+        games[best.x.i] = best.ds; Wr[best.x.i] = best.w; gain[best.x.i] += best.d; idle.splice(idle.indexOf(best.p), 1);
       }
-      return Math.max(cont[a].W, contStats(Q, Object.keys(byDay).sort().map(d => byDay[d])).W[0] || 0);
+      return { gain, total: Object.values(gain).reduce((a, b) => a + b, 0) };
     };
-    const main = solve(open, pool);
+    const main = solve(open, pool), mainStreams = streams(open, main);
     const assignedTo = {}; open.forEach((x, r) => { assignedTo[x.i] = main.pick[r]; });
     const willLock = new Set(), bars = {}, altFor = {};
     for (const x of open) {
       const g = lockable[x.i]; if (!g) continue;
-      const noLock = solve(open, pool, x.i);
-      const rest = solve(open.filter(y => y.i !== x.i), pool.filter(p => p !== x.p));
-      const alt = noLock.pick[open.indexOf(x)], rot = alt ? streamW(x, noLock) - cont[alt].W : 0;
-      bars[x.i] = Math.max(0, noLock.total - rest.total + rot);
+      const noLock = solve(open, pool, x.i), restRows = open.filter(y => y.i !== x.i);
+      const rest = solve(restRows, pool.filter(p => p !== x.p));
+      // opportunity cost with rotation on both sides: everything (this slot passing) - everything else
+      bars[x.i] = Math.max(0, noLock.total + streams(open, noLock).total - rest.total - streams(restRows, rest).total);
       altFor[x.i] = noLock.pick[open.indexOf(x)];
       if (g.fp >= bars[x.i] && (ls[x.p].st === "open" || ls[x.p].st === "confirm")) willLock.add(x.p);
     }
@@ -386,7 +395,7 @@ export class WeekPlan {
           const fp = lockable[i].fp, b = bars[i] ?? 0, pr = humanLockRate(opts.humanLocks, b ? fp / b : 9), sdP = cont[p]?.sd || 0;
           ev = pr * fp + (1 - pr) * b; sd = Math.sqrt((1 - pr) * sdP ** 2 + pr * (1 - pr) * (fp - b) ** 2);
         } else if (x && willLock.has(p)) ev = lockable[i].fp;
-        else if (x) { const a = assignedTo[i]; ev = a ? Math.max(0, (val(x, a, false) ?? 0) + streamW(x, main) - cont[a].W) : 0; sd = a ? cont[a].sd : 0; }
+        else if (x) { const a = assignedTo[i]; ev = a ? Math.max(0, (val(x, a, false) ?? 0) + mainStreams.gain[x.i]) : 0; sd = a ? cont[a].sd : 0; }
       }
       evOf[i] = ev; sdOf[i] = sd; M += ev; V += sd * sd;
     });
@@ -552,7 +561,7 @@ export class WeekPlan {
 
     const idle = pool.filter(p => !used.has(p) && todayGame(p)).map(p => ({ pid: p, name: this.b.name(p) }));
     for (const x of slots) { const i = this.slots.indexOf(x.slot) >= 0 ? slots.indexOf(x) : -1; x.ev = r1(evOf[i] || 0); x.sd = r1(sdOf[i] || 0); }
-    return { slots, actions, lineup, idle, grid, days: this.days, unlocked: open.length - willLock.size, expectedTotal: r1(main.total), outlook };
+    return { slots, actions, lineup, idle, grid, days: this.days, unlocked: open.length - willLock.size, expectedTotal: r1(main.total + mainStreams.total), outlook };
   }
 
   // expected locked points from the open slots for the rest of THIS week if the roster were `players`
