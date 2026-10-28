@@ -9,6 +9,7 @@ permissions:
   contents: write
   pages: write
   id-token: write
+  actions: read
 
 concurrency:
   group: lock-desk
@@ -19,6 +20,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Use the newest code that passed Tests
+        run: tools/tested_code.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Fetch saved state (fails the run rather than continuing on empty state)
         run: tools/state.sh restore
