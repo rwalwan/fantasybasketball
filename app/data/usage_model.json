@@ -6,58 +6,58 @@
   "op_rim"
  ],
  "league_mean": {
-  "tm_same": 0.2323,
-  "tm_other": 0.4611,
+  "tm_same": 0.248,
+  "tm_other": 0.4454,
   "op_rim": 0.6834
  },
  "groups": {
   "starter": {
    "coef": {
-    "tm_same": 0.1397,
-    "tm_other": 0.0702,
-    "op_rim": 0.0097
+    "tm_same": 0.1278,
+    "tm_other": 0.077,
+    "op_rim": 0.0082
    },
-   "n": 25980,
-   "n_with_absence": 6577,
+   "n": 24018,
+   "n_with_absence": 7207,
    "loso_mae_gain_fp": [
     {
-     "mae": 0.137,
-     "rmse": 0.158
+     "mae": 0.139,
+     "rmse": 0.155
     },
     {
-     "mae": 0.08,
+     "mae": 0.084,
+     "rmse": 0.087
+    },
+    {
+     "mae": 0.101,
      "rmse": 0.096
-    },
-    {
-     "mae": 0.122,
-     "rmse": 0.114
     }
    ],
-   "mean_effect_when_teammate_out": 0.0679
+   "mean_effect_when_teammate_out": 0.0711
   },
   "bench": {
    "coef": {
-    "tm_same": 0.3246,
-    "tm_other": 0.1557,
-    "op_rim": 0.0161
+    "tm_same": 0.2905,
+    "tm_other": 0.2041,
+    "op_rim": 0.018
    },
-   "n": 34957,
-   "n_with_absence": 9324,
+   "n": 31866,
+   "n_with_absence": 9966,
    "loso_mae_gain_fp": [
     {
-     "mae": 0.218,
-     "rmse": 0.261
+     "mae": 0.14,
+     "rmse": 0.183
     },
     {
-     "mae": 0.323,
-     "rmse": 0.369
+     "mae": 0.278,
+     "rmse": 0.313
     },
     {
-     "mae": 0.298,
-     "rmse": 0.349
+     "mae": 0.222,
+     "rmse": 0.282
     }
    ],
-   "mean_effect_when_teammate_out": 0.1659
+   "mean_effect_when_teammate_out": 0.1856
   }
  }
 }
