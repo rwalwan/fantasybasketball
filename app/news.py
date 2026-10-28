@@ -39,7 +39,7 @@ MAX_LLM_ITEMS = 30          # per run, to bound cost and time
 def _load(name, dflt):
     try:
         return json.load(open(os.path.join(STATE, name)))
-    except Exception:
+    except FileNotFoundError:          # missing = first run; a corrupt file must fail loudly, not be overwritten
         return dflt
 
 

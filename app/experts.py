@@ -22,7 +22,7 @@ SHRINK_N = 300          # graded games before a source's own accuracy fully driv
 def _load(name, dflt):
     try:
         return json.load(open(os.path.join(STATE, name)))
-    except Exception:
+    except FileNotFoundError:          # missing = first run; a corrupt file must fail loudly, not be overwritten
         return dflt
 
 

@@ -16,9 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Fetch saved state
-        run: |
-          mkdir -p data/state
-          git fetch --depth 1 origin state && git archive FETCH_HEAD | tar -x -C data/state
+        run: tools/state.sh restore
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -29,11 +27,6 @@ jobs:
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       - name: Save result to the state branch
-        run: |
-          cd data/state
-          git init -q -b state
-          git config user.name "lock-desk-bot"
-          git config user.email "lock-desk-bot@users.noreply.github.com"
-          git add -A
-          git commit -q -m "llm eval $(date -u +%FT%TZ)" || exit 0
-          git push -q --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" state
+        run: tools/state.sh save
+        env:
+          REMOTE: https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}

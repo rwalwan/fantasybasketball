@@ -20,13 +20,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fetch saved state (lineup snapshots, overrides)
-        run: |
-          mkdir -p data/state
-          if git ls-remote --exit-code --heads origin state >/dev/null; then
-            git fetch --depth 1 origin state
-            git archive FETCH_HEAD | tar -x -C data/state
-          fi
+      - name: Fetch saved state (fails the run rather than continuing on empty state)
+        run: tools/state.sh restore
 
       - name: Cache Sleeper data (finished weeks never change)
         uses: actions/cache@v4
@@ -83,15 +78,10 @@ jobs:
           timeout 60 google-chrome --headless=new --disable-gpu --no-sandbox --hide-scrollbars --force-device-scale-factor=1 \
             --window-size=390,3200 --virtual-time-budget=25000 --screenshot=data/state/mobile.png "http://localhost:8099/#api=${{ vars.WORKER_URL }}" >/dev/null 2>&1 || true
 
-      - name: Save state to the state branch
-        run: |
-          cd data/state
-          git init -q -b state
-          git config user.name "lock-desk-bot"
-          git config user.email "lock-desk-bot@users.noreply.github.com"
-          git add -A
-          git commit -q -m "state $(date -u +%FT%TZ)" || exit 0
-          git push -q --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" state
+      - name: Save state to the state branch (daily copy kept on state-backup)
+        run: tools/state.sh save
+        env:
+          REMOTE: https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
 
       - uses: actions/upload-pages-artifact@v3
         with:
