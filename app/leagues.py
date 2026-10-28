@@ -5,11 +5,14 @@ leagues' managers -> their leagues ... (breadth-first, capped). Keep leagues in 
 (settings.game_mode == 1, like ours) with 8+ teams. A league counts as verified Lock-In once a finished week's
 starter scores each equal ONE of that player's games (a daily-lineup league would show sums).
 Snapshots (daily): each kept league's matchups for the current week (starters, per-player points); finished
-weeks are stored once as finals. Only league ids, roster ids and player ids are stored - no usernames.
-State: data/state/leagues.sqlite, data/state/other_leagues.json. Sleeper asks for < 1000 calls/minute; this
+weeks are stored once as finals. No usernames are stored, and league ids are stored HASHED (review 2, finding 7d:
+the state branch is public; the study never needs the real ids). The real ids live only in the discovery list,
+data/cache/other_leagues.json, which stays in the private Actions cache (lost cache -> rediscovered).
+State: data/state/leagues.sqlite. Sleeper asks for < 1000 calls/minute; this
 makes a few hundred per day with a pause between calls.
 """
 import datetime as dt
+import hashlib
 import json
 import os
 import sqlite3
@@ -31,6 +34,8 @@ def fantasy_points(stats, scoring):
     return round(total / 10.0, 2)
 
 STATE = os.path.join(os.path.dirname(__file__), "..", "data", "state")
+CACHE = os.path.join(os.path.dirname(__file__), "..", "data", "cache")
+hid = lambda lid: "h" + hashlib.sha256(f"lock-desk:{lid}".encode()).hexdigest()[:16]
 MAX_USERS, MAX_LEAGUES, PAUSE = 600, 250, 0.08
 
 
@@ -43,6 +48,16 @@ def connect():
     CREATE TABLE IF NOT EXISTS league(league TEXT PRIMARY KEY, teams INT, scoring TEXT, positions TEXT,
         verified INT, checked TEXT);
     """)
+    if not con.execute("SELECT 1 FROM sqlite_master WHERE name='kv'").fetchone():
+        con.execute("CREATE TABLE kv(k TEXT PRIMARY KEY, v TEXT)")
+    if con.execute("SELECT v FROM kv WHERE k='hashed_ids'").fetchone() is None:     # stored before hashing
+        for (lid,) in con.execute("SELECT league FROM league").fetchall():
+            if not lid.startswith("h"):
+                con.execute("UPDATE league SET league=? WHERE league=?", (hid(lid), lid))
+                con.execute("UPDATE snap SET league=? WHERE league=?", (hid(lid), lid))
+        con.execute("INSERT INTO kv VALUES('hashed_ids','1')")
+        con.commit()
+        con.execute("VACUUM")                             # don't leave the old ids in freed pages
     return con
 
 
@@ -52,7 +67,11 @@ def _sleep():
 
 def discover(seed_league, season, today):
     """BFS over managers -> leagues. Returns {league_id: {teams, scoring, positions}} for Lock-In candidates."""
-    path = os.path.join(STATE, "other_leagues.json")
+    os.makedirs(CACHE, exist_ok=True)
+    old_path = os.path.join(STATE, "other_leagues.json")
+    if os.path.exists(old_path):                          # was on the public state branch
+        os.replace(old_path, os.path.join(CACHE, "other_leagues.json"))
+    path = os.path.join(CACHE, "other_leagues.json")
     if os.path.exists(path):
         old = json.load(open(path))
         if (dt.date.fromisoformat(today) - dt.date.fromisoformat(old["at"])).days < 7:
@@ -93,14 +112,15 @@ def discover(seed_league, season, today):
 def snapshot(con, leagues, week, today, final_weeks=()):
     """Store today's matchups for the current week, and finals for finished weeks not stored yet."""
     n = 0
-    for lid, info in leagues.items():
+    for real, info in leagues.items():
+        lid = hid(real)
         con.execute("INSERT OR IGNORE INTO league VALUES(?,?,?,?,?,?)",
                     (lid, info["teams"], json.dumps(info["scoring"]), json.dumps(info["positions"]), None, None))
         jobs = [(week, today, 0)] + [(w, "final", 1) for w in final_weeks
                                      if not con.execute("SELECT 1 FROM snap WHERE league=? AND week=? AND final=1 LIMIT 1", (lid, w)).fetchone()]
         for w, day, fin in jobs:
             try:
-                ms = sleeper.matchups(lid, w) or []
+                ms = sleeper.matchups(real, w) or []
             except Exception:
                 continue
             _sleep()
