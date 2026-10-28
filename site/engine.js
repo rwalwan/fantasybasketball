@@ -391,8 +391,9 @@ export class WeekPlan {
       } else {
         const x = open.find(y => y.i === i);
         if (x && opts.humanLocks && lockable[i]) {
-          // opponent: real managers don't lock like the engine. P(lock | score vs bar) from other Lock-In leagues
-          const fp = lockable[i].fp, b = bars[i] ?? 0, pr = humanLockRate(opts.humanLocks, b ? fp / b : 9), sdP = cont[p]?.sd || 0;
+          // opponent: real managers don't lock like the engine. P(lock | score / his own continuation) from other
+          // Lock-In leagues (app/league_study.py measures that same ratio); passing is worth the engine's bar
+          const fp = lockable[i].fp, b = bars[i] ?? 0, own = cont[p]?.W || 0, pr = humanLockRate(opts.humanLocks, own ? fp / own : 9), sdP = cont[p]?.sd || 0;
           ev = pr * fp + (1 - pr) * b; sd = Math.sqrt((1 - pr) * sdP ** 2 + pr * (1 - pr) * (fp - b) ** 2);
         } else if (x && willLock.has(p)) ev = lockable[i].fp;
         else if (x) { const a = assignedTo[i]; ev = a ? Math.max(0, (val(x, a, false) ?? 0) + mainStreams.gain[x.i]) : 0; sd = a ? cont[a].sd : 0; }
