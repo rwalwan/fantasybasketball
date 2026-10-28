@@ -51,18 +51,48 @@ def _save(name, obj):
 def norm(name):
     s = unicodedata.normalize("NFKD", name or "").encode("ascii", "ignore").decode().lower()
     s = re.sub(r"\b(jr|sr|ii|iii|iv)\b\.?", "", s)
-    return re.sub(r"[^a-z ]", "", s).strip()
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z ]", "", s)).strip()
+
+
+# common short first names in NBA coverage -> the name on the roster
+NICK = {"cam": "cameron", "steph": "stephen", "nic": "nicolas", "nick": "nicolas", "mo": "moritz", "herb": "herbert",
+        "alex": "alexandre", "zach": "zachary", "kj": "kenyon", "greg": "gregory", "matt": "matthew", "mike": "michael",
+        "chris": "christopher", "nate": "nathan", "bub": "carlton", "kenny": "kenneth", "tim": "timothy", "joe": "joseph"}
 
 
 class Names:
+    """News name -> Sleeper player id. Exact name first, then a known short form of the first name, then a unique
+    last name on the reported team. Ambiguous names (two players, no team to tell them apart) match nothing."""
+
     def __init__(self, meta):
-        self.by_name = {}
+        self.by_name, self.team = {}, {}
         for pid, m in meta.items():
             if m.get("team"):
-                self.by_name.setdefault(norm(f"{m.get('first_name', '')} {m.get('last_name', '')}"), pid)
+                self.by_name.setdefault(norm(f"{m.get('first_name', '')} {m.get('last_name', '')}"), []).append(pid)
+                self.team[pid] = m["team"]
+        self.by_last = {}
+        for name, pids in self.by_name.items():
+            for p in pids:
+                self.by_last.setdefault((name.split(" ")[-1], self.team[p]), []).append(p)
 
-    def pid(self, name):
-        return self.by_name.get(norm(name))
+    def _pick(self, pids, team):
+        if team:
+            pids = [p for p in pids if self.team.get(p) == team] or ([] if len(pids) > 1 else pids)
+        return pids[0] if len(pids) == 1 else None
+
+    def pid(self, name, team=None):
+        n = norm(name)
+        if not n:
+            return None
+        if n in self.by_name:
+            return self._pick(self.by_name[n], team)
+        first, _, rest = n.partition(" ")
+        full = NICK.get(first)
+        if full and rest and f"{full} {rest}" in self.by_name:
+            return self._pick(self.by_name[f"{full} {rest}"], team)
+        if team:
+            return self._pick(self.by_last.get((n.split(" ")[-1], team), []), team)
+        return None
 
 
 def parse_feed(url):
@@ -169,7 +199,7 @@ def collect(meta, my_players, fa_ids, today):
                                                           "out_min_days", "out_max_days", "minutes_effect", "beneficiaries", "summary")})
                 except Exception as e:
                     print("llm news failed:", e)
-            rec["pid"] = names.pid(rec.get("player") or it["title"].split(":")[0])
+            rec["pid"] = names.pid(rec.get("player") or it["title"].split(":")[0], rec.get("team") or None)
             rec["beneficiary_pids"] = [p for p in (names.pid(b) for b in (rec.get("beneficiaries") or [])) if p]
             news.append(rec)
     budget = news_budget + 10
@@ -189,7 +219,7 @@ def collect(meta, my_players, fa_ids, today):
             if x:
                 rec.update({k: x.get(k) for k in ("player", "team", "kind", "status", "games_out_estimate",
                                                   "out_min_days", "out_max_days", "minutes_effect", "beneficiaries", "summary")})
-                rec["pid"] = names.pid(rec.get("player") or "") or rec.get("pid")
+                rec["pid"] = names.pid(rec.get("player") or "", rec.get("team") or None) or rec.get("pid")
                 rec["beneficiary_pids"] = [p for p in (names.pid(b) for b in (rec.get("beneficiaries") or [])) if p]
         except Exception as e:
             print("llm backfill failed:", e)
