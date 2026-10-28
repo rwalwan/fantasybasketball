@@ -147,7 +147,10 @@ def main():
 
     # availability: per-game play probabilities (designation, return timelines from news, historical return rates)
     try:
-        watch_av = {p for r in rosters for p in (r.get("players") or [])} | {w["pid"] for w in waivers}
+        # every rostered player, every waiver target, and every injured player with an NBA team: the browser ranks
+        # free agents on its own, so any of them may need a curve (review finding 9)
+        watch_av = {p for r in rosters for p in (r.get("players") or [])} | {w["pid"] for w in waivers} | \
+            {p for p, m in meta.items() if m.get("team") and m.get("injury_status") and (p in book.prior or book.games.get(p))}
         av = availability.build(book, meta, team_game_dates(sched), today, book.is_final, watch_av)
         hn = availability.healthy_next(meta, team_game_dates(sched), today, book.is_final, watch_av, set(av))
         cal = availability.log_and_grade(av, book, book.is_final, today, hn)

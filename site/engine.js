@@ -140,7 +140,7 @@ export class Book {
     let q;
     if (a && a.status === st && date && a.q[date] != null) q = a.q[date];
     else if (!st) q = healthyAt(M, (j ?? 0) + 1);
-    else q = statusChain(M, st, j);
+    else q = statusChain(M, st, j, a?.missed || 0);   // status changed since the job ran: keep his missed count
     if (b2b) q *= B2B_FACTOR;
     return Math.round(q * 100) / 100;
   }
@@ -158,8 +158,9 @@ export function healthyAt(M, n) {
   return c.q.at(-1);
 }
 function hazardK(M, k) { return k <= 8 ? M.by_k[k - 1] : k <= 12 ? M.k9_12 : k <= 20 ? M.k13_20 : (M.k21p ?? M.k13_20); }
-function statusChain(M, st, j) {
-  let S = 1, k = 0;
+// k0 = games already missed (from the job's last run); without it a long absence restarted as a fresh one
+function statusChain(M, st, j, k0 = 0) {
+  let S = 1, k = k0;
   for (let i = 0; i <= j; i++) {
     let r;
     if (i === 0) r = DESIG[st] ? M.designation[DESIG[st]] : OUT.has(st) ? 0 : 1;
