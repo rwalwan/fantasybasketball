@@ -22,7 +22,11 @@ from . import sources
 
 STATE = os.path.join(os.path.dirname(__file__), "..", "data", "state")
 UA = {"User-Agent": "we-back-lock-desk (personal fantasy assistant; github.com/rwalwan/fantasybasketball)"}
-MODEL = os.environ.get("OPENROUTER_MODEL") or "anthropic/claude-haiku-5.5"                 # news, why-notes, reasons
+MODEL = os.environ.get("OPENROUTER_MODEL") or "anthropic/claude-haiku-5.5"                 # why-notes, reasons
+# News blurbs (status, minutes, injury timelines): DeepSeek V4.1 Flash. Oct 28 eval (tools/llm_eval.py): 96% of
+# labeled injury timelines right vs Haiku's 86% (50 items), best news agreement (0.885), cheaper. Override with
+# the OPENROUTER_MODEL_NEWS repo variable.
+NEWS_MODEL = os.environ.get("OPENROUTER_MODEL_NEWS") or "deepseek/deepseek-v4.1-flash-1017"
 # Expert articles use the same model by default. The Oct 2026 eval couldn't tell models apart on articles (5
 # articles, every model 100%), and their output is display-only, so Sonnet's ~15x cost wasn't justified (review
 # finding 13). Override with the OPENROUTER_MODEL_ADVICE repo variable.
@@ -191,7 +195,7 @@ def collect(meta, my_players, fa_ids, today):
             rec = {"source": src["name"], "title": it["title"], "link": it["link"], "at": now, "text": it["text"][:400]}
             if news_budget > 0 and os.environ.get("OPENROUTER_API_KEY"):
                 try:
-                    x = llm_json(NEWS_PROMPT, f"Title: {it['title']}\n\n{it['text']}")
+                    x = llm_json(NEWS_PROMPT, f"Title: {it['title']}\n\n{it['text']}", model=NEWS_MODEL)
                     news_budget -= 1
                     rec["llm_tried"] = True
                     if x:
@@ -214,7 +218,7 @@ def collect(meta, my_players, fa_ids, today):
             continue
         rec["llm_tried"] = rec["tl_tried"] = True
         try:
-            x = llm_json(NEWS_PROMPT, f"Title: {rec['title']}\n\n{rec.get('text', '')}")
+            x = llm_json(NEWS_PROMPT, f"Title: {rec['title']}\n\n{rec.get('text', '')}", model=NEWS_MODEL)
             budget -= 1
             if x:
                 rec.update({k: x.get(k) for k in ("player", "team", "kind", "status", "games_out_estimate",

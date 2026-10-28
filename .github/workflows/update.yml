@@ -45,6 +45,7 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
           OPENROUTER_MODEL_ADVICE: ${{ vars.OPENROUTER_MODEL_ADVICE }}
+          OPENROUTER_MODEL_NEWS: ${{ vars.OPENROUTER_MODEL_NEWS }}
 
       - uses: actions/setup-node@v4
         with:
