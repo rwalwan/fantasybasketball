@@ -101,7 +101,9 @@ class PlayerBook:
         if p is not None and p > 0:
             srcs.append((self.w.get("rotowire", 1 / 3), p))
         tw = sum(w for w, _ in srcs)
-        return round(sum(w * v for w, v in srcs) / tw, 1)
+        if tw <= 0:                       # weighted sources missing for this game (e.g. no RotoWire line): model
+            srcs, tw = [(1.0, base)], 1.0
+        return round(sum(w * v for w, v in srcs) / tw * self.w.get("scale", 1.0), 1)
 
     def play_prob(self, pid, date, days_ahead, b2b):
         st = self.status(pid)

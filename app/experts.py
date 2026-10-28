@@ -44,12 +44,12 @@ def source_projections(book, pid, date):
     return out
 
 
-def update(book, season, week, tips, now=None):
+def update(book, season, week, tips, now=None, w=None):
     """Log projections for untipped games this week; grade finished ones. Returns the scores table."""
     now = now or dt.datetime.now(dt.timezone.utc)
     log = _load(f"projlog_{season}.json", {})
     scores = _load(SCORES, {})
-    book.w = weights(scores)                     # log the blend with today's weights
+    book.w = w or weights(scores)                # log the blend with today's weights
     ratios = _load(RATIOS, {})
     done = _load(f"projlog_done_{season}.json", {})
 
@@ -149,6 +149,61 @@ def weights(scores):
         shrunk[s] = a * (inv[s] or mean_inv) + (1 - a) * mean_inv
     tot = sum(shrunk.values())
     return {s: round(v / tot, 3) for s, v in shrunk.items()}
+
+
+STACK_MIN_N = 200        # graded games with all three projections before fitted weights are used
+SCALE_SHRINK = 500       # games before the mean-bias correction counts fully
+
+
+def _fit_simplex(y, X, step=0.02):
+    """Non-negative weights summing to 1 that minimize the blend's squared error (grid over the simplex: three
+    sources, so this is exact to the grid step and needs no solver)."""
+    import numpy as np
+    g = np.arange(0, 1 + 1e-9, step)
+    W = np.array([(a, b, 1 - a - b) for a in g for b in g if a + b <= 1 + 1e-9])
+    err = ((y[None, :] - W @ X.T) ** 2).mean(axis=1)
+    return W[int(err.argmin())]
+
+
+def stack_weights(rows):
+    """Blend weights from graded games: rows = [date, actual, rotowire, model, ctx].
+    Inverse-MSE weighting assumed independent errors, but model and ctx are near-duplicates (error correlation
+    0.98), so together they outvoted the best source. Here the weights minimize the BLEND's error directly, and
+    are kept only if they beat RotoWire alone on days held out of the fit (leave-one-day-out); otherwise
+    RotoWire alone. A shrunk multiplicative scale corrects the blend's average bias."""
+    import numpy as np
+    n = len(rows)
+    rw_only = {"rotowire": 1.0, "model": 0.0, "ctx": 0.0, "scale": 1.0, "n": n}
+    if n < STACK_MIN_N:
+        return dict(rw_only, basis="too few graded games")
+    dates = np.array([r[0] for r in rows])
+    y = np.array([r[1] for r in rows], float)
+    X = np.array([r[2:5] for r in rows], float)
+    oos_stack = oos_rw = 0.0
+    days = sorted(set(dates))
+    if len(days) >= 2:
+        for d in days:
+            tr, te = dates != d, dates == d
+            w = _fit_simplex(y[tr], X[tr])
+            oos_stack += np.abs(y[te] - X[te] @ w).sum()
+            oos_rw += np.abs(y[te] - X[te, 0]).sum()
+    if len(days) < 2 or oos_stack >= oos_rw:
+        w = np.array([1.0, 0.0, 0.0])
+        basis = "RotoWire alone (a fitted blend did not beat it on held-out days)"
+    else:
+        w = _fit_simplex(y, X)
+        basis = f"fitted blend (held-out MAE {oos_stack / n:.2f} vs RotoWire {oos_rw / n:.2f})"
+    pred = X @ w
+    raw = y.sum() / max(pred.sum(), 1e-6)
+    scale = 1 + (raw - 1) * n / (n + SCALE_SHRINK)
+    return {"rotowire": round(float(w[0]), 3), "model": round(float(w[1]), 3), "ctx": round(float(w[2]), 3),
+            "scale": round(float(scale), 4), "n": n, "basis": basis}
+
+
+def graded_rows(con, season):
+    return [list(r) for r in con.execute(
+        "SELECT date, fp, proj_rw, proj_model, proj_ctx FROM games WHERE season=? AND proj_rw IS NOT NULL "
+        "AND proj_model IS NOT NULL AND proj_ctx IS NOT NULL ORDER BY date", (season,))]
 
 
 def table(scores, w):

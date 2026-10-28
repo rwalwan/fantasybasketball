@@ -128,8 +128,9 @@ export class Book {
     const srcs = [[this.w.model ?? 1 / 3, base]];
     if (c?.f) srcs.push([this.w.ctx ?? 1 / 3, base * c.f]);
     if (pr > 0) srcs.push([this.w.rotowire ?? 1 / 3, pr]);
-    const tw = srcs.reduce((a, [w]) => a + w, 0);
-    return Math.round((srcs.reduce((a, [w, v]) => a + w * v, 0) / tw) * 10) / 10;
+    let tw = srcs.reduce((a, [w]) => a + w, 0);
+    if (tw <= 0) { srcs.splice(0, srcs.length, [1, base]); tw = 1; }   // weighted sources missing (no RotoWire line): model
+    return Math.round((srcs.reduce((a, [w, v]) => a + w * v, 0) / tw) * (this.w.scale ?? 1) * 10) / 10;
   }
   // P(he plays that game). From the job's availability model when it matches his current status (designation
   // rates, reported return timelines, historical return hazard); otherwise the same model from status alone,

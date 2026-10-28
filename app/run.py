@@ -98,8 +98,10 @@ def main():
     manual = {**load_manual_locks(week), **(backend.get("locks") or {})}
 
     # grade projection sources and learn blend weights before planning
-    scores = experts.update(book, season, week, tips)
-    book.w = experts.weights(scores)
+    # blend weights fitted to graded games (finding 3: inverse-MSE let two near-duplicate sources outvote RotoWire)
+    w = experts.stack_weights(experts.graded_rows(con, season))
+    scores = experts.update(book, season, week, tips, w=w)
+    book.w = w
     wp = WeekPlan(book, sched, week, today, lg["roster_positions"], mine, my_m, rosters, tracker.eligible, tips)
     plan = wp.build(manual)
     waivers, worst = wp.waivers(sleeper.trending_adds())
