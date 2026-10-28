@@ -54,7 +54,7 @@ async function loadLive() {
   const { week, league } = base, season = league.season;
   const days = weekDays(base.schedule, week), today = etToday();
   const tipDays = days.filter(d => d >= today || d === days.find(x => x >= today));
-  const [schedule, rosters, matchups, stats, proj, trending, snapsGh, overridesGh, locksGh, oppSnaps, backend, tips, news, claims, moves, context, insights, learning, avail, usage] = await Promise.all([
+  const [schedule, rosters, matchups, stats, proj, trending, snapsGh, overridesGh, locksGh, oppSnaps, backend, tips, news, claims, moves, context, insights, learning, avail, usage, others] = await Promise.all([
     get(`${S2}/schedule/nba/regular/${season}`).catch(() => base.schedule),
     get(`${S1}/league/${LEAGUE}/rosters`), get(`${S1}/league/${LEAGUE}/matchups/${week}`),
     get(`${S2}/stats/nba/${season}/${week}?season_type=regular`), get(`${S2}/projections/nba/${season}/${week}?season_type=regular`),
@@ -70,13 +70,14 @@ async function loadLive() {
     get(`static/insights.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({ notes: [], trends: [], openings: [] })),
     get(`static/learning.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({})),
     get(`static/availability.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => null),
-    get(`static/usage.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({}))]);
+    get(`static/usage.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({})),
+    get(`static/league_study.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => null)]);
   // backend (minute-level lineup records, shared answers) wins over the 15-minute GitHub state branch
   const snaps = { ...snapsGh, ...(backend.lineups || {}) };
   const overrides = { ...overridesGh, ...(backend.elig || {}) };
   const locks = { ...locksGh, ...(backend.locks || {}) };
   base.schedule = schedule;
-  live = { rosters, matchups, stats, proj, trending, snaps, oppSnaps, overrides, locks, tips, news, claims, moves, context, insights, learning, avail, usage, backend: !!backend.ok, at: new Date() };
+  live = { rosters, matchups, stats, proj, trending, snaps, oppSnaps, overrides, locks, tips, news, claims, moves, context, insights, learning, avail, usage, others, backend: !!backend.ok, at: new Date() };
   void tipDays;
 }
 
@@ -282,7 +283,18 @@ function renderResearch(c) {
 }
 
 // ---- insights ----------------------------------------------------------------------------------------
+function renderOthers() {
+  const o = live.others;
+  if (!o || !o.starter_weeks) { $("others").innerHTML = `<div class="row"><span class="pos">${o ? `Collecting: ${o.candidates || 0} candidate leagues, ${o.verified?.lock_in || 0} verified Lock-In so far. Results appear after a finished week.` : "Not collected yet."}</span></div>`; return; }
+  const e = o.engine_minus_manager, b = o.best_scale;
+  $("others").innerHTML =
+    `<div class="row"><span>${o.verified.lock_in} verified Lock-In leagues · ${o.starter_weeks.toLocaleString()} starter-weeks (weeks ${o.weeks.join(", ")})</span></div>` +
+    `<div class="row"><span>The engine's lock rule on the same players' games vs what managers ended with: <b>${e.mean_fp >= 0 ? "+" : ""}${e.mean_fp}</b> FP per slot (95% CI ${e.ci95[0]} to ${e.ci95[1]}); same result ${Math.round(e.share_same * 100)}% of the time.</span></div>` +
+    `<div class="row"><span>Bar check (replaying every player-week): best scale ×${b.scale} = ${b.vs_current >= 0 ? "+" : ""}${b.vs_current} FP per slot vs the current bar (95% CI ${b.ci95_vs_current[0]} to ${b.ci95_vs_current[1]}).</span></div>` +
+    `<div class="row"><span class="pos">How often managers lock, by score vs the engine's bar: ${(o.lock_rate_by_score_vs_bar || []).map(r => `${r.score_vs_bar}: ${Math.round(r.lock_rate * 100)}% (n=${r.n})`).join(" · ")}</span></div>`;
+}
 function renderInsights(c) {
+  renderOthers();
   const ins = live.insights || {}, lr = live.learning || {}, mine = new Set(c.mine.players || []);
   const ol = c.plan.outlook;
   $("outlook").innerHTML = ol?.opp ? `<div class="row"><span>Projected final — you: <b>${r1(ol.mean)}</b> (80% range ${Math.round(ol.mean - 1.28 * ol.sd)}–${Math.round(ol.mean + 1.28 * ol.sd)}) · opponent: <b>${r1(ol.opp.mean)}</b> (${Math.round(ol.opp.mean - 1.28 * Math.sqrt(ol.opp.var))}–${Math.round(ol.opp.mean + 1.28 * Math.sqrt(ol.opp.var))})</span><span><b>${ol.winProb < 0.01 ? "<1%" : ol.winProb > 0.99 ? ">99%" : Math.round(ol.winProb * 100) + "%"}</b> win chance</span></div>` +

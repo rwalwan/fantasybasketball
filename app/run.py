@@ -226,6 +226,11 @@ def main():
         print("insights failed:", e, file=sys.stderr)
     con.close()
 
+    # other Lock-In leagues (daily job, app/league_run.py): publish the latest study with the site
+    ls_path = os.path.join(ROOT, "data", "state", "league_study.json")
+    if os.path.exists(ls_path):
+        with open(ls_path) as f, open(os.path.join(ROOT, "site", "static", "league_study.json"), "w") as g:
+            g.write(f.read())
     for name, obj in (("news", news_out), ("claims", claims_out), ("insights", ins_out), ("context", ctx_out)):
         with open(os.path.join(ROOT, "site", "static", f"{name}.json"), "w") as f:
             json.dump(obj, f, separators=(",", ":"))
