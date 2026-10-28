@@ -32,6 +32,44 @@ restore() {
   fi
   git rev-parse FETCH_HEAD > "$MARK"
   echo "state: restored $(cat "$MARK")"
+  repair
+}
+
+# A corrupt file (bad JSON, damaged SQLite) used to stop every run, alerts included, until fixed by hand (review 2,
+# finding 7). Replace it with the copy on state-backup (at most a day old); if that is bad or missing too, move it
+# aside as <name>.corrupt so the run starts that file fresh and the damaged copy is kept for inspection.
+bad_files() {
+  python3 - "$DIR" <<'PY'
+import json, os, sqlite3, sys
+d = sys.argv[1]
+for f in sorted(os.listdir(d)):
+    p = os.path.join(d, f)
+    try:
+        if f.endswith(".json"):
+            json.load(open(p))
+        elif f.endswith(".sqlite"):
+            con = sqlite3.connect(f"file:{p}?mode=ro", uri=True)
+            if con.execute("PRAGMA quick_check").fetchone()[0] != "ok":
+                raise ValueError("quick_check")
+            con.close()
+    except Exception:
+        print(f)
+PY
+}
+repair() {
+  local bad; bad=$(bad_files)
+  [ -z "$bad" ] && return 0
+  local tmp; tmp=$(mktemp -d)
+  if retry git fetch -q --depth 1 "$REMOTE" state-backup; then git archive FETCH_HEAD | tar -x -C "$tmp" 2>/dev/null; fi
+  for f in $bad; do
+    if [ -s "$tmp/$f" ] && STATE_ONE="$tmp/$f" python3 -c "
+import json, os, sqlite3; p = os.environ['STATE_ONE']
+json.load(open(p)) if p.endswith('.json') else sqlite3.connect(p).execute('PRAGMA quick_check').fetchone()"; then
+      cp "$tmp/$f" "$DIR/$f"; echo "::warning::state: $f was corrupt; restored the state-backup copy"
+    else
+      mv "$DIR/$f" "$DIR/$f.corrupt"; echo "::warning::state: $f was corrupt and has no good backup; moved aside as $f.corrupt"
+    fi
+  done
 }
 
 save() {
