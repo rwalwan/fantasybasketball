@@ -65,11 +65,13 @@ def allowed(url):
     rp = _robots.get(host)
     if rp is None:
         rp = urllib.robotparser.RobotFileParser()
+        # RFC 9309: 200 -> follow it; 4xx (no robots.txt) -> allowed; 5xx or unreachable -> disallow everything
+        deny = ["User-agent: *", "Disallow: /"]
         try:
             r = requests.get(host + "/robots.txt", headers={"User-Agent": UA}, timeout=15)
-            rp.parse(r.text.splitlines() if r.status_code == 200 else [])
+            rp.parse(r.text.splitlines() if r.status_code == 200 else [] if 400 <= r.status_code < 500 else deny)
         except Exception:
-            rp.parse([])
+            rp.parse(deny)
         _robots[host] = rp
     return rp.can_fetch(UA, url)
 

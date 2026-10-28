@@ -18,7 +18,7 @@
   "Questionable": 0.483,
   "Doubtful": 0.042,
   "Out": 0.0,
-  "_source": "isheplayingtonight.com: first official-report designation vs played, 2,007 player-games, Jan-Oct 2026"
+  "_source": "isheplayingtonight.com/nba-injuries/questionable-play-rate: published summary table (first official-report designation vs minutes played, 2,007 player-games, Jan-Oct 2026), read once by hand; no scraper. Per-category n: Probable 351, Questionable 1,367, Doubtful 289."
  },
  "healthy": 0.944,
  "b2b_factor": 0.93,
