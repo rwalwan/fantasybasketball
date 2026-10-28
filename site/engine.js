@@ -171,6 +171,16 @@ function statusChain(M, st, j, k0 = 0) {
   return (1 - S) * healthyAt(M, j + 1);
 }
 
+// eligibility from recorded lineup snapshots: true/false once the game's lineup was frozen at tip, else null
+export function eligFromSnaps(snaps, overrides = {}) {
+  return (pid, date) => {
+    const k = `${date}|${pid}`;
+    if (k in overrides) return !!overrides[k];
+    const s = snaps?.[k];
+    return s && s.frozen ? s.slot != null : null;
+  };
+}
+
 // ---------- schedule ----------
 export function weekDays(schedule, week) {
   const d = schedule.filter(g => g.week === week).map(g => g.date).sort();

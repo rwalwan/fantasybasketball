@@ -28,8 +28,8 @@ def _save(name, obj):
 
 
 class LineupTracker:
-    def __init__(self, season, week, now_utc=None):
-        self.name = f"lineups_{season}_w{week}.json"
+    def __init__(self, season, week, now_utc=None, prefix="lineups"):
+        self.name = f"{prefix}_{season}_w{week}.json"
         self.snaps = _load(self.name)
         self.overrides = _load("eligibility_overrides.json")
         self.now = now_utc or dt.datetime.now(dt.timezone.utc)

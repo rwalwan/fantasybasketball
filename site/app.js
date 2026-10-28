@@ -1,4 +1,4 @@
-import { Book, WeekPlan, Valuer, waiverMoves, weekDays, teamGames, fits, range80 } from "./engine.js";
+import { Book, WeekPlan, Valuer, eligFromSnaps, waiverMoves, weekDays, teamGames, fits, range80 } from "./engine.js";
 
 // ---- config -----------------------------------------------------------------------------------
 const LEAGUE = "1400915575915491328", USER = "1388708038000533504";
@@ -54,12 +54,13 @@ async function loadLive() {
   const { week, league } = base, season = league.season;
   const days = weekDays(base.schedule, week), today = etToday();
   const tipDays = days.filter(d => d >= today || d === days.find(x => x >= today));
-  const [schedule, rosters, matchups, stats, proj, trending, snapsGh, overridesGh, locksGh, backend, tips, news, claims, moves, context, insights, learning, avail] = await Promise.all([
+  const [schedule, rosters, matchups, stats, proj, trending, snapsGh, overridesGh, locksGh, oppSnaps, backend, tips, news, claims, moves, context, insights, learning, avail] = await Promise.all([
     get(`${S2}/schedule/nba/regular/${season}`).catch(() => base.schedule),
     get(`${S1}/league/${LEAGUE}/rosters`), get(`${S1}/league/${LEAGUE}/matchups/${week}`),
     get(`${S2}/stats/nba/${season}/${week}?season_type=regular`), get(`${S2}/projections/nba/${season}/${week}?season_type=regular`),
     get(`${S1}/players/nba/trending/add?lookback_hours=24&limit=50`).catch(() => []),
     soft(`${STATE}lineups_${season}_w${week}.json`), soft(`${STATE}eligibility_overrides.json`), soft(`${STATE}locks_w${week}.json`),
+    soft(`${STATE}opp_lineups_${season}_w${week}.json`),
     API ? soft(`${API}/state?season=${season}&week=${week}`) : Promise.resolve({}),
     get(`static/tips.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({})),
     get(`static/news.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({ items: [], mine: [] })),
@@ -74,7 +75,7 @@ async function loadLive() {
   const overrides = { ...overridesGh, ...(backend.elig || {}) };
   const locks = { ...locksGh, ...(backend.locks || {}) };
   base.schedule = schedule;
-  live = { rosters, matchups, stats, proj, trending, snaps, overrides, locks, tips, news, claims, moves, context, insights, learning, avail, backend: !!backend.ok, at: new Date() };
+  live = { rosters, matchups, stats, proj, trending, snaps, oppSnaps, overrides, locks, tips, news, claims, moves, context, insights, learning, avail, backend: !!backend.ok, at: new Date() };
   void tipDays;
 }
 
@@ -111,7 +112,7 @@ function compute() {
   if (oppRoster) {
     oppPlan = new WeekPlan({ Q: base.QS, book, schedule: base.schedule, week: base.week, today: etToday(), now: new Date(),
       rosterPositions: base.league.roster_positions, roster: oppRoster, matchup: opp, rosters: live.rosters, tips: live.tips,
-      elig: () => true, locks: {} }).build();
+      elig: eligFromSnaps(live.oppSnaps), locks: {} }).build();
     oppOut = { mean: oppPlan.outlook.mean, var: oppPlan.outlook.var };
   }
   const waivers = wp.waivers(live.trending);

@@ -95,6 +95,13 @@ def main():
     tracker.record(slots, my_m.get("starters") or [], mine.get("players") or [], book.team,
                    lambda team: sorted(d for d in tg.get(team, {}) if d in days), tips)
 
+    # the opponent's lineup too (every run), so their bench games aren't treated as lockable (review finding 11)
+    if opp_m:
+        opp_roster = next((r for r in rosters if r["roster_id"] == opp_m["roster_id"]), {})
+        LineupTracker(season, week, prefix="opp_lineups").record(
+            slots, opp_m.get("starters") or [], opp_roster.get("players") or [], book.team,
+            lambda team: sorted(d for d in tg.get(team, {}) if d in days), tips)
+
     manual = {**load_manual_locks(week), **(backend.get("locks") or {})}
 
     # grade projection sources and learn blend weights before planning
