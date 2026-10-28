@@ -154,15 +154,44 @@ def healthy_next(meta, team_dates, today, is_final, pids, skip):
         if not up:
             continue
         prev = (dt.date.fromisoformat(up[0]) - dt.timedelta(days=1)).isoformat()
-        out[pid] = (up[0], round(healthy_at(1) * (M["b2b_factor"] if prev in dates else 1), 3))
+        b2b = prev in dates
+        out[pid] = (up[0], round(healthy_at(1) * (M["b2b_factor"] if b2b else 1), 3), b2b)
     return out
+
+
+# Next-game play rate of a player with no designation, by stage of the season (2021-24 panel, top-100 players, non-b2b
+# games after a game he played): Oct 1 - Nov 10 0.955 (n=2,120), mid-Nov - mid-Mar 0.944 (the whole-season figure,
+# n=16,475), Mar 15 on 0.930 (n=2,540). Review 2 (F2 refinement): use the stage's rate until this season's own log
+# has 300+ graded healthy games, then this season's rate.
+STAGE_RATE = (("10-01", "11-10", 0.955), ("03-15", "06-30", 0.930))
+OWN_MIN = 300
+
+
+def next_game_healthy(today):
+    """(rate, basis) for the first point of the healthy curve."""
+    log = _load("availability_log.json", {"open": {}, "graded": []})
+    own = [r for r in log.get("graded", []) if r.get("status") is None and r.get("b2b") is False]
+    if len(own) >= OWN_MIN:
+        return round(sum(bool(r["played"]) for r in own) / len(own), 3), f"this season's own rate, {len(own)} graded games"
+    md = today[5:]
+    rate = next((r for lo, hi, r in STAGE_RATE if lo <= md <= hi), M.get("_q0_hist", M["healthy_curve"]["q"][0]))
+    return rate, f"historical rate for this stage of the season (own log: {len(own)} of {OWN_MIN} graded games)"
+
+
+def set_next_game(rate, basis):
+    """Replace the curve's first point (next game) for this run; the rest of the curve is unchanged."""
+    M.setdefault("_q0_hist", M["healthy_curve"]["q"][0])
+    M["healthy_curve"]["q"][0] = rate
+    M["healthy_next_basis"] = basis
 
 
 def log_and_grade(avail, book, is_final, today, healthy=None):
     """Log each player's next-game probability; grade logged games once final. Returns calibration by bucket."""
     log = _load("availability_log.json", {"open": {}, "graded": []})
-    for pid, (d, qv) in (healthy or {}).items():
-        log["open"].setdefault(f"{d}|{pid}", {"q": qv, "status": None, "missed": 0, "timeline": False})
+    for pid, h in (healthy or {}).items():
+        d, qv = h[0], h[1]
+        log["open"].setdefault(f"{d}|{pid}", {"q": qv, "status": None, "missed": 0, "timeline": False,
+                                               "b2b": h[2] if len(h) > 2 else None})
     for pid, a in avail.items():
         nxt = min(a["q"]) if a["q"] else None
         if nxt:

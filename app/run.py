@@ -110,6 +110,9 @@ def main():
         # so any of them may need a curve (review finding 9). Runs before projections: the usage model needs it.
         watch_av = {p for r in rosters for p in (r.get("players") or [])} | \
             {p for p, m in meta.items() if m.get("team") and m.get("injury_status") and (p in book.prior or book.games.get(p))}
+        rate, basis = availability.next_game_healthy(today)
+        availability.set_next_game(rate, basis)
+        print(f"healthy next-game rate {rate}: {basis}")
         av = availability.build(book, meta, team_game_dates(sched), today, book.is_final, watch_av)
         hn = availability.healthy_next(meta, team_game_dates(sched), today, book.is_final, watch_av, set(av))
         cal = availability.log_and_grade(av, book, book.is_final, today, hn)
