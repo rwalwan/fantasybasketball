@@ -52,19 +52,19 @@ jobs:
           node-version: "22"
 
       - name: Suggested moves (+ AI reasons)
-        run: node tools/moves.mjs || echo "moves step failed (site still publishes)"
+        run: tools/step.sh moves node tools/moves.mjs
         env:
           WORKER_URL: ${{ vars.WORKER_URL }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
 
       - name: Decision log + grading
-        run: python -m app.learn || echo "learn step failed"
+        run: tools/step.sh learn python -m app.learn
         env:
           WORKER_URL: ${{ vars.WORKER_URL }}
 
       - name: Phone alerts
-        run: python -m app.alerts || echo "alerts step failed"
+        run: tools/step.sh alerts python -m app.alerts
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
 

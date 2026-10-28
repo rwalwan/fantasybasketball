@@ -54,7 +54,7 @@ async function loadLive() {
   const { week, league } = base, season = league.season;
   const days = weekDays(base.schedule, week), today = etToday();
   const tipDays = days.filter(d => d >= today || d === days.find(x => x >= today));
-  const [schedule, rosters, matchups, stats, proj, trending, snapsGh, overridesGh, locksGh, oppSnaps, backend, tips, news, claims, moves, context, insights, learning, avail, usage, others] = await Promise.all([
+  const [schedule, rosters, matchups, stats, proj, trending, snapsGh, overridesGh, locksGh, oppSnaps, backend, tips, news, claims, moves, context, insights, learning, avail, usage, others, health] = await Promise.all([
     get(`${S2}/schedule/nba/regular/${season}`).catch(() => base.schedule),
     get(`${S1}/league/${LEAGUE}/rosters`), get(`${S1}/league/${LEAGUE}/matchups/${week}`),
     get(`${S2}/stats/nba/${season}/${week}?season_type=regular`), get(`${S2}/projections/nba/${season}/${week}?season_type=regular`),
@@ -71,13 +71,14 @@ async function loadLive() {
     get(`static/learning.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({})),
     get(`static/availability.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => null),
     get(`static/usage.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({})),
-    get(`static/league_study.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => null)]);
+    get(`static/league_study.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => null),
+    get(`static/health.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({}))]);
   // backend (minute-level lineup records, shared answers) wins over the 15-minute GitHub state branch
   const snaps = { ...snapsGh, ...(backend.lineups || {}) };
   const overrides = { ...overridesGh, ...(backend.elig || {}) };
   const locks = { ...locksGh, ...(backend.locks || {}) };
   base.schedule = schedule;
-  live = { rosters, matchups, stats, proj, trending, snaps, oppSnaps, overrides, locks, tips, news, claims, moves, context, insights, learning, avail, usage, others, backend: !!backend.ok, at: new Date() };
+  live = { rosters, matchups, stats, proj, trending, snaps, oppSnaps, overrides, locks, tips, news, claims, moves, context, insights, learning, avail, usage, others, health, backend: !!backend.ok, at: new Date() };
   void tipDays;
 }
 
@@ -198,6 +199,9 @@ function render() {
   renderInsights(c);
   $("foot").textContent = `Plan's expected total from open slots: ${r1(plan.expectedTotal || 0)}. Recomputed every minute from Sleeper (scores, schedule, injuries). A game is lockable only if he was starting when it tipped; lineups are recorded by the scheduled job (every 15 min) and by this page while it's open. ${live.backend ? "Answers sync to your backend, and lineups are recorded every minute." : "Answers are saved in this browser only (backend not connected)."}`;
   $("dot").classList.toggle("stale", Date.now() - live.at > 5 * 60000);
+  // a job step that failed in the last run (moves, learning, alerts): say so instead of showing stale numbers silently
+  const bad = Object.values(live.health || {}).filter(h => !h.ok);
+  $("health").innerHTML = bad.length ? `<div class="banner" style="background:var(--riskbg);color:var(--risk)">⚠ Last update: ${bad.map(h => esc(h.step)).join(", ")} failed (${esc(new Date(bad[0].at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }))}). Those numbers may be out of date.</div>` : "";
 }
 
 // ---- trade assistant ------------------------------------------------------------------------------
