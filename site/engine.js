@@ -61,6 +61,10 @@ const STATUS_Q = { Probable: 0.9, "Day-To-Day": 0.75, GTD: 0.6, Questionable: 0.
   Out: 0, IR: 0, Suspended: 0, NA: 0, DNR: 0, COV: 0 };
 const OUT = new Set(["Out", "IR", "Suspended", "NA", "DNR", "COV"]);
 const SHAKY = new Set(["Questionable", "Doubtful", "GTD", "Day-To-Day"]);
+export const GAME_MINUTES = 150;
+// first / second game back from a 5+ game absence, share of normal FP (2021-24, n=278 returns; research/out1.txt)
+export const RETURN_RAMP = [0.86, 0.96];
+export const usesFaab = settings => settings?.waiver_type === 2;   // Sleeper: 2 = FAAB (budget is sent either way)     // tip to final: used for relief sequencing AND when a relief swap is safe
 export const B2B_FACTOR = 0.93, PRIOR_GAMES = 8;   // b2b/non-b2b play-rate ratio (availability_model.json)
 
 export class Book {
@@ -257,9 +261,12 @@ export class WeekPlan {
   tipped(p, d) { const t = this.tip(p, d); return t ? new Date(t) <= this.now : d < this.today; }
   upcoming(p) {
     const t = this.b.team(p), done = new Set(this.played(p).map(g => g.date)), all = Object.keys(this.tg[t] || {});
+    // coming back from 5+ straight missed games: his first two games back run below normal (RETURN_RAMP)
+    const last = this.b.done(p).at(-1)?.date, gone = last ? all.filter(d => d > last && d < this.today && this.final(p, d)).length : 0;
+    const ramp = gone >= 5 && !OUT.has(this.b.status(p)) ? RETURN_RAMP : [];
     return this.teamDays(t).filter(d => !done.has(d) && !this.tipped(p, d)).map((d, j) => {
       const b2b = all.includes(addDays(d, -1));
-      return { date: d, mu: this.b.gameMu(p, d), q: this.b.playProb(p, dayDiff(d, this.today), b2b, d, j), Q: this.qOf(p),
+      return { date: d, mu: ramp[j] ? Math.round(this.b.gameMu(p, d) * ramp[j] * 10) / 10 : this.b.gameMu(p, d), q: this.b.playProb(p, dayDiff(d, this.today), b2b, d, j), Q: this.qOf(p),
                opp: this.tg[t][d].opp, b2b, tip: this.tip(p, d) };
     });
   }
@@ -393,7 +400,7 @@ export class WeekPlan {
     // unassigned players who play today are inserted where they add the most expected value.
     //   value(draws..., tail) folds from the end: V = q*E[max(X, V)] + (1-q)*V
     const fixed = new Set([...locked, ...willLock, ...liveNow]);
-    const GAME_MS = 150 * 60000;
+    const GAME_MS = GAME_MINUTES * 60000;
     const todayGame = p => { const g = cont[p]?.u[0]; return g && g.date === this.today && g.tip ? g : null; };
     const afterToday = p => { const u = (cont[p]?.u || []).filter(g => g.date > this.today); return u.length ? contValues(Q, u)[0] : 0; };
     const fold = (draws, tail) => {
@@ -436,7 +443,7 @@ export class WeekPlan {
     }
     const planByIdx = Object.fromEntries(plans.map(pl => [pl.x.i, pl]));
     const tipOf = g => g?.tip || null;
-    const swapAfterOf = g => new Date(Date.parse(g.tip) + 135 * 60000).toISOString();
+    const swapAfterOf = g => new Date(Date.parse(g.tip) + GAME_MS).toISOString();
     const nm = p => (p && p !== "0" ? this.b.name(p) : "(empty)");
 
     // ---- 3) one plan per slot: the lock call + today's sequence, rendered everywhere from this ------
@@ -719,6 +726,12 @@ export function tradeIdeas(valuer, book, mine, others, limit = 15) {
     if (out.length >= limit) break;
   }
   return out;
+}
+
+// Waiver suggestions worth showing: a real edge (2+ pts this week or 1+ every week after), top 8, with the
+// expert consensus attached
+export function selectAdds(moves, consensus = {}, limit = 8) {
+  return moves.filter(m => m.weekGain >= 2 || m.rosGain >= 1).slice(0, limit).map(m => ({ ...m, experts: consensus[m.pid] || null }));
 }
 
 // For each free agent, the drop that gains the most: this week's expected locked total (the real plan: open

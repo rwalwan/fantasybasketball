@@ -1,4 +1,4 @@
-import { Book, WeekPlan, Valuer, eligFromSnaps, waiverMoves, weekDays, teamGames, fits, range80 } from "./engine.js";
+import { Book, WeekPlan, Valuer, eligFromSnaps, usesFaab, waiverMoves, weekDays, teamGames, fits, range80 } from "./engine.js";
 
 // ---- config -----------------------------------------------------------------------------------
 const LEAGUE = "1400915575915491328", USER = "1388708038000533504";
@@ -134,7 +134,7 @@ const LABEL = { lock: "Lock", keep: "Counts", pass: "Pass", start: "Start", lock
 function render() {
   const c = compute(), { plan, my, opp, mine } = c;
   const oppOwner = live.rosters.find(r => r.roster_id === opp?.roster_id)?.owner_id;
-  $("score").innerHTML = `<b>${r1((my.points || 0) / 10)}</b> – ${r1((opp?.points || 0) / 10)}<span>score now vs ${esc(base.users[oppOwner] || "opponent")} · FAAB $${base.league.settings.waiver_budget - (mine.settings?.waiver_budget_used || 0)}</span>`;
+  $("score").innerHTML = `<b>${r1((my.points || 0) / 10)}</b> – ${r1((opp?.points || 0) / 10)}<span>score now vs ${esc(base.users[oppOwner] || "opponent")} ${usesFaab(base.league.settings) ? ` · FAAB $${base.league.settings.waiver_budget - (mine.settings?.waiver_budget_used || 0)}` : ""}</span>`;
   $("metatext").textContent = `${base.league.name} · week ${base.week} · live ${live.at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
 
   // ONE source: plan.actions (top summary), plan.slots (cards + table). Phone alerts read the same lists.
@@ -151,7 +151,7 @@ function render() {
   $("now").innerHTML = mline + (nextBy ? `<b>Next deadline:</b> <span class="when">${until(nextBy)}</span> (${esc(tipTime(nextBy))})` : "<b>No deadlines pending.</b>") +
     `<ul>${acts.filter(a => a.kind !== "pass").map(a => { const [w, ...rest] = a.text.split(" "); return `<li><b>${esc(w)}</b> ${esc(rest.join(" "))} <span class="pos">· ${esc(when(a))}</span></li>`; }).join("")}` +
     (passes.length ? `<li><b>Pass</b> ${passes.map(a => esc(a.text.replace(/^Don't lock /, ""))).join(", ")} <span class="pos">· waiting is worth more</span></li>` : "") +
-    (topAdd ? `<li><b>Waiver</b> add ${esc(topAdd.name)}, drop ${esc(topAdd.dropName)} — bid $${topAdd.bid} <span class="pos">· Moves tab</span></li>` : "") + `</ul>`;
+    (topAdd ? `<li><b>Waiver</b> add ${esc(topAdd.name)}, drop ${esc(topAdd.dropName)}${usesFaab(base.league.settings) ? ` — bid $${topAdd.bid}` : ""} <span class="pos">· Moves tab</span></li>` : "") + `</ul>`;
 
   $("slots").innerHTML = plan.slots.map(s => {
     const nums = s.score != null && s.action !== "locked" && s.action !== "live" ? `<div class="nums">game <b>${r1(s.score)}</b>${s.bar != null ? ` · bar ${r1(s.bar)}` : ""}${s.deadline ? ` · decide by ${esc(tipTime(s.deadline.tip) || day(s.deadline.date))}` : ""}</div>` : "";
@@ -186,7 +186,7 @@ function render() {
 
   const w = c.waivers;
   $("waivers").innerHTML = `<tr><th>Player</th><th>Team</th><th>Pos</th><th>FP/G</th><th>Games left</th><th title="Expected locked points gained this week with the best drop">This week</th><th title="Lock-in points per week after this one">Per week after</th><th>Drop</th><th>Last 3</th><th>Adds 24h</th><th>Experts</th><th>Bid</th></tr>` +
-    w.list.map(x => `<tr><td>${esc(x.name)}${x.status ? `<span class="st">${esc(x.status)}</span>` : ""}</td><td>${esc(x.team)}</td><td class="pos">${esc(x.pos)}</td><td class="n">${r1(x.fpg)}</td><td class="n">${x.left}</td><td class="n">${x.drop ? (x.weekGain >= 0 ? "+" : "") + r1(x.weekGain) : "–"}</td><td class="n">${x.drop ? (x.rosGain >= 0 ? "+" : "") + r1(x.rosGain) : "–"}</td><td class="pos">${x.drop ? esc(x.drop) : "no gain"}</td><td class="n">${x.recent.map(r1).join(" / ") || "–"}</td><td class="n">${x.trend.toLocaleString()}</td><td class="n">${consCell(x.pid)}</td><td class="n">${x.bid ? "$" + x.bid : "–"}</td></tr>`).join("");
+    w.list.map(x => `<tr><td>${esc(x.name)}${x.status ? `<span class="st">${esc(x.status)}</span>` : ""}</td><td>${esc(x.team)}</td><td class="pos">${esc(x.pos)}</td><td class="n">${r1(x.fpg)}</td><td class="n">${x.left}</td><td class="n">${x.drop ? (x.weekGain >= 0 ? "+" : "") + r1(x.weekGain) : "–"}</td><td class="n">${x.drop ? (x.rosGain >= 0 ? "+" : "") + r1(x.rosGain) : "–"}</td><td class="pos">${x.drop ? esc(x.drop) : "no gain"}</td><td class="n">${x.recent.map(r1).join(" / ") || "–"}</td><td class="n">${x.trend.toLocaleString()}</td><td class="n">${consCell(x.pid)}</td><td class="n">${x.bid && usesFaab(base.league.settings) ? "$" + x.bid : "–"}</td></tr>`).join("");
 
   renderTrades(c);
   renderExperts();
@@ -235,7 +235,7 @@ function renderTrades(c) {
 function renderMoves() {
   const m = live.moves || { adds: [], trades: [] };
   $("movesmeta").textContent = m.generated ? `Suggestions updated ${new Date(m.generated).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}; refreshed every 15 minutes.` : "";
-  $("adds").innerHTML = (m.adds || []).length ? m.adds.map(x => `<div class="slot lock"><div class="top"><span><span class="nm">Add ${esc(x.name)}</span> <span class="pos">${esc(x.team)} ${esc(x.pos)}</span></span><span class="tag">bid $${x.bid}</span></div>` +
+  $("adds").innerHTML = (m.adds || []).length ? m.adds.map(x => `<div class="slot lock"><div class="top"><span><span class="nm">Add ${esc(x.name)}</span> <span class="pos">${esc(x.team)} ${esc(x.pos)}</span></span><span class="tag">${usesFaab(base.league.settings) ? `bid $${x.bid}` : "waiver claim"}</span></div>` +
       `<p>Drop <b>${esc(x.dropName)}</b>. ${x.weekGain != null ? `+${r1(x.weekGain)} locked pts this week, ${x.rosGain >= 0 ? "+" : ""}${r1(x.rosGain)}/week after` : `Team +${r1(x.gain)}`} · ${r1(x.fpg)} FP/G · ${x.left} games left this week${x.experts ? ` · ${Math.round(x.experts.bull_share * 100)}% of experts say add` : ""}${x.trend ? ` · ${x.trend.toLocaleString()} adds in 24h` : ""}</p>` +
       ((x.uncertain || []).length ? `<p class="bad">Value uncertain: ${x.uncertain.map(esc).join(", ")} ${x.uncertain.length > 1 ? "are" : "is"} out long-term with no reported return timeline.</p>` : "") + (x.reason ? `<p><i>${esc(x.reason)}</i></p>` : "") + `</div>`).join("")
     : `<div class="box"><div class="row"><span class="pos">No add/drop improves your team right now.</span></div></div>`;

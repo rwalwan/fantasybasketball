@@ -120,7 +120,10 @@ export default {
       try { await env.KV.put(name, JSON.stringify(cur)); } catch (e) { return json({ error: "storage limit reached", detail: e.message }, 503); }
       return json({ ok: true });
     }
-    if (url.pathname === "/run") return json(await snapshot(env));   // manual trigger / health check
+    if (url.pathname === "/run") {                                    // manual trigger / health check: key required
+      if (req.headers.get("x-key") !== env.WRITE_KEY) return json({ error: "bad key" }, 401);
+      return json(await snapshot(env));
+    }
     if (url.pathname === "/kick" && req.headers.get("x-key") === env.WRITE_KEY) return json(await kickWorkflow(env));
     return json({ service: "lock-desk", ok: true });
   },

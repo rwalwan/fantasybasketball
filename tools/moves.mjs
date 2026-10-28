@@ -3,7 +3,7 @@
 // the site, so the numbers match what you see there. Reasons are cached so each suggestion is only
 // written once (OpenRouter key stays server-side; never shipped to the browser).
 import fs from "node:fs";
-import { Book, WeekPlan, Valuer, eligFromSnaps, weekDays, tradeIdeas, waiverMoves, playerValue } from "../site/engine.js";
+import { Book, WeekPlan, Valuer, eligFromSnaps, selectAdds, weekDays, tradeIdeas, waiverMoves, playerValue } from "../site/engine.js";
 
 const LEAGUE = "1400915575915491328", USER = "1388708038000533504";
 const S1 = "https://api.sleeper.app/v1", S2 = "https://api.sleeper.com";
@@ -51,7 +51,7 @@ const protect = new Set([...(mine.reserve || []),
 const claims = (() => { try { return st("claims"); } catch { return { consensus: {} }; } })();
 const fa = wp.waivers(trending, 40).list;
 const valuer = new Valuer({ book, schedule, Q: st("quantiles"), rosterPositions: league.roster_positions, week, today, settings: league.settings, freeAgents: fa.map(x => x.pid) });
-const adds = waiverMoves(wp, valuer, mine, fa, protect, 12).filter(m => m.weekGain >= 2 || m.rosGain >= 1)   // a real edge: 2+ pts this week or 1+ pt every week after.slice(0, 8).map(m => ({ ...m, experts: claims.consensus?.[m.pid] || null }));
+const adds = selectAdds(waiverMoves(wp, valuer, mine, fa, protect, 12), claims.consensus || {});
 const trades = tradeIdeas(valuer, book, mine, rosters.filter(r => r.roster_id !== mine.roster_id), 10)
   .map(t => ({ ...t, partner: userName[t.owner_id] || `Team ${t.roster_id}`,
                giveNames: t.give.map(p => book.name(p)), getNames: t.get.map(p => book.name(p)) }));
