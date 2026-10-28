@@ -173,6 +173,7 @@ def collect(meta, my_players, fa_ids, today):
     srcs, report = sources.active_sources()
     takes = _load("expert_takes.json", [])
     news_budget, advice_budget = MAX_LLM_ITEMS // 2, MAX_LLM_ITEMS - MAX_LLM_ITEMS // 2
+    full_budget = 6                    # full-article reads for cut-off injury teasers, per run
     advice_items = []
     for src in srcs:
         try:
@@ -198,6 +199,15 @@ def collect(meta, my_players, fa_ids, today):
                     x = llm_json(NEWS_PROMPT, f"Title: {it['title']}\n\n{it['text']}", model=NEWS_MODEL)
                     news_budget -= 1
                     rec["llm_tried"] = True
+                    if full_budget > 0 and it.get("link") and needs_full_text(it["title"], it["text"], x):
+                        full_budget -= 1
+                        try:     # robots.txt-checked, polite fetch of the article itself, then re-read
+                            body = sources.article_text(it["link"])[:4000]
+                            y = llm_json(NEWS_PROMPT, f"Title: {it['title']}\n\n{body}", model=NEWS_MODEL)
+                            if y and (y.get("out_min_days") is not None or y.get("out_max_days") is not None):
+                                x, rec["full_text"] = y, True
+                        except Exception as e:
+                            print("full text failed:", it["link"], e)
                     if x:
                         rec.update({k: x.get(k) for k in ("player", "team", "kind", "status", "games_out_estimate",
                                                           "out_min_days", "out_max_days", "minutes_effect", "beneficiaries", "summary")})
@@ -304,6 +314,18 @@ def _window(n, team_of):
     if mn == 0 and not mx and n.get("status") != "available":
         return None
     return mn, mx
+
+
+TEASER_END = re.compile(r"(\[(…|\.\.\.)\]|…)\s*$")
+TIMELINE_WORDS = re.compile(r"(?i)\b(weeks?|months?|until|timeline|sidelined|indefinitely|season|surgery|re-?evaluated|miss(es|ing)? (time|games)|out for)\b")
+
+
+def needs_full_text(title, text, x):
+    """An injury item whose feed text is a cut-off teaser ('… […]') with timeline words in the title but no
+    timeline extracted: worth reading the full article (review finding 12: 'Sidelined Until December')."""
+    x = x or {}
+    return (x.get("kind") == "injury" and x.get("out_min_days") is None and x.get("out_max_days") is None
+            and bool(TEASER_END.search(text or "")) and bool(TIMELINE_WORDS.search(title or "")))
 
 
 def update_timelines(tl, items, team_of, window_h=48):

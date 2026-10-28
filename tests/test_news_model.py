@@ -7,5 +7,5 @@ from app import news
 assert news.NEWS_MODEL == "deepseek/deepseek-v4.1-flash-1017"
 assert news.ADVICE_MODEL == news.MODEL == "anthropic/claude-haiku-5.5"
 src = open(news.__file__).read()
-assert src.count("llm_json(NEWS_PROMPT") == src.count("model=NEWS_MODEL") == 2, "every news call uses NEWS_MODEL"
+assert src.count("llm_json(NEWS_PROMPT") == src.count("model=NEWS_MODEL") >= 2, "every news call uses NEWS_MODEL"
 print("ok: news model")
