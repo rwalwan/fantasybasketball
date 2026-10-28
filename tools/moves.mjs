@@ -123,3 +123,42 @@ void playerValue;
   fs.writeFileSync(stateFile("value_debug.json"), JSON.stringify({ at: new Date().toISOString(), discSum: valuer.discSum, weeks: valuer.weeks.length,
     size: valuer.size, teams, rostered, fa: faRows.slice(0, 40) }, null, 1));
 }
+
+// ---- win-chance calibration log (review validation plan 5) ---------------------------------------
+// Once per day, the win chance of EVERY matchup in the league (each team's plan from the same engine), graded
+// when the week is final: does "70%" win 70% of the time? data/state/winprob_log.json
+try {
+  const log = readState("winprob_log.json", { open: {}, graded: [] });
+  const Phi = z => 0.5 * (1 + Math.tanh(0.7978845608 * (z + 0.044715 * z ** 3)));
+  const byMatch = {};
+  for (const m of matchups) if (m.matchup_id != null) (byMatch[m.matchup_id] ||= []).push(m);
+  const daysLeft = weekDays(schedule, week).filter(d => d >= today).length;
+  for (const [mid, pair] of Object.entries(byMatch)) {
+    const key = `${week}|${today}|${mid}`;
+    if (pair.length !== 2 || log.open[key]) continue;
+    const out = pair.map(m => {
+      const r = rosters.find(x => x.roster_id === m.roster_id);
+      const isMe = r.roster_id === mine.roster_id;
+      return isMe ? plan.outlook : new WeekPlan({ Q: st("quantiles"), book, schedule, week, today, rosterPositions: league.roster_positions,
+        roster: r, matchup: m, rosters, tips: tipsRaw, locks: {}, elig: () => true }).build().outlook;
+    });
+    const p = Phi((out[0].mean - out[1].mean) / Math.sqrt(out[0].var + out[1].var + 1));
+    log.open[key] = { week, day: today, days_left: daysLeft, a: pair[0].roster_id, b: pair[1].roster_id, p_a: Math.round(p * 1000) / 1000 };
+  }
+  // grade finished weeks
+  for (const w of [...new Set(Object.values(log.open).map(x => x.week))].filter(w => w < week)) {
+    const fin = await get(`${S1}/league/${LEAGUE}/matchups/${w}`);
+    const pts = Object.fromEntries(fin.map(m => [m.roster_id, m.points]));
+    for (const [k, x] of Object.entries(log.open)) if (x.week === w) {
+      if (pts[x.a] != null && pts[x.b] != null && pts[x.a] !== pts[x.b]) log.graded.push({ ...x, a_won: pts[x.a] > pts[x.b] });
+      delete log.open[k];
+    }
+  }
+  const g = log.graded, bins = {};
+  for (const x of g) { const b = Math.min(4, Math.floor(Math.max(x.p_a, 1 - x.p_a) * 10) - 5); const fav = x.p_a >= 0.5 ? x.a_won : !x.a_won;
+    const k = `${50 + b * 10}-${60 + b * 10}%`; (bins[k] ||= { n: 0, pred: 0, won: 0 }); bins[k].n++; bins[k].pred += Math.max(x.p_a, 1 - x.p_a); bins[k].won += fav; }
+  log.calibration = { n: g.length, brier: g.length ? Math.round(1000 * g.reduce((a, x) => a + (x.p_a - (x.a_won ? 1 : 0)) ** 2, 0) / g.length) / 1000 : null,
+    favorite_by_bin: Object.fromEntries(Object.entries(bins).sort().map(([k, v]) => [k, { n: v.n, predicted: Math.round(100 * v.pred / v.n), won: Math.round(100 * v.won / v.n) }])) };
+  fs.writeFileSync(stateFile("winprob_log.json"), JSON.stringify(log));
+  fs.writeFileSync("site/static/winprob.json", JSON.stringify(log.calibration));
+} catch (e) { console.log("win-chance log failed:", e.message); }

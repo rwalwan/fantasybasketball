@@ -54,7 +54,7 @@ async function loadLive() {
   const { week, league } = base, season = league.season;
   const days = weekDays(base.schedule, week), today = etToday();
   const tipDays = days.filter(d => d >= today || d === days.find(x => x >= today));
-  const [schedule, rosters, matchups, stats, proj, trending, snapsGh, overridesGh, locksGh, oppSnaps, backend, tips, news, claims, moves, context, insights, learning, avail, usage, others, health] = await Promise.all([
+  const [schedule, rosters, matchups, stats, proj, trending, snapsGh, overridesGh, locksGh, oppSnaps, backend, tips, news, claims, moves, context, insights, learning, avail, usage, others, health, winprob] = await Promise.all([
     get(`${S2}/schedule/nba/regular/${season}`).catch(() => base.schedule),
     get(`${S1}/league/${LEAGUE}/rosters`), get(`${S1}/league/${LEAGUE}/matchups/${week}`),
     get(`${S2}/stats/nba/${season}/${week}?season_type=regular`), get(`${S2}/projections/nba/${season}/${week}?season_type=regular`),
@@ -72,13 +72,14 @@ async function loadLive() {
     get(`static/availability.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => null),
     get(`static/usage.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({})),
     get(`static/league_study.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => null),
-    get(`static/health.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({}))]);
+    get(`static/health.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({})),
+    get(`static/winprob.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => null)]);
   // backend (minute-level lineup records, shared answers) wins over the 15-minute GitHub state branch
   const snaps = { ...snapsGh, ...(backend.lineups || {}) };
   const overrides = { ...overridesGh, ...(backend.elig || {}) };
   const locks = { ...locksGh, ...(backend.locks || {}) };
   base.schedule = schedule;
-  live = { rosters, matchups, stats, proj, trending, snaps, oppSnaps, overrides, locks, tips, news, claims, moves, context, insights, learning, avail, usage, others, health, backend: !!backend.ok, at: new Date() };
+  live = { rosters, matchups, stats, proj, trending, snaps, oppSnaps, overrides, locks, tips, news, claims, moves, context, insights, learning, avail, usage, others, health, winprob, backend: !!backend.ok, at: new Date() };
   void tipDays;
 }
 
@@ -304,6 +305,7 @@ function renderInsights(c) {
   const ol = c.plan.outlook;
   $("outlook").innerHTML = ol?.opp ? `<div class="row"><span>Projected final — you: <b>${r1(ol.mean)}</b> (80% range ${Math.round(ol.mean - 1.28 * ol.sd)}–${Math.round(ol.mean + 1.28 * ol.sd)}) · opponent: <b>${r1(ol.opp.mean)}</b> (${Math.round(ol.opp.mean - 1.28 * Math.sqrt(ol.opp.var))}–${Math.round(ol.opp.mean + 1.28 * Math.sqrt(ol.opp.var))})</span><span><b>${ol.winProb < 0.01 ? "<1%" : ol.winProb > 0.99 ? ">99%" : Math.round(ol.winProb * 100) + "%"}</b> win chance</span></div>` +
     `<div class="row"><span class="pos">Projected final = locked games + the rest of live games' projections + the expected value of each open slot (from the lock plan). Win chance = how often your final beats theirs given both ranges.</span></div>` +
+    (live.winprob?.n ? `<div class="row"><span class="pos">Win-chance check, every matchup in the league, graded at week's end: ${live.winprob.n} predictions, Brier ${live.winprob.brier} (0.25 = coin flip). ${Object.entries(live.winprob.favorite_by_bin).map(([k, v]) => `${k}: favorite won ${v.won}% (n=${v.n})`).join(" · ")}</span></div>` : `<div class="row"><span class="pos">Win-chance check: logging every matchup daily; graded after this week ends.</span></div>`) +
     `<div class="row"><span class="pos">Lock calls compare your win chance if you lock vs wait. When they differ by 2+ points, the matchup decides: protect a lead with safe locks, chase upside when behind.</span></div>` : `<div class="row"><span class="pos">No matchup found.</span></div>`;
   $("why").innerHTML = (ins.notes || []).map(n => `<div class="row"><span><b>${esc(n.player)}</b> <span class="pos">${esc(n.date)}</span> — ${esc(n.text)}</span><span class="chip ${n.tag === "signal" ? "up" : ""}">${esc(n.tag)}</span></div>`).join("") ||
     `<div class="row"><span class="pos">Notes appear after games finish, for any game that lands well above or below its projection.</span></div>`;
