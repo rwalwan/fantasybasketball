@@ -19,6 +19,11 @@ def main():
     finals = list(range(1, week))
     found = leagues.discover(LEAGUE_ID, season, today)
     con = leagues.connect()
+    if not con.execute("SELECT 1 FROM sqlite_master WHERE name='kv'").fetchone():
+        con.execute("CREATE TABLE kv(k TEXT PRIMARY KEY, v TEXT)")
+    if con.execute("SELECT v FROM kv WHERE k='verify_v'").fetchone() != ("2",):
+        con.execute("UPDATE league SET verified=NULL, checked=NULL")      # v1 compared x10 points to FP
+        con.execute("INSERT OR REPLACE INTO kv VALUES('verify_v','2')")
     n = leagues.snapshot(con, found, week, today, finals)
     stats = {w: sleeper.week_stats(season, w, final=True) for w in finals}
     for w in finals:
