@@ -205,13 +205,8 @@ class Context:
         f = _cap(1 + ((r - 1) * n + (base - 1) * 30) / (n + 30 + 40))
         if abs(f - 1) >= 0.02:
             parts.append(("opp", f, f"{opp} allows {abs(f - 1) * 100:.0f}% {'more' if f > 1 else 'fewer'} than usual to {grp}s"))
-        # 2) pace
-        tp, tn = self.pace.get(team, (self.league_pace, 0))
-        op, on = self.pace.get(opp, (self.league_pace, 0))
-        pace = math.sqrt(_shrink(tp / self.league_pace, tn, 8) * _shrink(op / self.league_pace, on, 8))
-        f2 = _cap(1 + (pace - 1) * 0.8, 0.94, 1.06)
-        if abs(f2 - 1) >= 0.015:
-            parts.append(("pace", f2, f"{'fast' if f2 > 1 else 'slow'} game environment ({(f2 - 1) * 100:+.0f}%)"))
+        # 2) no separate pace factor: the opponent ratio above is raw FP vs baseline, so it already includes the
+        #    opponent's pace, and his own team's pace is in his baseline (review finding 7: counted twice)
         # 3) minutes trend: last 3 vs expected
         mine = self.by_player.get(pid, [])
         if len(mine) >= 3:
@@ -246,6 +241,15 @@ class Context:
             total *= f
         total = _cap(total, 0.82, 1.2)
         return round(total, 3), [{"k": k, "f": round(f, 3), "why": w} for k, f, w in parts]
+
+
+def normalize_factors(ctx):
+    """Rescale {key: factor} so the league-wide mean is 1: the teammates bump only raises and the rest bump only
+    rewards, which left the average factor at ~1.056 (a systematic over-projection)."""
+    if not ctx:
+        return ctx
+    m = sum(ctx.values()) / len(ctx)
+    return {k: v / m for k, v in ctx.items()}
 
 
 def last_season_prior(fetch_week, prev_season, scoring, meta, baseline_prev):

@@ -279,8 +279,12 @@ def build_context(con, season, meta, book, sched, week, today, prior_ctx, prior_
         if (meta.get(pid) or {}).get("injury_status") in ("Out", "IR"):
             continue
         f, parts = ctx.factors(pid, team, info["opp"], rest, mates)
-        book.ctx[(pid, date)] = f
         out[f"{pid}|{date}"] = {"f": f, "parts": parts, "opp": info["opp"], "rest": rest}
+    norm = memory.normalize_factors({k: v["f"] for k, v in out.items()})
+    for k, v in out.items():
+        v["f"] = round(norm[k], 3)
+        pid, date = k.split("|")
+        book.ctx[(pid, date)] = v["f"]
     return out
 
 
