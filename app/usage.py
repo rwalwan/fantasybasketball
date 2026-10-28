@@ -7,7 +7,8 @@ For each player and each of his team's games in the next few weeks:
   op_rim              expected blocks/game missing from the opponent's rotation (lost rim protection).
 Each feature is compared with what's typical in his baseline: his own games this season (which teammates were out,
 from the memory store) blended with the league average (8 pseudo-games, like the baseline itself).
-  factor = 1 + sum(coef x (feature - reference)), coefficients by role (starter 28+ min, bench), capped 0.8-1.4.
+  factor = 1 + sum(coef x (feature - reference)), coefficients by role (starter 28+ min, bench), capped at 0.8 and
+  +30% (starters) / +60% (bench), the range where the fit stays calibrated.
 Tested and dropped: the absent opponent at his position (likely primary defender), by minutes or steals+blocks -
 no measurable effect out of sample. Validation on this season's graded games: model MAE 10.15 -> 9.95; RotoWire
 already prices teammate injuries (applying this on top of it: 9.007 -> 9.035), so it enters the blend as its own
@@ -22,6 +23,10 @@ from .memory import minutes
 
 U = json.load(open(os.path.join(os.path.dirname(__file__), "data", "usage_model.json")))
 PSEUDO = 8                        # same shrinkage as the baseline (PRIOR_GAMES)
+# Caps from the fit's calibration table (2021-24): predictions track actual lifts up to +57% for bench players
+# (n = 120 in that bin, actual +62%); starters' predictions never exceed ~+30% (one case beyond).
+CAP = {"starter": 1.3, "bench": 1.6}
+role_of = lambda x: "starter" if x["mpg"] >= 28 else "bench"
 
 
 def profiles(season_rows, prev_rows):
@@ -103,7 +108,7 @@ def build(con, season, meta, prof, team_dates, dates_ahead, avail, pids, names=N
             opp = team_dates[t][d].get("opp")
             rim = sum(miss(m, d, j) * prof[m]["bpg"] for m in rotation.get(opp, []))
             f = 1 + g["tm_same"] * (same - ref_same) + g["tm_other"] * (other - ref_other) + g["op_rim"] * (rim - lm["op_rim"])
-            f = max(0.8, min(1.4, f))
+            f = max(0.8, min(CAP[role_of(x)], f))
             reasons = [f"{nm} likely out" for _, nm in sorted(why, reverse=True)[:3]]
             if names and g["op_rim"] * (rim - lm["op_rim"]) >= 0.01:
                 reasons.append(f"{opp} missing rim protection")
@@ -118,5 +123,5 @@ def build(con, season, meta, prof, team_dates, dates_ahead, avail, pids, names=N
         if keys:
             mean = sum(out[k][0] for k in keys) / len(keys)
             for k in keys:
-                out[k] = (round(max(0.8, min(1.4, out[k][0] / mean)), 3), out[k][1])
+                out[k] = (round(max(0.8, min(CAP[r], out[k][0] / mean)), 3), out[k][1])
     return out
