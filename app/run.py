@@ -137,9 +137,10 @@ def main():
         prof = usagemod.profiles(season_rows, prev_rows if "prev_rows" in dir() else [])
         upids = {p for p, m in meta.items() if m.get("team") and (p in book.prior or book.games.get(p) or any(k[0] == p for k in book.proj))}
         um = usagemod.build(con, season, meta, prof, team_game_dates(sched), horizon, av if "av" in dir() else {}, upids, book.name)
-        book.usage = {k: v[0] for k, v in um.items()}
         ug = usagemod.log_and_grade(um, book, book.is_final, today, os.path.join(ROOT, "data", "state"))
-        print("usage grades by horizon:", json.dumps(ug))
+        um, off = usagemod.gate(um, ug, today)
+        print("usage grades by horizon:", json.dumps(ug), "| off for:", sorted(off) or "none")
+        book.usage = {k: v[0] for k, v in um.items()}
         usage_out = {}
         for (p, d), (f, why) in um.items():
             if abs(f - 1) >= 0.01:

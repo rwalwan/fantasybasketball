@@ -31,4 +31,10 @@ usage.log_and_grade({("X", "2026-11-12"): (1.15, [])}, B(), lambda d, t: False, 
 g = usage.log_and_grade({}, B(), lambda d, t: True, "2026-11-13", sd)
 print("horizon grades", g)
 assert g["8-28 days"]["n"] == 1 and g["8-28 days"]["actual_lift"] == 0.2 and g["8-28 days"]["mae_with"] == 1.0
+# a bucket whose graded games (100+) show the factor hurts is switched off; others keep it
+grades = {"8-28 days": {"n": 150, "mae_with": 9.9, "mae_without": 9.5}, "next 1 day": {"n": 150, "mae_with": 9.0, "mae_without": 9.4}}
+um = {("X", "2026-11-03"): (1.2, ["a"]), ("X", "2026-11-20"): (1.2, ["b"])}
+g2, off = usage.gate(um, grades, "2026-11-02")
+assert off == {"8-28 days"} and g2[("X", "2026-11-20")][0] == 1.0 and g2[("X", "2026-11-03")][0] == 1.2
+assert usage.gate(um, {"8-28 days": {"n": 40, "mae_with": 99, "mae_without": 1}}, "2026-11-02")[1] == set(), "needs 100 games"
 print("ok: review 2 finding 4")

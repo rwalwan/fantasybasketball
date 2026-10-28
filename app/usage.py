@@ -178,3 +178,21 @@ def log_and_grade(um, book, is_final, today, state_dir):
     os.makedirs(state_dir, exist_ok=True)
     json.dump(log, open(path, "w"))
     return grades
+
+
+GATE_N = 100
+
+
+def gate(um, grades, today):
+    """Turn the factor off (1.0) for a horizon bucket whose graded games (100+) show it makes projections worse
+    than the plain baseline (review 2: use it in four-week values only where it beats the plain model)."""
+    off = {name for name, g in (grades or {}).items() if g["n"] >= GATE_N and g["mae_with"] > g["mae_without"]}
+    if not off:
+        return um, off
+    t0 = dt.date.fromisoformat(today)
+    out = {}
+    for (p, d), (f, why) in um.items():
+        h = (dt.date.fromisoformat(d) - t0).days
+        b = next((name for name, lo, hi in BUCKETS if lo <= h <= hi), None)
+        out[(p, d)] = (1.0, []) if b in off else (f, why)
+    return out, off
