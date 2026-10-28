@@ -44,7 +44,7 @@ def hazard(k):
     """P(plays the next game | has missed k straight games), k >= 1."""
     if k <= 8:
         return M["by_k"][k - 1]
-    return M["k9_12"] if k <= 12 else M["k13_20"]
+    return M["k9_12"] if k <= 12 else M["k13_20"] if k <= 20 else M["k21p"]
 
 
 def _load(name, dflt):
@@ -128,7 +128,11 @@ def build(book, meta, team_dates, today, is_final, pids):
             basis = (f"{st}: next game {round(M['designation'].get(DESIG.get(st, ''), 0) * 100) if st in DESIG else 0}% by designation, "
                      f"then the historical return rate after {missed} missed game(s)") if st in DESIG or st in OUTISH else None
         if q:
-            out[pid] = {"status": st, "missed": missed, "timeline": tl, "basis": basis, "q": q,
+            # long absence, no reported timeline: the return curve is a population average, so say so on cards
+            uncertain = st in OUTISH and not tl and missed >= 13
+            if uncertain:
+                basis = (basis or "") + "; long absence with no reported timeline: value uncertain"
+            out[pid] = {"status": st, "missed": missed, "timeline": tl, "basis": basis, "q": q, "uncertain": uncertain,
                         "injury": {k: m.get(k) for k in ("injury_body_part", "injury_notes", "injury_start_date") if m.get(k)}}
     return out
 

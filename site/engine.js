@@ -147,7 +147,7 @@ export class Book {
 }
 
 // status-only version of app/availability.py (missed-so-far unknown -> 0); copy of app/data/availability_model.json
-const DEFAULT_AVAIL = {"by_k": [0.544, 0.323, 0.273, 0.253, 0.228, 0.188, 0.156, 0.19], "k9_12": 0.157, "k13_20": 0.139, "healthy": 0.944, "designation": {"Probable": 0.866, "Questionable": 0.483, "Doubtful": 0.042, "Out": 0.0}, "healthy_curve": {"ahead": [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 30], "q": [0.944, 0.923, 0.907, 0.897, 0.888, 0.882, 0.874, 0.867, 0.862, 0.858, 0.85, 0.848]}};
+const DEFAULT_AVAIL = {"by_k": [0.496, 0.286, 0.234, 0.219, 0.182, 0.157, 0.124, 0.146], "k9_12": 0.103, "k13_20": 0.084, "healthy": 0.944, "designation": {"Probable": 0.866, "Questionable": 0.483, "Doubtful": 0.042, "Out": 0.0}, "healthy_curve": {"ahead": [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 30], "q": [0.944, 0.923, 0.907, 0.897, 0.888, 0.882, 0.874, 0.867, 0.862, 0.858, 0.85, 0.848]}, "k21p": 0.078};
 const DESIG = { Probable: "Probable", Questionable: "Questionable", GTD: "Questionable", DTD: "Questionable", "Day-To-Day": "Questionable", Doubtful: "Doubtful" };
 // P(an undesignated player plays a non-b2b game n games ahead): 0.944 next game, ~0.85 long run (history)
 export function healthyAt(M, n) {
@@ -157,7 +157,7 @@ export function healthyAt(M, n) {
     return c.q[i - 1] + (c.q[i] - c.q[i - 1]) * (n - c.ahead[i - 1]) / (c.ahead[i] - c.ahead[i - 1]);
   return c.q.at(-1);
 }
-function hazardK(M, k) { return k <= 8 ? M.by_k[k - 1] : k <= 12 ? M.k9_12 : M.k13_20; }
+function hazardK(M, k) { return k <= 8 ? M.by_k[k - 1] : k <= 12 ? M.k9_12 : k <= 20 ? M.k13_20 : (M.k21p ?? M.k13_20); }
 function statusChain(M, st, j) {
   let S = 1, k = 0;
   for (let i = 0; i <= j; i++) {

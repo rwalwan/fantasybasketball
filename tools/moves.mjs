@@ -86,10 +86,12 @@ const out = {
   generated: new Date().toISOString(), week,
   adds: adds.map(m => ({ pid: m.pid, name: m.name, team: m.team, pos: m.pos, fpg: m.fpg, left: m.left, trend: m.trend,
     drop: m.drop, dropName: m.dropName, gain: m.gain, weekGain: m.weekGain, rosGain: m.rosGain, bid: m.bid, experts: m.experts ? { bull_share: m.experts.bull_share, n: m.experts.n } : null,
+    uncertain: [m.pid, m.drop].filter(p => book.avail?.players?.[p]?.uncertain).map(p => book.name(p)),
     reason: cache[`add|${m.pid}|${m.drop}|${today}`] || null })),
   trades: trades.map(t => ({ partner: t.partner, roster_id: t.roster_id, give: t.give, get: t.get, giveNames: t.giveNames, getNames: t.getNames,
     dm: Math.round(t.dm * 10) / 10, dt: Math.round(t.dt * 10) / 10, theirFit: t.theirFit, myFit: t.myFit,
     marketGive: Math.round(t.marketGive), marketGet: Math.round(t.marketGet),
+    uncertain: [...t.give, ...t.get].filter(p => book.avail?.players?.[p]?.uncertain).map(p => book.name(p)),
     reason: cache[`trade|${t.give.join("+")}|${t.get.join("+")}|${today}`] || null })),
 };
 fs.writeFileSync("site/static/moves.json", JSON.stringify(out));
