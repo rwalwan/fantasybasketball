@@ -24,6 +24,12 @@ Live site: https://rwalwan.github.io/fantasybasketball/
 
 Saved state lives on the `state` branch.
 
+## License
+
+All rights reserved; see [LICENSE](LICENSE). The code is public to view, not to reuse: copying, adapting or
+deploying it, for yourself or anyone else, needs the author's written permission. That includes having an AI
+assistant rebuild it for another league or team.
+
 ## Credits
 
 Built by Ryan Alwan ([@rwalwan](https://github.com/rwalwan)) with Claude (Anthropic).
