@@ -8,7 +8,8 @@ Data, not guesses (app/data/availability_model.json):
   * A reported timeline beats both: if the latest injury news says "out 2-4 weeks", he is out until the early
     end, his return is spread evenly over the games in the window, and he is back after it. "At least a week"
     (no upper end) switches to the empirical hazard once the minimum has passed.
-  * Once back: the normal 92% healthy play rate (rest days, minor knocks), b2b handled by the engine.
+  * Once back: the historical healthy play rate by games ahead (94.4% next game, ~85% long run; rest days,
+    new injuries), b2b handled by the engine.
 
 Every prediction for a next game is logged and graded when the game is final (data/state/availability_log.json),
 so the designation and hazard numbers can be checked against this league's own players as the season runs.
@@ -25,6 +26,18 @@ OUTISH = {"Out", "IR", "Suspended", "PUP", "NA"}
 # Sleeper's informal labels map to the closest official designation we have data for
 DESIG = {"Probable": "Probable", "Questionable": "Questionable", "GTD": "Questionable", "DTD": "Questionable",
          "Day-To-Day": "Questionable", "Doubtful": "Doubtful"}
+
+
+def healthy_at(n):
+    """P(an undesignated player plays a non-b2b game n games ahead) from the historical curve."""
+    c = M["healthy_curve"]
+    if n <= c["ahead"][0]:
+        return c["q"][0]
+    for i in range(1, len(c["ahead"])):
+        if n <= c["ahead"][i]:
+            a0, a1, q0, q1 = c["ahead"][i - 1], c["ahead"][i], c["q"][i - 1], c["q"][i]
+            return q0 + (q1 - q0) * (n - a0) / (a1 - a0)
+    return c["q"][-1]
 
 
 def hazard(k):
@@ -80,7 +93,7 @@ def build(book, meta, team_dates, today, is_final, pids):
             e1 = (t0 + dt.timedelta(days=int(tl["out_max_days"]))).isoformat() if tl.get("out_max_days") is not None else None
             window = [d for d in upcoming if e0 <= d <= e1] if e1 else []
             S, k = 1.0, missed
-            for d in upcoming:
+            for j, d in enumerate(upcoming):
                 if d < e0:
                     back = 0.0
                     k += 1
@@ -94,7 +107,7 @@ def build(book, meta, team_dates, today, is_final, pids):
                     S *= 1 - r
                     back = 1 - S
                     k += 1
-                q[d] = round(back * M["healthy"], 3)
+                q[d] = round(back * healthy_at(j + 1), 3)
             basis = f"reported timeline ({tl.get('source')}, {tl['at'][:10]}): {tl.get('summary') or ''}".strip()
         else:
             S, k = 1.0, missed
@@ -110,7 +123,7 @@ def build(book, meta, team_dates, today, is_final, pids):
                 else:
                     r = hazard(max(1, k))
                 S *= 1 - r                                     # S = still out
-                q[d] = round((1 - S) * M["healthy"], 3)
+                q[d] = round((1 - S) * healthy_at(j + 1), 3)
                 k += 1
             basis = (f"{st}: next game {round(M['designation'].get(DESIG.get(st, ''), 0) * 100) if st in DESIG else 0}% by designation, "
                      f"then the historical return rate after {missed} missed game(s)") if st in DESIG or st in OUTISH else None
@@ -120,9 +133,28 @@ def build(book, meta, team_dates, today, is_final, pids):
     return out
 
 
-def log_and_grade(avail, book, is_final, today):
+def healthy_next(meta, team_dates, today, is_final, pids, skip):
+    """{pid: (date, q)} next-game prediction for undesignated players, so the healthy curve is graded too."""
+    out = {}
+    for pid in pids:
+        m = meta.get(pid) or {}
+        team = m.get("team")
+        if pid in skip or not team or m.get("injury_status"):
+            continue
+        dates = sorted(team_dates.get(team, {}))
+        up = [d for d in dates if d >= today and not is_final(d, team)]
+        if not up:
+            continue
+        prev = (dt.date.fromisoformat(up[0]) - dt.timedelta(days=1)).isoformat()
+        out[pid] = (up[0], round(healthy_at(1) * (M["b2b_factor"] if prev in dates else 1), 3))
+    return out
+
+
+def log_and_grade(avail, book, is_final, today, healthy=None):
     """Log each player's next-game probability; grade logged games once final. Returns calibration by bucket."""
     log = _load("availability_log.json", {"open": {}, "graded": []})
+    for pid, (d, qv) in (healthy or {}).items():
+        log["open"].setdefault(f"{d}|{pid}", {"q": qv, "status": None, "missed": 0, "timeline": False})
     for pid, a in avail.items():
         nxt = min(a["q"]) if a["q"] else None
         if nxt:

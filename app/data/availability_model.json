@@ -20,6 +20,38 @@
   "Out": 0.0,
   "_source": "isheplayingtonight.com: first official-report designation vs played, 2,007 player-games, Jan-Oct 2026"
  },
- "healthy": 0.92,
- "b2b_factor": 0.86
+ "healthy": 0.944,
+ "b2b_factor": 0.93,
+ "healthy_curve": {
+  "ahead": [
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   8,
+   10,
+   12,
+   15,
+   20,
+   30
+  ],
+  "q": [
+   0.944,
+   0.923,
+   0.907,
+   0.897,
+   0.888,
+   0.882,
+   0.874,
+   0.867,
+   0.862,
+   0.858,
+   0.85,
+   0.848
+  ],
+  "_source": "2021-24 box-score panel, top-100 players: P(plays a non-b2b team game N games after a game he played); n=16,500 at N=1"
+ },
+ "_b2b_source": "same panel: b2b/non-b2b play-rate ratio 0.931-0.943 at every horizon (research/out2.txt: miss 13.9% -> 19.8%, 0.802/0.861)"
 }

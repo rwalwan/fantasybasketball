@@ -6,7 +6,7 @@ from .scoring import fantasy_points
 # Probability a player suits up, by Sleeper injury_status (applies to his next game).
 STATUS_Q = {None: 0.92, "": 0.92, "Probable": 0.9, "Day-To-Day": 0.75, "GTD": 0.6, "Questionable": 0.55,
             "Doubtful": 0.2, "Out": 0.0, "IR": 0.0, "Suspended": 0.0, "NA": 0.0, "DNR": 0.0, "COV": 0.0}
-B2B_FACTOR = 0.86       # second night of a back-to-back: miss rate 14% -> 20% (research, 5 seasons)
+B2B_FACTOR = 0.93       # b2b/non-b2b play-rate ratio: 0.802/0.861 (research, miss rate 14% -> 20%)
 PRIOR_GAMES = 8         # shrink this season's average toward last season's with this many pseudo-games
 RETURN_RAMP = (0.83, 0.90)  # first / second game back from a 5+ game absence, share of normal production
 

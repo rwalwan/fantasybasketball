@@ -61,7 +61,7 @@ const STATUS_Q = { Probable: 0.9, "Day-To-Day": 0.75, GTD: 0.6, Questionable: 0.
   Out: 0, IR: 0, Suspended: 0, NA: 0, DNR: 0, COV: 0 };
 const OUT = new Set(["Out", "IR", "Suspended", "NA", "DNR", "COV"]);
 const SHAKY = new Set(["Questionable", "Doubtful", "GTD", "Day-To-Day"]);
-export const B2B_FACTOR = 0.86, PRIOR_GAMES = 8;
+export const B2B_FACTOR = 0.93, PRIOR_GAMES = 8;   // b2b/non-b2b play-rate ratio (availability_model.json)
 
 export class Book {
   constructor({ scoring, players, priors, gamelog, weights, ctx, avail }) {
@@ -138,7 +138,7 @@ export class Book {
     const st = this.status(p), a = this.avail?.players?.[p], M = this.avail?.model || DEFAULT_AVAIL;
     let q;
     if (a && a.status === st && date && a.q[date] != null) q = a.q[date];
-    else if (!st || !M) q = !st ? 0.92 : (STATUS_Q[st] ?? 0.85);
+    else if (!st) q = healthyAt(M, (j ?? 0) + 1);
     else q = statusChain(M, st, j);
     if (b2b) q *= B2B_FACTOR;
     return Math.round(q * 100) / 100;
@@ -146,8 +146,16 @@ export class Book {
 }
 
 // status-only version of app/availability.py (missed-so-far unknown -> 0); copy of app/data/availability_model.json
-const DEFAULT_AVAIL = {"by_k": [0.544, 0.323, 0.273, 0.253, 0.228, 0.188, 0.156, 0.19], "k9_12": 0.157, "k13_20": 0.139, "healthy": 0.92, "designation": {"Probable": 0.866, "Questionable": 0.483, "Doubtful": 0.042, "Out": 0.0}};
+const DEFAULT_AVAIL = {"by_k": [0.544, 0.323, 0.273, 0.253, 0.228, 0.188, 0.156, 0.19], "k9_12": 0.157, "k13_20": 0.139, "healthy": 0.944, "designation": {"Probable": 0.866, "Questionable": 0.483, "Doubtful": 0.042, "Out": 0.0}, "healthy_curve": {"ahead": [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 30], "q": [0.944, 0.923, 0.907, 0.897, 0.888, 0.882, 0.874, 0.867, 0.862, 0.858, 0.85, 0.848]}};
 const DESIG = { Probable: "Probable", Questionable: "Questionable", GTD: "Questionable", DTD: "Questionable", "Day-To-Day": "Questionable", Doubtful: "Doubtful" };
+// P(an undesignated player plays a non-b2b game n games ahead): 0.944 next game, ~0.85 long run (history)
+export function healthyAt(M, n) {
+  const c = M.healthy_curve; if (!c) return M.healthy ?? 0.92;
+  if (n <= c.ahead[0]) return c.q[0];
+  for (let i = 1; i < c.ahead.length; i++) if (n <= c.ahead[i])
+    return c.q[i - 1] + (c.q[i] - c.q[i - 1]) * (n - c.ahead[i - 1]) / (c.ahead[i] - c.ahead[i - 1]);
+  return c.q.at(-1);
+}
 function hazardK(M, k) { return k <= 8 ? M.by_k[k - 1] : k <= 12 ? M.k9_12 : M.k13_20; }
 function statusChain(M, st, j) {
   let S = 1, k = 0;
@@ -158,7 +166,7 @@ function statusChain(M, st, j) {
     if (i === 0 && DESIG[st] && j === 0) return r;
     S *= 1 - r; k++;
   }
-  return (1 - S) * M.healthy;
+  return (1 - S) * healthyAt(M, j + 1);
 }
 
 // ---------- schedule ----------

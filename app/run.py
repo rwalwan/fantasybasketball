@@ -147,7 +147,8 @@ def main():
     try:
         watch_av = {p for r in rosters for p in (r.get("players") or [])} | {w["pid"] for w in waivers}
         av = availability.build(book, meta, team_game_dates(sched), today, book.is_final, watch_av)
-        cal = availability.log_and_grade(av, book, book.is_final, today)
+        hn = availability.healthy_next(meta, team_game_dates(sched), today, book.is_final, watch_av, set(av))
+        cal = availability.log_and_grade(av, book, book.is_final, today, hn)
         os.makedirs(os.path.join(ROOT, "site", "static"), exist_ok=True)
         with open(os.path.join(ROOT, "site", "static", "availability.json"), "w") as f:
             json.dump({"model": availability.M, "players": av, "calibration": cal}, f, separators=(",", ":"))
