@@ -20,7 +20,15 @@ const day = d => new Date(d + "T12:00:00").toLocaleDateString("en-US", { weekday
 const tipTime = t => t ? new Date(t).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" }) : "";
 const until = t => { const m = Math.round((new Date(t) - Date.now()) / 60000); return m <= 0 ? "now" : m < 60 ? `${m} min` : `${Math.floor(m / 60)}h ${m % 60}m`; };
 const etToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
-const get = async (url, opt = {}) => { const r = await fetch(url, { cache: "no-store", ...opt }); if (!r.ok) throw new Error(`${r.status} ${url}`); return r.json(); };
+// offline: the home-screen app's service worker serves the last saved copy, marked x-lockdesk-cached -> banner
+let offlineSince = null;
+const get = async (url, opt = {}) => {
+  const r = await fetch(url, { cache: "no-store", ...opt });
+  if (!r.ok) throw new Error(`${r.status} ${url}`);
+  if (r.headers.get("x-lockdesk-cached")) offlineSince = Math.min(offlineSince ?? Infinity, +r.headers.get("x-lockdesk-saved") || 0);
+  return r.json();
+};
+const offlineBanner = since => `<div class="banner" style="background:var(--riskbg);color:var(--risk)">⚠ Offline: showing saved data${since ? ` from ${esc(new Date(since).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" }))}` : ""}. Scores, locks and injuries may have changed.</div>`;
 const soft = url => get(url).catch(() => ({}));
 // ESPN rejects CORS preflights, and cache:"no-store" makes Chrome add headers that trigger one.
 // So scoreboard requests use a plain GET with a cache-busting query param instead.
@@ -202,7 +210,7 @@ function render() {
   $("dot").classList.toggle("stale", Date.now() - live.at > 5 * 60000);
   // a job step that failed in the last run (moves, learning, alerts): say so instead of showing stale numbers silently
   const bad = Object.values(live.health || {}).filter(h => !h.ok);
-  $("health").innerHTML = bad.length ? `<div class="banner" style="background:var(--riskbg);color:var(--risk)">⚠ Last update: ${bad.map(h => esc(h.step)).join(", ")} failed (${esc(new Date(bad[0].at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }))}). Those numbers may be out of date.</div>` : "";
+  $("health").innerHTML = (offlineSince != null ? offlineBanner(offlineSince) : "") + (bad.length ? `<div class="banner" style="background:var(--riskbg);color:var(--risk)">⚠ Last update: ${bad.map(h => esc(h.step)).join(", ")} failed (${esc(new Date(bad[0].at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }))}). Those numbers may be out of date.</div>` : "");
 }
 
 // ---- trade assistant ------------------------------------------------------------------------------
@@ -368,8 +376,12 @@ document.addEventListener("click", e => {
 });
 
 async function tick(full) {
+  offlineSince = null;
   try { if (full || !base) await loadBase(); await loadLive(); render(); }
-  catch (err) { $("now").textContent = "Couldn't load live data: " + err.message; $("dot").classList.add("stale"); }
+  catch (err) {
+    $("now").textContent = "Couldn't load live data: " + err.message; $("dot").classList.add("stale");
+    if (!navigator.onLine || err instanceof TypeError) $("health").innerHTML = offlineBanner(live?.at ? +live.at : null);
+  }
 }
 tick(true);
 setInterval(() => tick(false), 60000);           // live data every minute
