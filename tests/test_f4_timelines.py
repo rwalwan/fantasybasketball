@@ -20,14 +20,14 @@ print({p: win(tl, p) for p in (WAL, ANT, JJJ, KAW)})
 assert win(tl, WAL) == (100, 200), "max-only: out at least half the max"
 assert win(tl, JJJ) == (42, 56)
 assert win(tl, KAW) == (14, None), "the 2019 history piece (kind 'other') must not count"
-assert win(tl, ANT) == (60, 60), "most-cited window within 48h"
+assert win(tl, ANT) == (30, 60), "most outlets within 48h (review 2: was (60, 60) from Yahoo copies)"
 
 # JJJ before the 6-8 week report: the in-game '0 days' extraction must not mean 'back now'
 early = news.update_timelines({}, [x for x in fx if x["at"] < "2026-10-27T03"], team)
 assert JJJ not in early, early.get(JJJ)
 # one late contrary outlet doesn't flip Edwards
 late = dict(fx[-1], at="2026-10-28T05:00+00:00", out_min_days=60, out_max_days=None, source="Late Outlet", title="x")
-assert win(news.update_timelines(tl, [late], team), ANT) == (60, 60)
+assert win(news.update_timelines(tl, [late], team), ANT) == (30, 60)
 # wrong team or out-of-bounds values are rejected
 bad = [dict(fx[0], pid=KAW, team="LAL", at="2026-10-28T06:00+00:00", out_min_days=3, out_max_days=5, title="y"),
        dict(fx[0], pid=KAW, team="TOR", at="2026-10-28T06:01+00:00", out_min_days=30, out_max_days=10, title="z")]

@@ -68,6 +68,10 @@ def build(book, meta, team_dates, today, is_final, pids):
         # a timeline only applies if he hasn't played since it was reported
         if tl and played and played[-1] >= tl["at"][:10]:
             tl = None
+        # 'day-to-day' (0-3 days) says less than the official game designation, which is measured (review 2, finding 2:
+        # Markkanen's GTD 48% had become 94% from a day-to-day report)
+        if tl and st in DESIG and tl.get("out_max_days") is not None and tl["out_max_days"] <= 3:
+            tl = None
         if st not in INJ and not tl:
             continue
         dates = sorted(team_dates.get(team, {}))

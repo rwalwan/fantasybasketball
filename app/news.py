@@ -147,7 +147,7 @@ NEWS_PROMPT = """You turn one NBA news blurb into JSON for a fantasy basketball 
  "summary": "<one short sentence in your own words>"}
 out_min_days / out_max_days = the reported absence timeline in DAYS from this report, only if the text gives one:
 "out 2-4 weeks" -> 14, 28; "at least a week" -> 7, null; "expected back Friday" -> both = days until then;
-"out for the season" -> 200, 200; "day-to-day" -> 0, 3; "indefinitely" or no timeline -> null, null.
+"about two months" -> 45, 75 (about N -> 0.75N to 1.25N); "out for the season" -> 200, 200; "day-to-day" -> 0, 3; "indefinitely" or no timeline -> null, null.
 Use only what the text supports. Do not copy sentences from the source."""
 
 CLAIMS_PROMPT = """You read one fantasy basketball article or post for a tool that tracks expert opinion. Reply with ONE JSON object:
@@ -328,9 +328,19 @@ def needs_full_text(title, text, x):
             and bool(TEASER_END.search(text or "")) and bool(TIMELINE_WORDS.search(title or "")))
 
 
+def approx(w):
+    """'About two months' is extracted as an exact (60, 60); read an exact window of 2+ weeks (short of the season)
+    as about +/-25% (review 2, finding 2). Short exact ones ('back Friday') stay as they are."""
+    mn, mx = w[0], w[1]
+    if mx is not None and mn == mx and 14 <= mn < 200:
+        return [round(0.75 * mn), round(1.25 * mn)]
+    return list(w)
+
+
 def update_timelines(tl, items, team_of, window_h=48):
     """Latest reported injury timeline per player. Every validated report is kept; within 48 h of a player's
-    newest report the most-cited window wins (ties: the latest), so one outlet's wording can't flip it."""
+    newest report each OUTLET gets one vote (its latest report), so one aggregator's copies can't decide it, and
+    the most-voted window wins (ties: the latest). A newer 'available' report wins outright (review 2, finding 2)."""
     for v in tl.values():                                   # entries saved before validation existed
         if "reports" not in v:
             w = _window(dict(v, kind="injury", pid=None), lambda _p: None)
@@ -354,14 +364,22 @@ def update_timelines(tl, items, team_of, window_h=48):
             continue
         newest = dt.datetime.fromisoformat(reps[-1]["at"])
         recent = [r for r in reps if (newest - dt.datetime.fromisoformat(r["at"])).total_seconds() <= window_h * 3600]
-        count = {}
-        for r in recent:
-            count[tuple(r["w"])] = count.get(tuple(r["w"]), 0) + 1
-        best = max(count.values())
-        pick = [r for r in recent if count[tuple(r["w"])] == best][-1]
-        out[pid] = {"at": pick["at"], "out_min_days": pick["w"][0], "out_max_days": pick["w"][1],
+        latest = {}
+        for r in recent:                                    # sorted by time: each outlet's latest report
+            latest[r.get("source") or r["key"]] = r
+        votes = sorted(latest.values(), key=lambda r: r["at"])
+        if reps[-1]["w"][0] == 0 and not reps[-1]["w"][1]:  # newest report says he's available: it wins
+            pick, best = reps[-1], 1
+        else:
+            count = {}
+            for r in votes:
+                count[tuple(approx(r["w"]))] = count.get(tuple(approx(r["w"])), 0) + 1
+            best = max(count.values())
+            pick = [r for r in votes if count[tuple(approx(r["w"]))] == best][-1]
+        w = approx(pick["w"])
+        out[pid] = {"at": pick["at"], "out_min_days": w[0], "out_max_days": w[1],
                     "summary": pick["summary"], "source": pick["source"], "player": pick["player"],
-                    "cited": best, "reports": recent[-30:]}
+                    "cited": best, "outlets": len(votes), "reports": recent[-30:]}
     return out
 
 
