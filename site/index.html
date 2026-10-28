@@ -2,15 +2,26 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>We Back Lock Desk</title>
+<!-- home-screen app: Android/Chrome via the manifest, iPhone via the apple-* tags -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#111316">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Lock Desk">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#f6f5f1;--card:#fff;--ink:#16181d;--quiet:#646a73;--line:#e3e1da;--lock:#1f7a4d;--lockbg:#e6f3ec;--pass:#9a6200;--passbg:#fbf1dd;--start:#2457a6;--startbg:#e8eef9;--risk:#b42318;--riskbg:#fdecea;--chip:#efeee9}
 @media (prefers-color-scheme:dark){:root{--bg:#111316;--card:#191c20;--ink:#eceae4;--quiet:#9aa0a8;--line:#2a2e34;--lock:#5cc58f;--lockbg:#16291f;--pass:#e8b04d;--passbg:#2c2414;--start:#7aa7f0;--startbg:#17223a;--risk:#f28b82;--riskbg:#331a18;--chip:#23272c}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "IBM Plex Sans",system-ui,sans-serif}
-main{max-width:1080px;margin:0 auto;padding:20px 16px 60px}
+main{max-width:1080px;margin:0 auto;padding:max(20px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(60px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+.tools{display:flex;gap:6px;margin-top:6px}.tools button{font:inherit;font-size:12px;border:1px solid var(--line);background:var(--card);color:var(--quiet);padding:3px 9px;border-radius:99px;cursor:pointer}
+.banner{background:var(--startbg);color:var(--start);border-radius:8px;padding:8px 12px;margin-top:12px;font-size:13px}
 header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;border-bottom:2px solid var(--ink);padding-bottom:12px}
 h1{font-size:22px;margin:0;letter-spacing:-.01em}#meta{font-size:13px;color:var(--quiet);margin-top:2px}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--lock);margin-right:6px;vertical-align:middle}
@@ -56,7 +67,8 @@ select{font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);
 <body>
 <main>
 <header>
-  <div><h1>Lock Desk</h1><div id="meta"><span class="dot" id="dot"></span><span id="metatext">loading live data…</span></div></div>
+  <div><h1>Lock Desk</h1><div id="meta"><span class="dot" id="dot"></span><span id="metatext">loading live data…</span></div>
+    <div class="tools"><button id="refresh" title="Reload live data">↻ Refresh</button><button id="setup" title="Connect this device to your backend">⚙ Backend</button></div></div>
   <div class="score" id="score"></div>
 </header>
 <div class="now" id="now">Loading…</div>

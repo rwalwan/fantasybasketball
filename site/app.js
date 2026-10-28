@@ -369,3 +369,27 @@ tick(true);
 setInterval(() => tick(false), 60000);           // live data every minute
 setInterval(() => tick(true), 30 * 60000);       // game logs / priors every 30 minutes
 setInterval(() => { if (live) render(); }, 30000); // countdowns
+
+// ---- home-screen app ------------------------------------------------------------------------------
+// The installed app (Add to Home Screen) keeps its own storage, separate from the browser's, so the backend
+// link has to be entered once inside it: ⚙ Backend -> paste the setup link (…#api=<url>&key=<key>).
+$("refresh").onclick = () => tick(false);
+$("setup").onclick = () => {
+  const now = API ? `Connected to ${API}.` : "Not connected: answers are saved on this device only.";
+  const v = prompt(`${now}\n\nPaste your setup link (the one ending in #api=…&key=…), or leave empty to keep the current setting:`, "");
+  if (!v) return;
+  const h = new URLSearchParams((v.includes("#") ? v.split("#")[1] : v).replace(/^#/, ""));
+  if (!h.get("api")) { alert("That link has no api=… part."); return; }
+  try { localStorage.setItem("lockdesk_api", h.get("api")); localStorage.setItem("lockdesk_key", h.get("key") || ""); } catch {}
+  location.reload();
+};
+const standalone = window.matchMedia?.("(display-mode: standalone)").matches || navigator.standalone === true;
+if (standalone && !API) {
+  const b = document.createElement("div");
+  b.className = "banner";
+  b.textContent = "Home-screen app: tap ⚙ Backend once and paste your setup link, so lock answers sync with your other devices.";
+  $("now").before(b);
+}
+// an app resumed from the background may show minutes-old data: refresh right away
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && base) tick(false); });
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
