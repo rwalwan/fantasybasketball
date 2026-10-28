@@ -178,6 +178,12 @@ function statusChain(M, st, j, k0 = 0) {
   return (1 - S) * healthyAt(M, j + 1);
 }
 
+// share of real managers who lock a game scoring `ratio` x the bar (rows from app/league_study.py)
+export function humanLockRate(rows, ratio) {
+  const r = (rows || []).find(x => ratio >= x.lo && ratio < x.hi);
+  return r ? r.lock_rate : ratio >= 1 ? 1 : 0;
+}
+
 // eligibility from recorded lineup snapshots: true/false once the game's lineup was frozen at tip, else null
 export function eligFromSnaps(snaps, overrides = {}) {
   return (pid, date) => {
@@ -375,7 +381,11 @@ export class WeekPlan {
         ev = g.fp + (1 - frac) * mu * 0.95; sd = qsd(this.qOf(p)) * mu * Math.sqrt(1 - frac);
       } else {
         const x = open.find(y => y.i === i);
-        if (x && willLock.has(p)) ev = lockable[i].fp;
+        if (x && opts.humanLocks && lockable[i]) {
+          // opponent: real managers don't lock like the engine. P(lock | score vs bar) from other Lock-In leagues
+          const fp = lockable[i].fp, b = bars[i] ?? 0, pr = humanLockRate(opts.humanLocks, b ? fp / b : 9), sdP = cont[p]?.sd || 0;
+          ev = pr * fp + (1 - pr) * b; sd = Math.sqrt((1 - pr) * sdP ** 2 + pr * (1 - pr) * (fp - b) ** 2);
+        } else if (x && willLock.has(p)) ev = lockable[i].fp;
         else if (x) { const a = assignedTo[i]; ev = a ? Math.max(0, (val(x, a, false) ?? 0) + streamW(x, main) - cont[a].W) : 0; sd = a ? cont[a].sd : 0; }
       }
       evOf[i] = ev; sdOf[i] = sd; M += ev; V += sd * sd;

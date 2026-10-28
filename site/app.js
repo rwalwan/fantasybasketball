@@ -114,7 +114,7 @@ function compute() {
   if (oppRoster) {
     oppPlan = new WeekPlan({ Q: base.QS, book, schedule: base.schedule, week: base.week, today: etToday(), now: new Date(),
       rosterPositions: base.league.roster_positions, roster: oppRoster, matchup: opp, rosters: live.rosters, tips: live.tips,
-      elig: eligFromSnaps(live.oppSnaps), locks: {} }).build();
+      elig: eligFromSnaps(live.oppSnaps), locks: {} }).build({ humanLocks: live.others?.opponent_model_ready ? live.others.lock_rate_eligible : null });
     oppOut = { mean: oppPlan.outlook.mean, var: oppPlan.outlook.var };
   }
   const waivers = wp.waivers(live.trending);
@@ -289,9 +289,10 @@ function renderOthers() {
   const e = o.engine_minus_manager, b = o.best_scale;
   $("others").innerHTML =
     `<div class="row"><span>${o.verified.lock_in} verified Lock-In leagues · ${o.starter_weeks.toLocaleString()} starter-weeks (weeks ${o.weeks.join(", ")})</span></div>` +
-    `<div class="row"><span>The engine's lock rule on the same players' games vs what managers ended with: <b>${e.mean_fp >= 0 ? "+" : ""}${e.mean_fp}</b> FP per slot (95% CI ${e.ci95[0]} to ${e.ci95[1]}); same result ${Math.round(e.share_same * 100)}% of the time.</span></div>` +
-    `<div class="row"><span>Bar check (replaying every player-week): best scale ×${b.scale} = ${b.vs_current >= 0 ? "+" : ""}${b.vs_current} FP per slot vs the current bar (95% CI ${b.ci95_vs_current[0]} to ${b.ci95_vs_current[1]}).</span></div>` +
-    `<div class="row"><span class="pos">How often managers lock, by score vs the engine's bar: ${(o.lock_rate_by_score_vs_bar || []).map(r => `${r.score_vs_bar}: ${Math.round(r.lock_rate * 100)}% (n=${r.n})`).join(" · ")}</span></div>`;
+    `<div class="row"><span>The engine's lock rule on the same players' games vs what managers ended with: <b>${e.mean_pct_of_proj >= 0 ? "+" : ""}${e.mean_pct_of_proj}%</b> of the player's projection per slot (95% CI ${e.ci95[0]} to ${e.ci95[1]}%); same result ${Math.round(e.share_same * 100)}% of the time.</span></div>` +
+    `<div class="row"><span>Bar check (replaying every player-week): best scale ×${b.scale} = ${b.vs_current >= 0 ? "+" : ""}${b.vs_current}% of projection per slot vs the current bar${b.scale === 1 ? " (the current bar is the best tested)" : ` (95% CI ${b.ci95_vs_current[0]} to ${b.ci95_vs_current[1]}%)`}.</span></div>` +
+    `<div class="row"><span class="pos">How often managers lock, by score vs the engine's bar${o.eligible_points ? " (games the player was in their lineup)" : " (all games; a pass may be a game he sat on their bench)"}: ${(o.eligible_points ? o.lock_rate_eligible : o.lock_rate_by_score_vs_bar || []).map(r => `${r.score_vs_bar}: ${Math.round(r.lock_rate * 100)}% (n=${r.n})`).join(" · ")}</span></div>` +
+    `<div class="row"><span class="pos">${o.opponent_model_ready ? "Your opponent's outlook uses these real lock rates." : `Opponent model: waiting for enough lineup-checked decisions (${o.eligible_points || 0} so far); until then the opponent is assumed to lock like the engine.`}</span></div>`;
 }
 function renderInsights(c) {
   renderOthers();

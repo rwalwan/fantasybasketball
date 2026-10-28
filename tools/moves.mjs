@@ -41,7 +41,8 @@ const wp = new WeekPlan({ Q: st("quantiles"), book, schedule, week, today, roste
 const opp = matchups.find(m => m.matchup_id === my.matchup_id && m.roster_id !== mine.roster_id);
 const oppRoster = opp && rosters.find(r => r.roster_id === opp.roster_id);
 const oppPlan = oppRoster ? new WeekPlan({ Q: st("quantiles"), book, schedule, week, today, rosterPositions: league.roster_positions,
-  roster: oppRoster, matchup: opp, rosters, tips: tipsRaw, locks: {}, elig: eligFromSnaps(readState(`opp_lineups_${season}_w${week}.json`, {})) }).build() : null;
+  roster: oppRoster, matchup: opp, rosters, tips: tipsRaw, locks: {}, elig: eligFromSnaps(readState(`opp_lineups_${season}_w${week}.json`, {})) })
+  .build({ humanLocks: (s => s.opponent_model_ready ? s.lock_rate_eligible : null)(readState("league_study.json", {})) }) : null;
 const plan = wp.build({ opp: oppPlan ? { mean: oppPlan.outlook.mean, var: oppPlan.outlook.var } : null });
 // never suggest dropping someone the plan is counting on: locked/kept games, today's starters and relief, next-up players
 const protect = new Set([...(mine.reserve || []),

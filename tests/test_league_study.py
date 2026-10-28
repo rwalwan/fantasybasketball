@@ -25,6 +25,7 @@ out = league_study.study(con, [1], stats, prior, boot=50)
 print({k: out[k] for k in ("leagues", "decision_points", "starter_weeks", "engine_minus_manager")})
 assert out["leagues"] == 1 and out["starter_weeks"] == 25 and out["decision_points"] == 50   # pass game 1, lock game 2
 # engine rule with mu 40: game 2 (50) beats the 1-game bar; game 1 is below the 2-game bar except the 44
-assert out["engine_minus_manager"]["share_same"] >= 0.9   # the 44 in game 1 beats the bar (~43): engine locks it
+assert out["engine_minus_manager"]["share_same"] >= 0.9 and "mean_pct_of_proj" in out["engine_minus_manager"]   # the 44 in game 1 beats the bar (~43): engine locks it
 assert {r["scale"] for r in out["bar_scale"]} >= {0.9, 1.0, 1.1}
+assert out["opponent_model_ready"] is False and out["eligible_points"] == 0   # no morning snapshots in this test
 print("ok: league study")
