@@ -1,4 +1,5 @@
-"""Entry point: python -m app.run  ->  writes site/data.json (the dashboard reads it)."""
+"""Entry point: python -m app.run -> the job's data for the site (site/static/*.json) and saved state.
+The plan itself is computed by site/engine.js (in the browser and in tools/moves.mjs), one engine for both."""
 import datetime as dt
 import json
 import os
@@ -12,7 +13,7 @@ from . import experts
 from . import news as newsmod
 from . import memory, insights, availability
 from . import usage as usagemod
-from .engine import WeekPlan, team_game_dates, week_dates
+from .engine import free_agent_watch, team_game_dates, week_dates
 from .lineups import LineupTracker
 from .model import PlayerBook
 
@@ -29,7 +30,6 @@ def main():
     week = int(os.environ.get("FBB_WEEK") or current_week(sched, today))
     meta = sleeper.players()
     rosters = sleeper.rosters(LEAGUE_ID)
-    users = {u["user_id"]: u.get("display_name") for u in sleeper.users(LEAGUE_ID)}
     mine = next(r for r in rosters if r.get("owner_id") == USER_ID)
     mus = sleeper.matchups(LEAGUE_ID, week)
     my_m = next(m for m in mus if m["roster_id"] == mine["roster_id"])
@@ -103,8 +103,6 @@ def main():
             slots, opp_m.get("starters") or [], opp_roster.get("players") or [], book.team,
             lambda team: sorted(d for d in tg.get(team, {}) if d in days), tips)
 
-    manual = {**load_manual_locks(week), **(backend.get("locks") or {})}
-
     # grade projection sources and learn blend weights before planning
     # availability: per-game play probabilities (designation, return timelines from news, historical return rates)
     try:
@@ -157,9 +155,8 @@ def main():
     w = experts.stack_weights(experts.graded_rows(con, season))
     scores = experts.update(book, season, week, tips, w=w)
     book.w = w
-    wp = WeekPlan(book, sched, week, today, lg["roster_positions"], mine, my_m, rosters, tracker.eligible, tips)
-    plan = wp.build(manual)
-    waivers, worst = wp.waivers(sleeper.trending_adds())
+    # free agents worth reading news and expert takes about (the add/drop suggestions come from tools/moves.mjs)
+    waivers = free_agent_watch(book, {p for r in rosters for p in (r.get("players") or [])})
     # news + expert claims (AI extraction via OpenRouter when OPENROUTER_API_KEY is set)
     news_out, claims_out = {"items": [], "mine": []}, {"experts": [], "consensus": {}, "recent": []}
     try:
@@ -201,12 +198,6 @@ def main():
 
 
 
-    opp_owner = next((r.get("owner_id") for r in rosters if opp_m and r["roster_id"] == opp_m["roster_id"]), None)
-    out = dict(generated=dt.datetime.now(ZoneInfo("America/Los_Angeles")).strftime("%a %b %d, %I:%M %p PT"),
-               league=lg["name"], week=week, today=today, plan=plan, waivers=waivers, worst_bench=worst,
-               score=dict(me=(my_m.get("points") or 0) / 10, opp=((opp_m or {}).get("points") or 0) / 10,
-                          opp_name=users.get(opp_owner, "Opponent")),
-               faab_left=lg["settings"].get("waiver_budget", 100) - (mine.get("settings") or {}).get("waiver_budget_used", 0))
     os.makedirs(os.path.join(ROOT, "site"), exist_ok=True)
     export_static(book, season, week, meta, lg)
     with open(os.path.join(ROOT, "site", "static", "experts.json"), "w") as f:
@@ -238,10 +229,7 @@ def main():
             json.dump(obj, f, separators=(",", ":"))
     with open(os.path.join(ROOT, "site", "static", "tips.json"), "w") as f:
         json.dump({f"{d}|{t}": v for (d, t), v in tips.items()}, f, separators=(",", ":"))
-    with open(os.path.join(ROOT, "site", "data.json"), "w") as f:
-        json.dump(out, f, indent=1, default=str)
-    print(f"week {week}, {len(plan['slots'])} slots, {plan['unlocked']} unlocked, {len(waivers)} waiver targets")
-    return out
+    print(f"week {week}: data for {len(meta)} players, {len(waivers)} free agents watched")
 
 
 def export_static(book, season, week, meta, lg):
@@ -339,11 +327,6 @@ def fetch_backend(season, week):
     except Exception as e:
         print("backend unavailable:", e, file=sys.stderr)
         return {}
-
-
-def load_manual_locks(week):
-    path = os.path.join(ROOT, "data", "state", f"locks_w{week}.json")
-    return json.load(open(path)) if os.path.exists(path) else {}
 
 
 if __name__ == "__main__":
