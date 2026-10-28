@@ -68,7 +68,8 @@ export const usesFaab = settings => settings?.waiver_type === 2;   // Sleeper: 2
 export const B2B_FACTOR = 0.93, PRIOR_GAMES = 8;   // b2b/non-b2b play-rate ratio (availability_model.json)
 
 export class Book {
-  constructor({ scoring, players, priors, gamelog, weights, ctx, avail }) {
+  constructor({ scoring, players, priors, gamelog, weights, ctx, avail, usage }) {
+    this.usage = usage || {};            // pid -> {date: [factor, reasons?]} teammates out etc. (app/usage.py)
     this.avail = avail || null;          // {model, players: {pid: {status, q: {date: p}}}} (app/availability.py)
     this.sc = scoring;
     this.ctx = ctx || {};                                 // "pid|date" -> {f, parts} matchup context (app/memory.py)
@@ -109,6 +110,7 @@ export class Book {
       if (r.date && r.stats) this.proj[`${r.player_id}|${r.date}`] = fantasyPoints(r.stats, this.sc);
     }
   }
+  usageF(p, date) { return this.usage?.[p]?.[date]?.[0] ?? 1; }
   name(p) { return this.meta[p]?.name || p; }
   team(p) { return this.meta[p]?.team; }
   pos(p) { return this.meta[p]?.pos || []; }
@@ -132,6 +134,7 @@ export class Book {
     const srcs = [[this.w.model ?? 1 / 3, base]];
     if (c?.f) srcs.push([this.w.ctx ?? 1 / 3, base * c.f]);
     if (pr > 0) srcs.push([this.w.rotowire ?? 1 / 3, pr]);
+    if (this.w.usage) srcs.push([this.w.usage, base * this.usageF(p, date)]);
     let tw = srcs.reduce((a, [w]) => a + w, 0);
     if (tw <= 0) { srcs.splice(0, srcs.length, [1, base]); tw = 1; }   // weighted sources missing (no RotoWire line): model
     return Math.round((srcs.reduce((a, [w, v]) => a + w * v, 0) / tw) * (this.w.scale ?? 1) * 10) / 10;
@@ -635,7 +638,7 @@ export class Valuer {
       const games = all.filter(d => days.includes(d)).map(d => {
         const prev = new Date(d + "T12:00:00Z"); prev.setUTCDate(prev.getUTCDate() - 1);
         const q = this.b.playProb(p, null, all.includes(prev.toISOString().slice(0, 10)), d, ahead.indexOf(d));
-        return { mu: base, q, Q: Qp };
+        return { mu: base * this.b.usageF(p, d), q, Q: Qp };    // usage: teammates out in the next 4 weeks
       });
       return games.length ? contValues(this.Q, games)[0] : 0;
     });

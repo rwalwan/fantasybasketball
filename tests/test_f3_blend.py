@@ -28,5 +28,5 @@ print("stacked", w, "MAE", round(mae(nw, w["scale"]), 2))
 assert mae(nw, w["scale"]) <= mae(np.array([1, 0, 0])) + 1e-9, "never worse than RotoWire alone"
 assert w["rotowire"] >= 0.6 and w["ctx"] <= 0.2
 # too little data: fall back to RotoWire alone (the best single source so far), no scale change
-assert experts.stack_weights(rows[:50]) == {"rotowire": 1.0, "model": 0.0, "ctx": 0.0, "scale": 1.0, "n": 50, "basis": "too few graded games"}
+assert experts.stack_weights(rows[:50]) == {"rotowire": 1.0, "model": 0.0, "ctx": 0.0, "usage": 0.0, "scale": 1.0, "n": 50, "basis": "too few graded games"}
 print("ok: finding 3")

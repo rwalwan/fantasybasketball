@@ -45,7 +45,7 @@ def connect():
     con.executescript("""
     CREATE TABLE IF NOT EXISTS games(pid TEXT, gid TEXT, date TEXT, season TEXT, team TEXT, opp TEXT, home INT,
         min REAL, fga REAL, pf REAL, pts REAL, reb REAL, ast REAL, fp REAL, team_pts INT, opp_pts INT, margin INT,
-        rest INT, b2b INT, out_mates TEXT, exp_min REAL, proj_rw REAL, proj_model REAL, proj_ctx REAL,
+        rest INT, b2b INT, out_mates TEXT, exp_min REAL, proj_rw REAL, proj_model REAL, proj_ctx REAL, proj_usage REAL,
         PRIMARY KEY(pid, gid));
     CREATE INDEX IF NOT EXISTS games_date ON games(date);
     CREATE INDEX IF NOT EXISTS games_team ON games(team, date);
@@ -55,6 +55,8 @@ def connect():
     CREATE TABLE IF NOT EXISTS notes(pid TEXT, date TEXT, kind TEXT, tag TEXT, text TEXT, facts TEXT, PRIMARY KEY(pid, date, kind));
     CREATE TABLE IF NOT EXISTS kv(k TEXT PRIMARY KEY, v TEXT);
     """)
+    if "proj_usage" not in [r[1] for r in con.execute("PRAGMA table_info(games)")]:
+        con.execute("ALTER TABLE games ADD COLUMN proj_usage REAL")      # usage source (app/usage.py)
     return con
 
 
@@ -90,13 +92,13 @@ def ingest(con, season, week_rows, schedule, scoring, projlog, prior_min, meta=N
         rows.append((r["player_id"], r.get("game_id"), r["date"], season, r.get("team"), r.get("opponent"),
                      1 if home_of.get((r["date"], r.get("team"))) else 0, minutes(st), float(st.get("fga") or 0),
                      float(st.get("pf") or 0), float(st.get("pts") or 0), float(st.get("reb") or 0), float(st.get("ast") or 0),
-                     fantasy_points(st, scoring), tp, op, (tp or 0) - (op or 0), pl.get("rotowire"), pl.get("model"), pl.get("ctx")))
-    con.executemany("""INSERT INTO games(pid,gid,date,season,team,opp,home,min,fga,pf,pts,reb,ast,fp,team_pts,opp_pts,margin,proj_rw,proj_model,proj_ctx)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                     fantasy_points(st, scoring), tp, op, (tp or 0) - (op or 0), pl.get("rotowire"), pl.get("model"), pl.get("ctx"), pl.get("usage")))
+    con.executemany("""INSERT INTO games(pid,gid,date,season,team,opp,home,min,fga,pf,pts,reb,ast,fp,team_pts,opp_pts,margin,proj_rw,proj_model,proj_ctx,proj_usage)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT(pid,gid) DO UPDATE SET min=excluded.min, fga=excluded.fga, pf=excluded.pf, pts=excluded.pts, reb=excluded.reb,
           ast=excluded.ast, fp=excluded.fp, team_pts=excluded.team_pts, opp_pts=excluded.opp_pts, margin=excluded.margin,
           proj_rw=COALESCE(games.proj_rw, excluded.proj_rw), proj_model=COALESCE(games.proj_model, excluded.proj_model),
-          proj_ctx=COALESCE(games.proj_ctx, excluded.proj_ctx)""", rows)
+          proj_ctx=COALESCE(games.proj_ctx, excluded.proj_ctx), proj_usage=COALESCE(games.proj_usage, excluded.proj_usage)""", rows)
     con.execute("DELETE FROM games WHERE pid LIKE 'TEAM_%'")
     _derive(con, season, prior_min, meta)
     con.commit()

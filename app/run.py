@@ -11,6 +11,7 @@ from . import espn, sleeper
 from . import experts
 from . import news as newsmod
 from . import memory, insights, availability
+from . import usage as usagemod
 from .engine import WeekPlan, team_game_dates, week_dates
 from .lineups import LineupTracker
 from .model import PlayerBook
@@ -105,6 +106,51 @@ def main():
     manual = {**load_manual_locks(week), **(backend.get("locks") or {})}
 
     # grade projection sources and learn blend weights before planning
+    # availability: per-game play probabilities (designation, return timelines from news, historical return rates)
+    try:
+        # every rostered player and every injured player with an NBA team: the browser ranks free agents on its own,
+        # so any of them may need a curve (review finding 9). Runs before projections: the usage model needs it.
+        watch_av = {p for r in rosters for p in (r.get("players") or [])} | \
+            {p for p, m in meta.items() if m.get("team") and m.get("injury_status") and (p in book.prior or book.games.get(p))}
+        av = availability.build(book, meta, team_game_dates(sched), today, book.is_final, watch_av)
+        hn = availability.healthy_next(meta, team_game_dates(sched), today, book.is_final, watch_av, set(av))
+        cal = availability.log_and_grade(av, book, book.is_final, today, hn)
+        os.makedirs(os.path.join(ROOT, "site", "static"), exist_ok=True)
+        with open(os.path.join(ROOT, "site", "static", "availability.json"), "w") as f:
+            json.dump({"model": availability.M, "players": av, "calibration": cal}, f, separators=(",", ":"))
+        print(f"availability: {len(av)} players modeled")
+        if os.path.exists(os.path.join(ROOT, "data", "state", "availability_err.txt")):
+            os.remove(os.path.join(ROOT, "data", "state", "availability_err.txt"))
+        with open(os.path.join(ROOT, "data", "state", "availability_now.json"), "w") as f:
+            json.dump({"players": av, "calibration": cal}, f, indent=1)
+    except Exception as e:
+        import traceback
+        print("availability failed:", e, file=sys.stderr)
+        with open(os.path.join(ROOT, "data", "state", "availability_err.txt"), "w") as f:
+            f.write(traceback.format_exc())
+
+    # usage: teammates out (and lost opponent rim protection) -> projected output, next 4 weeks (app/usage.py)
+    book.usage, usage_why = {}, {}
+    try:
+        horizon = {d for g in sched for d in [g["date"]] if today <= d <= (dt.date.fromisoformat(today) + dt.timedelta(days=28)).isoformat()}
+        prof = usagemod.profiles(season_rows, prev_rows if "prev_rows" in dir() else [])
+        upids = {p for p, m in meta.items() if m.get("team") and (p in book.prior or book.games.get(p) or any(k[0] == p for k in book.proj))}
+        um = usagemod.build(con, season, meta, prof, team_game_dates(sched), horizon, av if "av" in dir() else {}, upids, book.name)
+        book.usage = {k: v[0] for k, v in um.items()}
+        usage_out = {}
+        for (p, d), (f, why) in um.items():
+            if abs(f - 1) >= 0.01:
+                usage_out.setdefault(p, {})[d] = [f, why] if d in days else [f]
+        os.makedirs(os.path.join(ROOT, "site", "static"), exist_ok=True)
+        with open(os.path.join(ROOT, "site", "static", "usage.json"), "w") as f:
+            json.dump(usage_out, f, separators=(",", ":"))
+        print(f"usage: {len(um)} player-games, {sum(len(v) for v in usage_out.values())} adjusted")
+        top = sorted(((abs(f - 1), book.name(p), d, f, why) for (p, d), (f, why) in um.items() if d in days), reverse=True)[:25]
+        with open(os.path.join(ROOT, "data", "state", "usage_debug.json"), "w") as f:
+            json.dump({"player_games": len(um), "this_week_top": [dict(name=n, date=d, factor=f, why=w) for _, n, d, f, w in top]}, f, indent=1)
+    except Exception as e:
+        print("usage failed:", e, file=sys.stderr)
+
     # blend weights fitted to graded games (finding 3: inverse-MSE let two near-duplicate sources outvote RotoWire)
     w = experts.stack_weights(experts.graded_rows(con, season))
     scores = experts.update(book, season, week, tips, w=w)
@@ -152,28 +198,6 @@ def main():
         print("news/experts failed:", e, file=sys.stderr)
 
 
-    # availability: per-game play probabilities (designation, return timelines from news, historical return rates)
-    try:
-        # every rostered player, every waiver target, and every injured player with an NBA team: the browser ranks
-        # free agents on its own, so any of them may need a curve (review finding 9)
-        watch_av = {p for r in rosters for p in (r.get("players") or [])} | {w["pid"] for w in waivers} | \
-            {p for p, m in meta.items() if m.get("team") and m.get("injury_status") and (p in book.prior or book.games.get(p))}
-        av = availability.build(book, meta, team_game_dates(sched), today, book.is_final, watch_av)
-        hn = availability.healthy_next(meta, team_game_dates(sched), today, book.is_final, watch_av, set(av))
-        cal = availability.log_and_grade(av, book, book.is_final, today, hn)
-        os.makedirs(os.path.join(ROOT, "site", "static"), exist_ok=True)
-        with open(os.path.join(ROOT, "site", "static", "availability.json"), "w") as f:
-            json.dump({"model": availability.M, "players": av, "calibration": cal}, f, separators=(",", ":"))
-        print(f"availability: {len(av)} players modeled")
-        if os.path.exists(os.path.join(ROOT, "data", "state", "availability_err.txt")):
-            os.remove(os.path.join(ROOT, "data", "state", "availability_err.txt"))
-        with open(os.path.join(ROOT, "data", "state", "availability_now.json"), "w") as f:
-            json.dump({"players": av, "calibration": cal}, f, indent=1)
-    except Exception as e:
-        import traceback
-        print("availability failed:", e, file=sys.stderr)
-        with open(os.path.join(ROOT, "data", "state", "availability_err.txt"), "w") as f:
-            f.write(traceback.format_exc())
 
     opp_owner = next((r.get("owner_id") for r in rosters if opp_m and r["roster_id"] == opp_m["roster_id"]), None)
     out = dict(generated=dt.datetime.now(ZoneInfo("America/Los_Angeles")).strftime("%a %b %d, %I:%M %p PT"),

@@ -100,6 +100,9 @@ class PlayerBook:
             srcs.append((self.w.get("ctx", 1 / 3), base * f))
         if p is not None and p > 0:
             srcs.append((self.w.get("rotowire", 1 / 3), p))
+        u = getattr(self, "usage", {}).get((pid, date))
+        if self.w.get("usage"):
+            srcs.append((self.w["usage"], base * (u or 1.0)))     # teammates out etc. (app/usage.py)
         tw = sum(w for w, _ in srcs)
         if tw <= 0:                       # weighted sources missing for this game (e.g. no RotoWire line): model
             srcs, tw = [(1.0, base)], 1.0

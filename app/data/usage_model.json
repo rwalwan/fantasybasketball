@@ -1,0 +1,63 @@
+{
+ "note": "Fit the usage model: how much a player's fantasy output moves when rotation players are out.",
+ "features": [
+  "tm_same",
+  "tm_other",
+  "op_rim"
+ ],
+ "league_mean": {
+  "tm_same": 0.2323,
+  "tm_other": 0.4611,
+  "op_rim": 0.6834
+ },
+ "groups": {
+  "starter": {
+   "coef": {
+    "tm_same": 0.1397,
+    "tm_other": 0.0702,
+    "op_rim": 0.0097
+   },
+   "n": 25980,
+   "n_with_absence": 6577,
+   "loso_mae_gain_fp": [
+    {
+     "mae": 0.137,
+     "rmse": 0.158
+    },
+    {
+     "mae": 0.08,
+     "rmse": 0.096
+    },
+    {
+     "mae": 0.122,
+     "rmse": 0.114
+    }
+   ],
+   "mean_effect_when_teammate_out": 0.0679
+  },
+  "bench": {
+   "coef": {
+    "tm_same": 0.3246,
+    "tm_other": 0.1557,
+    "op_rim": 0.0161
+   },
+   "n": 34957,
+   "n_with_absence": 9324,
+   "loso_mae_gain_fp": [
+    {
+     "mae": 0.218,
+     "rmse": 0.261
+    },
+    {
+     "mae": 0.323,
+     "rmse": 0.369
+    },
+    {
+     "mae": 0.298,
+     "rmse": 0.349
+    }
+   ],
+   "mean_effect_when_teammate_out": 0.1659
+  }
+ }
+}

@@ -41,6 +41,7 @@ def source_projections(book, pid, date):
     f = getattr(book, "ctx", {}).get((pid, date))
     if f:
         out["ctx"] = round(book.baseline(pid) * f, 1)        # model x matchup context (memory.py)
+    out["usage"] = round(book.baseline(pid) * getattr(book, "usage", {}).get((pid, date), 1.0), 1)   # app/usage.py
     return out
 
 
@@ -155,30 +156,47 @@ STACK_MIN_N = 200        # graded games with all three projections before fitted
 SCALE_SHRINK = 500       # games before the mean-bias correction counts fully
 
 
-def _fit_simplex(y, X, step=0.02):
-    """Non-negative weights summing to 1 that minimize the blend's squared error (grid over the simplex: three
+def _simplex(k, step):
+    """All k-vectors of non-negative multiples of `step` summing to 1."""
+    n = round(1 / step)
+    def rec(k, left):
+        if k == 1:
+            yield (left,)
+            return
+        for i in range(left + 1):
+            for rest in rec(k - 1, left - i):
+                yield (i,) + rest
+    import numpy as np
+    return np.array(list(rec(k, n)), float) / n
+
+
+def _fit_simplex(y, X, step=None):
+    """Non-negative weights summing to 1 that minimize the blend's squared error (grid over the simplex: few
     sources, so this is exact to the grid step and needs no solver)."""
     import numpy as np
-    g = np.arange(0, 1 + 1e-9, step)
-    W = np.array([(a, b, 1 - a - b) for a in g for b in g if a + b <= 1 + 1e-9])
+    W = _simplex(X.shape[1], step or (0.02 if X.shape[1] <= 3 else 0.05))
     err = ((y[None, :] - W @ X.T) ** 2).mean(axis=1)
     return W[int(err.argmin())]
 
 
+SOURCES = ["rotowire", "model", "ctx", "usage"]
+
+
 def stack_weights(rows):
-    """Blend weights from graded games: rows = [date, actual, rotowire, model, ctx].
+    """Blend weights from graded games: rows = [date, actual, rotowire, model, ctx(, usage)] - sources beyond the
+    row length get weight 0.
     Inverse-MSE weighting assumed independent errors, but model and ctx are near-duplicates (error correlation
     0.98), so together they outvoted the best source. Here the weights minimize the BLEND's error directly, and
     are kept only if they beat RotoWire alone on days held out of the fit (leave-one-day-out); otherwise
     RotoWire alone. A shrunk multiplicative scale corrects the blend's average bias."""
     import numpy as np
     n = len(rows)
-    rw_only = {"rotowire": 1.0, "model": 0.0, "ctx": 0.0, "scale": 1.0, "n": n}
+    rw_only = {"rotowire": 1.0, "model": 0.0, "ctx": 0.0, "usage": 0.0, "scale": 1.0, "n": n}
     if n < STACK_MIN_N:
         return dict(rw_only, basis="too few graded games")
     dates = np.array([r[0] for r in rows])
     y = np.array([r[1] for r in rows], float)
-    X = np.array([r[2:5] for r in rows], float)
+    X = np.array([r[2:] for r in rows], float)
     oos_stack = oos_rw = 0.0
     days = sorted(set(dates))
     if len(days) >= 2:
@@ -188,7 +206,7 @@ def stack_weights(rows):
             oos_stack += np.abs(y[te] - X[te] @ w).sum()
             oos_rw += np.abs(y[te] - X[te, 0]).sum()
     if len(days) < 2 or oos_stack >= oos_rw:
-        w = np.array([1.0, 0.0, 0.0])
+        w = np.eye(X.shape[1])[0]
         basis = "RotoWire alone (a fitted blend did not beat it on held-out days)"
     else:
         w = _fit_simplex(y, X)
@@ -196,14 +214,19 @@ def stack_weights(rows):
     pred = X @ w
     raw = y.sum() / max(pred.sum(), 1e-6)
     scale = 1 + (raw - 1) * n / (n + SCALE_SHRINK)
-    return {"rotowire": round(float(w[0]), 3), "model": round(float(w[1]), 3), "ctx": round(float(w[2]), 3),
-            "scale": round(float(scale), 4), "n": n, "basis": basis}
+    out = {s: 0.0 for s in SOURCES}
+    out.update({s: round(float(v), 3) for s, v in zip(SOURCES, w)})
+    return dict(out, scale=round(float(scale), 4), n=n, basis=basis)
 
 
 def graded_rows(con, season):
-    return [list(r) for r in con.execute(
-        "SELECT date, fp, proj_rw, proj_model, proj_ctx FROM games WHERE season=? AND proj_rw IS NOT NULL "
-        "AND proj_model IS NOT NULL AND proj_ctx IS NOT NULL ORDER BY date", (season,))]
+    """Graded games with every source's projection. The usage source joins once it has STACK_MIN_N games."""
+    q = ("SELECT date, fp, proj_rw, proj_model, proj_ctx{u} FROM games WHERE season=? AND proj_rw IS NOT NULL "
+         "AND proj_model IS NOT NULL AND proj_ctx IS NOT NULL{w} ORDER BY date")
+    four = [list(r) for r in con.execute(q.format(u=", proj_usage", w=" AND proj_usage IS NOT NULL"), (season,))]
+    if len(four) >= STACK_MIN_N:
+        return four
+    return [list(r) for r in con.execute(q.format(u="", w=""), (season,))]
 
 
 def table(scores, w):
