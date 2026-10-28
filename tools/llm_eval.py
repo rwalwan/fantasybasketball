@@ -179,7 +179,9 @@ def main():
         ac = [x["cost"] for x in res[label]["advice"] if x.get("cost") is not None]
         report["models"].append({
             "label": label, "model": next(c[1] for c in CONFIGS if c[0] == label),
-            "errors": sum(1 for x in allc if x.get("error")), "first_error": next((x["error"] for x in allc if x.get("error")), None),
+            "errors": sum(1 for x in allc if x.get("error")),
+            "scores_valid": not any(x.get("error") for x in allc),       # failed calls (e.g. rate limits) void the scores
+            "first_error": next((x["error"] for x in allc if x.get("error")), None),
             "json_ok": round(sum(1 for x in allc if x.get("json") is not None) / max(1, len(allc)), 3),
             "news_agree": {f: round(agree[f] / tot[f], 3) for f in tot},
             "news_agree_avg": round(sum(agree.values()) / max(1, sum(tot.values())), 3),
@@ -197,6 +199,11 @@ def main():
         m = report["models"][-1]
         if m["cost_per_news"] is not None and m["cost_per_article"] is not None:
             m["monthly_est"] = round(30 * (200 * m["cost_per_news"] + 15 * m["cost_per_article"]), 2)
+    # review 2 (F13): how much these numbers can carry
+    report["caveats"] = [
+        "Timeline labels (tests/fixtures/timeline_labels.json) were made by Claude, exclude ambiguous items, and cover about "
+        "28 distinct injuries (one player appears 8 times): a gap of a few items (e.g. 48 vs 43 of 50) is not significant.",
+        "A model with scores_valid = false had failed calls; its scores are invalid, not low."]
     json.dump(report, open(os.path.join(STATE, "llm_eval.json"), "w"), indent=1)
     for m in report["models"]:
         print(json.dumps(m))
