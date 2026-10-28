@@ -10,7 +10,7 @@ assert round(A.healthy_at(1), 3) == 0.944 and 0.84 <= A.healthy_at(30) <= 0.86
 meta = {"h": {"team": "AAA"}, "inj": {"team": "AAA", "injury_status": "Out"}}
 dates = {"AAA": {"2026-11-01": {}, "2026-11-02": {}, "2026-11-04": {}}}
 hn = A.healthy_next(meta, dates, "2026-11-02", lambda d, t: d < "2026-11-02", ["h", "inj"], set())
-assert hn == {"h": ("2026-11-02", round(0.944 * 0.93, 3))}, hn
+assert hn == {"h": ("2026-11-02", round(0.944 * 0.93, 3), True)}, hn
 A.STATE = tempfile.mkdtemp()
 b = model.PlayerBook({}, meta)
 A.log_and_grade({}, b, lambda d, t: False, "2026-11-02", hn)
