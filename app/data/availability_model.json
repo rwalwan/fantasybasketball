@@ -1,18 +1,18 @@
 {
- "note": "P(plays next team game | has missed k straight), top-150 players 2021-24 (research/hazard_refit.py). Each player's last stint runs to his team's final game, so absences that never ended (season-ending injuries) are included as censored; absences with a coach's-decision, rest, personal or suspension entry are excluded. Inactive rest days can't be separated from injuries in box scores, so k=1-2 still include some rest.",
+ "note": "P(plays next team game | has missed k straight), top-150 players 2021-24 (research/hazard_refit.py). Each player's last stint is observed to his team's 15th-to-last game, so absences that never ended (season-ending injuries) are censored without counting end-of-season shutdowns; absences with a coach's-decision, rest, personal, suspension, health-and-safety protocol or reconditioning entry are dropped (not injuries).",
  "by_k": [
-  0.496,
-  0.286,
-  0.234,
-  0.219,
-  0.182,
+  0.503,
+  0.302,
+  0.252,
+  0.25,
+  0.226,
+  0.18,
   0.157,
-  0.124,
-  0.146
+  0.218
  ],
- "k9_12": 0.103,
- "k13_20": 0.084,
- "k21p": 0.078,
+ "k9_12": 0.117,
+ "k13_20": 0.118,
+ "k21p": 0.118,
  "designation": {
   "Probable": 0.866,
   "Questionable": 0.483,
@@ -54,6 +54,20 @@
   "_source": "2021-24 box-score panel, top-100 players: P(plays a non-b2b team game N games after a game he played); n=16,500 at N=1"
  },
  "_b2b_source": "same panel: b2b/non-b2b play-rate ratio 0.931-0.943 at every horizon (research/out2.txt: miss 13.9% -> 19.8%, 0.802/0.861)",
- "n_runs": 1918,
- "n_censored": 219
+ "n_runs": 1437,
+ "n_censored": 85,
+ "at_risk": {
+  "1": 1437,
+  "2": 689,
+  "3": 469,
+  "4": 344,
+  "5": 252,
+  "6": 189,
+  "7": 153,
+  "8": 124,
+  "9-12": 298,
+  "13-20": 273,
+  "21+": 65
+ },
+ "_hazard_source": "research/hazard_refit.py (review 2, finding 5): protocol/reconditioning stays dropped, last stint observed to the team's 15th-to-last game (end-of-season shutdowns censored). 13-20 (0.114, n=273) and 21+ (0.138, n=65) don't differ (se 0.047), so 13+ is pooled: 0.118."
 }

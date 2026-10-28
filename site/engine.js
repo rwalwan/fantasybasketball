@@ -154,7 +154,7 @@ export class Book {
 }
 
 // status-only version of app/availability.py (missed-so-far unknown -> 0); copy of app/data/availability_model.json
-const DEFAULT_AVAIL = {"by_k": [0.496, 0.286, 0.234, 0.219, 0.182, 0.157, 0.124, 0.146], "k9_12": 0.103, "k13_20": 0.084, "healthy": 0.944, "designation": {"Probable": 0.866, "Questionable": 0.483, "Doubtful": 0.042, "Out": 0.0}, "healthy_curve": {"ahead": [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 30], "q": [0.944, 0.923, 0.907, 0.897, 0.888, 0.882, 0.874, 0.867, 0.862, 0.858, 0.85, 0.848]}, "k21p": 0.078};
+const DEFAULT_AVAIL = {"by_k": [0.503, 0.302, 0.252, 0.25, 0.226, 0.18, 0.157, 0.218], "k9_12": 0.117, "k13_20": 0.118, "healthy": 0.944, "designation": {"Probable": 0.866, "Questionable": 0.483, "Doubtful": 0.042, "Out": 0.0, "_source": "isheplayingtonight.com/nba-injuries/questionable-play-rate: published summary table (first official-report designation vs minutes played, 2,007 player-games, Jan-Oct 2026), read once by hand; no scraper. Per-category n: Probable 351, Questionable 1,367, Doubtful 289."}, "healthy_curve": {"ahead": [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 30], "q": [0.944, 0.923, 0.907, 0.897, 0.888, 0.882, 0.874, 0.867, 0.862, 0.858, 0.85, 0.848], "_source": "2021-24 box-score panel, top-100 players: P(plays a non-b2b team game N games after a game he played); n=16,500 at N=1"}, "k21p": 0.118};
 const DESIG = { Probable: "Probable", Questionable: "Questionable", GTD: "Questionable", DTD: "Questionable", "Day-To-Day": "Questionable", Doubtful: "Doubtful" };
 // P(an undesignated player plays a non-b2b game n games ahead): 0.944 next game, ~0.85 long run (history)
 export function healthyAt(M, n) {
