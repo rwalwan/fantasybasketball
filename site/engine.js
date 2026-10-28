@@ -64,7 +64,9 @@ const SHAKY = new Set(["Questionable", "Doubtful", "GTD", "Day-To-Day"]);
 export const GAME_MINUTES = 150;
 // first / second game back from a 5+ game absence, share of normal FP (2021-24, n=278 returns; research/out1.txt)
 export const RETURN_RAMP = [0.86, 0.96];
-export const usesFaab = settings => settings?.waiver_type === 2;   // Sleeper: 2 = FAAB (budget is sent either way)     // tip to final: used for relief sequencing AND when a relief swap is safe
+// FAAB league? Sleeper sends a waiver budget either way. waiver_type 2 = FAAB is community-documented, not in
+// Sleeper's published docs (review 2), so actual spending also counts: any roster with waiver_budget_used > 0.
+export const usesFaab = (settings, rosters = []) => settings?.waiver_type === 2 || rosters.some(r => (r?.settings?.waiver_budget_used || 0) > 0);     // tip to final: used for relief sequencing AND when a relief swap is safe
 export const B2B_FACTOR = 0.93, PRIOR_GAMES = 8;   // b2b/non-b2b play-rate ratio (availability_model.json)
 
 export class Book {

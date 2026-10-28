@@ -43,4 +43,7 @@ import { usesFaab, RETURN_RAMP } from "../site/engine.js";
 //  d) the league's waiver_type is 0; Sleeper's FAAB is 2 and it sends a default budget either way
 assert.equal(usesFaab({ waiver_type: 0, waiver_budget: 100 }), false);
 assert.equal(usesFaab({ waiver_type: 2, waiver_budget: 100 }), true);
+// review 2: the code 2 isn't in Sleeper's docs, so real spending also marks a FAAB league
+assert.equal(usesFaab({ waiver_type: 0, waiver_budget: 100 }, [{ settings: { waiver_budget_used: 0 } }]), false);
+assert.equal(usesFaab({ waiver_type: 0, waiver_budget: 100 }, [{ settings: { waiver_budget_used: 7 } }]), true);
 console.log("ok: finding 15 (ramp, FAAB)");
