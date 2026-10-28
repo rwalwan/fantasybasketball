@@ -115,7 +115,7 @@ function compute() {
     oppOut = { mean: oppPlan.outlook.mean, var: oppPlan.outlook.var };
   }
   const waivers = wp.waivers(live.trending);
-  const valuer = new Valuer({ book, schedule: base.schedule, Q: base.QS, rosterPositions: base.league.roster_positions, week: base.week, today: etToday(),
+  const valuer = new Valuer({ book, schedule: base.schedule, Q: base.QS, rosterPositions: base.league.roster_positions, week: base.week, today: etToday(), settings: base.league.settings,
                               freeAgents: waivers.list.map(x => x.pid) });
   const plan = wp.build({ opp: oppOut });
   // every free agent scored the same way Moves does: best drop, this week's locked-points change + rest of season

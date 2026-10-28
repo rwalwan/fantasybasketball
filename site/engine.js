@@ -593,13 +593,18 @@ export function playerValue(book, pid) {
 // Missing roster spots are filled with the best free agent, so a 2-for-1 gets credit for the open spot.
 const NEAR = 4;   // weeks solved one by one in team valuation
 export class Valuer {
-  constructor({ book, schedule, Q, rosterPositions, week, freeAgents = [], today }) {
+  constructor({ book, schedule, Q, rosterPositions, week, freeAgents = [], today, settings = {} }) {
     Object.assign(this, { b: book, week, today: today || "0000-00-00", Q: Array.isArray(Q) ? Q : Q.quantiles, QT: Array.isArray(Q) ? null : Q.tiers });
     this.slots = rosterPositions.filter(s => s !== "BN" && s !== "IR");
     this.size = rosterPositions.filter(s => s !== "IR").length;
     this.tg = teamGames(schedule);
-    const weeks = [...new Set(schedule.filter(g => g.week > week).map(g => g.week))].sort((a, b) => a - b);
-    this.weeks = weeks.map((w, i) => ({ w, days: weekDays(schedule, w), disc: 0.97 ** i }));
+    // horizon: through the championship week (league settings), playoff weeks counted fully - they decide the
+    // title; regular-season weeks discounted 3%/week for roster and role churn
+    const p0 = settings.playoff_week_start, rounds = Math.ceil(Math.log2(Math.max(2, settings.playoff_teams || 2)));
+    const last = p0 ? p0 + rounds - 1 : Infinity;
+    this.deadline = settings.trade_deadline || Infinity;
+    const weeks = [...new Set(schedule.filter(g => g.week > week && g.week <= last).map(g => g.week))].sort((a, b) => a - b);
+    this.weeks = weeks.map((w, i) => ({ w, days: weekDays(schedule, w), disc: p0 && w >= p0 ? 1 : 0.97 ** i }));
     this.discSum = this.weeks.reduce((a, x) => a + x.disc, 0) || 1;
     this.fa = freeAgents; this.memo = new Map();
   }
@@ -672,6 +677,7 @@ const swapIn = (roster, out, inn) => roster.filter(p => !out.includes(p)).concat
 export const teamValue = (valuer, players) => valuer.team(players);
 
 export function tradeIdeas(valuer, book, mine, others, limit = 15) {
+  if (valuer.week > valuer.deadline) return [];             // past the league's trade deadline
   const T = ps => ps.reduce((a, p) => a + valuer.tradeValue(p), 0);
   const myB = valuer.team(mine.players, true), ideas = [];
   for (const r of others) {

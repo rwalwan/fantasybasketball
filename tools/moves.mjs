@@ -50,7 +50,7 @@ const protect = new Set([...(mine.reserve || []),
 
 const claims = (() => { try { return st("claims"); } catch { return { consensus: {} }; } })();
 const fa = wp.waivers(trending, 40).list;
-const valuer = new Valuer({ book, schedule, Q: st("quantiles"), rosterPositions: league.roster_positions, week, today, freeAgents: fa.map(x => x.pid) });
+const valuer = new Valuer({ book, schedule, Q: st("quantiles"), rosterPositions: league.roster_positions, week, today, settings: league.settings, freeAgents: fa.map(x => x.pid) });
 const adds = waiverMoves(wp, valuer, mine, fa, protect, 12).filter(m => m.weekGain >= 2 || m.rosGain >= 1)   // a real edge: 2+ pts this week or 1+ pt every week after.slice(0, 8).map(m => ({ ...m, experts: claims.consensus?.[m.pid] || null }));
 const trades = tradeIdeas(valuer, book, mine, rosters.filter(r => r.roster_id !== mine.roster_id), 10)
   .map(t => ({ ...t, partner: userName[t.owner_id] || `Team ${t.roster_id}`,
