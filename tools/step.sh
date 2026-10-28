@@ -5,8 +5,11 @@
 # Usage: tools/step.sh <name> <command...>
 name="$1"; shift
 log=$(mktemp)
-"$@" 2> >(tee "$log" >&2)
+# stderr to a file, then echoed: a `2> >(tee ...)` process substitution could still be writing when the log was read
+# (review 2, finding 7c), so the recorded error tail could come out empty
+"$@" 2>"$log"
 rc=$?
+cat "$log" >&2
 python3 - "$name" "$rc" "$log" <<'PY'
 import json, os, sys, datetime as dt
 name, rc, log = sys.argv[1], int(sys.argv[2]), sys.argv[3]
