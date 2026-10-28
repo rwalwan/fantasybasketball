@@ -380,7 +380,13 @@ setInterval(() => { if (live) render(); }, 30000); // countdowns
 // The installed app (Add to Home Screen) keeps its own storage, separate from the browser's, so the backend
 // link has to be entered once inside it: ⚙ Backend -> paste the setup link (…#api=<url>&key=<key>).
 $("refresh").onclick = () => tick(false);
-$("setup").onclick = () => {
+$("setup").onclick = async () => {
+  // already connected here: hand out this device's setup link (to paste into the home-screen app)
+  if (API && KEY && confirm("This device is connected. Copy its setup link, to paste into the home-screen app or another device?")) {
+    const link = `${location.origin}${location.pathname}#api=${encodeURIComponent(API)}&key=${encodeURIComponent(KEY)}`;
+    try { await navigator.clipboard.writeText(link); alert("Setup link copied."); } catch { prompt("Copy this setup link:", link); }
+    return;
+  }
   const now = API ? `Connected to ${API}.` : "Not connected: answers are saved on this device only.";
   const v = prompt(`${now}\n\nPaste your setup link (the one ending in #api=…&key=…), or leave empty to keep the current setting:`, "");
   if (!v) return;
