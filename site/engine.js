@@ -303,6 +303,18 @@ export class WeekPlan {
       pick.forEach((c, r) => { if (c >= 0 && c < cols.length && m[r][c] != null) total += m[r][c]; });
       return { total, pick: pick.map(c => (c >= 0 && c < cols.length ? cols[c] : null)) };
     };
+    // A slot isn't limited to one player's games: on days its player doesn't play, an eligible player the
+    // solution leaves idle can take the slot (rotate in, lock or pass, rotate back). Value of that stream =
+    // stopping value over the merged games, one per day (the better one when two play the same day).
+    const streamW = (x, sol) => {
+      const a = sol.pick[open.indexOf(x)]; if (!a) return 0;
+      const busy = new Set(sol.pick.filter(p => p && p !== a)), byDay = {};
+      for (const p of pool) {
+        if (busy.has(p) || !fits(x.s, this.b.pos(p))) continue;
+        for (const g of cont[p].u) if (!byDay[g.date] || g.mu * g.q > byDay[g.date].mu * byDay[g.date].q) byDay[g.date] = g;
+      }
+      return Math.max(cont[a].W, contStats(Q, Object.keys(byDay).sort().map(d => byDay[d])).W[0] || 0);
+    };
     const main = solve(open, pool);
     const assignedTo = {}; open.forEach((x, r) => { assignedTo[x.i] = main.pick[r]; });
     const willLock = new Set(), bars = {}, altFor = {};
@@ -310,7 +322,8 @@ export class WeekPlan {
       const g = lockable[x.i]; if (!g) continue;
       const noLock = solve(open, pool, x.i);
       const rest = solve(open.filter(y => y.i !== x.i), pool.filter(p => p !== x.p));
-      bars[x.i] = Math.max(0, noLock.total - rest.total);
+      const alt = noLock.pick[open.indexOf(x)], rot = alt ? streamW(x, noLock) - cont[alt].W : 0;
+      bars[x.i] = Math.max(0, noLock.total - rest.total + rot);
       altFor[x.i] = noLock.pick[open.indexOf(x)];
       if (g.fp >= bars[x.i] && (ls[x.p].st === "open" || ls[x.p].st === "confirm")) willLock.add(x.p);
     }
@@ -333,7 +346,7 @@ export class WeekPlan {
       } else {
         const x = open.find(y => y.i === i);
         if (x && willLock.has(p)) ev = lockable[i].fp;
-        else if (x) { const a = assignedTo[i]; ev = a ? Math.max(0, (val(x, a, false) ?? 0)) : 0; sd = a ? cont[a].sd : 0; }
+        else if (x) { const a = assignedTo[i]; ev = a ? Math.max(0, (val(x, a, false) ?? 0) + streamW(x, main) - cont[a].W) : 0; sd = a ? cont[a].sd : 0; }
       }
       evOf[i] = ev; sdOf[i] = sd; M += ev; V += sd * sd;
     });
