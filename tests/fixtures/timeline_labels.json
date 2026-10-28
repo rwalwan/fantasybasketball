@@ -1,0 +1,705 @@
+{
+ "note": "50 injury/return news items from state news.json (Oct 26-28, 2026), labeled for the reported absence timeline in days from the report, using the same rules as NEWS_PROMPT. Labeled by Claude from the blurb text (not by a human): spot-checks welcome. Ambiguous items (e.g. 'likely sidelined for most of the season', truncated teasers) were left out.",
+ "items": [
+  {
+   "title": "Aaron Nesmith Good to Go Monday",
+   "text": "Indiana Pacers forward Aaron Nesmith (hamstring) is available for Monday's game against the Milwaukee Bucks, according to Scott Agness of [\u2026]",
+   "at": "2026-10-26T23:46+00:00",
+   "status": "available",
+   "label": {
+    "out_min_days": null,
+    "out_max_days": null
+   },
+   "production_extraction": {
+    "out_min_days": 0,
+    "out_max_days": 0
+   }
+  },
+  {
+   "title": "Kings Announce Injury Updates On Murray, Raynaud, Cardwell",
+   "text": "Kings forward Keegan Murray will be reevaluated in 10-to-14 days after being diagnosed with left ankle capsulitis, the team announced in a press release. Murray experienced soreness and stiffness in his surgically-repaired left ankle after the team\u2019s loss to Portland on Friday. He was ruled out of Sunday\u2019s loss to Memphis after initially being listed [\u2026]",
+   "at": "2026-10-27T00:01+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": 10,
+    "out_max_days": 14
+   },
+   "production_extraction": {
+    "out_min_days": 10,
+    "out_max_days": 14
+   }
+  },
+  {
+   "title": "T.J. McConnell Out Again Monday",
+   "text": "Indiana Pacers guard T.J. McConnell (hamstring) will miss Monday's game against the Milwaukee Bucks, according to Scott Agness of Fieldhouse [\u2026]",
+   "at": "2026-10-27T00:01+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": null,
+    "out_max_days": null
+   },
+   "production_extraction": {
+    "out_min_days": null,
+    "out_max_days": null
+   }
+  },
+  {
+   "title": "Jalen Williams Likely Out for the Season",
+   "text": "Oklahoma City Thunder forward Jalen Williams (leg) is expected to miss several months after suffering a dislocated left ankle and [\u2026]",
+   "at": "2026-10-27T00:16+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": 200,
+    "out_max_days": 200
+   },
+   "production_extraction": {
+    "out_min_days": 200,
+    "out_max_days": 200
+   }
+  },
+  {
+   "title": "Jalen Suggs to be Re-Evaluated in Two Weeks",
+   "text": "Orlando Magic guard Jalen Suggs (knee) will be re-evaluated in two weeks after an MRI revealed a mild right knee [\u2026]",
+   "at": "2026-10-27T00:30+00:00",
+   "status": "unknown",
+   "label": {
+    "out_min_days": 14,
+    "out_max_days": null
+   },
+   "production_extraction": {
+    "out_min_days": null,
+    "out_max_days": null
+   }
+  },
+  {
+   "title": "Cameron Johnson: Downgraded to out",
+   "text": "Johnson (ankle) has been ruled out for Monday's game against Golden State.\n\n        Visit RotoWire.com for more analysis on this update.",
+   "at": "2026-10-27T01:16+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": null,
+    "out_max_days": null
+   },
+   "production_extraction": {
+    "out_min_days": null,
+    "out_max_days": null
+   }
+  },
+  {
+   "title": "Cameron Johnson to Miss Second Straight Game",
+   "text": "Denver Nuggets forward Cam Johnson (ankle) has been ruled out for Monday's game against the Golden State Warriors with a [\u2026]",
+   "at": "2026-10-27T01:31+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": null,
+    "out_max_days": null
+   },
+   "production_extraction": {
+    "out_min_days": null,
+    "out_max_days": null
+   }
+  },
+  {
+   "title": "Jaren Jackson: Won't return Monday",
+   "text": "Jackson has been ruled out for the rest of Monday's game against the Grizzlies due to a right knee injury.\n\n        Visit RotoWire.com for more analysis on this update.",
+   "at": "2026-10-27T02:11+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": null,
+    "out_max_days": null
+   },
+   "production_extraction": {
+    "out_min_days": 0,
+    "out_max_days": 0
+   }
+  },
+  {
+   "title": "Lauri Markkanen: Won't return vs. Memphis",
+   "text": "Markkanen (wrist) won't return to Monday's game against Memphis.\n\n        Visit RotoWire.com for more analysis on this update.",
+   "at": "2026-10-27T02:16+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": null,
+    "out_max_days": null
+   },
+   "production_extraction": {
+    "out_min_days": null,
+    "out_max_days": null
+   }
+  },
+  {
+   "title": "Injury Notes: Pacers, Adams, Dybantsa, Hornets, Jones",
+   "text": "Pacers guard Ben Sheppard, who tore the meniscus in his left knee last week, is scheduled to undergo surgery to address the injury this Wednesday, head coach Rick Carlisle told reporters ahead of Monday\u2019s game, per Scott Agness of Fieldhouse Files (Twitter link). While the Pacers are unlikely to provide a specific recovery timeline until [\u2026]",
+   "at": "2026-10-27T02:31+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": null,
+    "out_max_days": null
+   },
+   "production_extraction": {
+    "out_min_days": null,
+    "out_max_days": null
+   }
+  },
+  {
+   "title": "Ivica Zubac: Walking without boot",
+   "text": "The Pacers don't have a timetable for Zubac's return after he suffered a left ankle injury Sunday against Brooklyn, but he was able to walk without a boot Monday, Dustin Dopirak of The Indianapolis Star reports.\n\n        Visit RotoWire.com for more analysis on this update.",
+   "at": "2026-10-27T04:46+00:00",
+   "status": "unknown",
+   "label": {
+    "out_min_days": null,
+    "out_max_days": null
+   },
+   "production_extraction": {
+    "out_min_days": null,
+    "out_max_days": null
+   }
+  },
+  {
+   "title": "Keegan Murray Out 10-14 Days Due To Ankle Soreness; Maxime Raynaud, Dylan Cardwell Out 1-2 Weeks",
+   "text": " The Sacramento gave an update on a trip of injured frontcourt players. Starting forward Keegan Murray is out 10-to-14 days due to left ankle capsulitis. This injury is described as persistent soreness and stiffness in Murray's surgically repaired left ankle. \n Sacramento will also be without their two backup centers for a little longer too. Maxime Raynaud is progressing through his recovery from ",
+   "at": "2026-10-27T13:31+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": 10,
+    "out_max_days": 14
+   },
+   "production_extraction": {
+    "out_min_days": 10,
+    "out_max_days": 14
+   }
+  },
+  {
+   "title": "Maxime Raynaud Out at Least Two More Weeks",
+   "text": "Sacramento Kings center Maxime Raynaud (knee) will be re-evaluated in approximately two weeks as he continues to recover from a [\u2026]",
+   "at": "2026-10-27T14:01+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": 14,
+    "out_max_days": null
+   },
+   "production_extraction": {
+    "out_min_days": 14,
+    "out_max_days": null
+   }
+  },
+  {
+   "title": "Keegan Murray to be Re-Evaluated in 10 to 14 Days",
+   "text": "Sacramento Kings forward Keegan Murray (ankle) has been diagnosed with left ankle capsulitis and will be re-evaluated in 10 to [\u2026]",
+   "at": "2026-10-27T14:01+00:00",
+   "status": "unknown",
+   "label": {
+    "out_min_days": 10,
+    "out_max_days": 14
+   },
+   "production_extraction": {
+    "out_min_days": null,
+    "out_max_days": null
+   }
+  },
+  {
+   "title": "Kawhi Leonard: Expected to miss multiple weeks",
+   "text": "Leonard (knee) is expected to miss multiple weeks due to swelling in his left knee, Shams Charania of ESPN reports.\n\n        Visit RotoWire.com for more analysis on this update.",
+   "at": "2026-10-27T15:46+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": 14,
+    "out_max_days": null
+   },
+   "production_extraction": {
+    "out_min_days": 14,
+    "out_max_days": null
+   }
+  },
+  {
+   "title": "Kawhi Leonard Expected To Miss \u2018Weeks\u2019 Due To Knee Issue",
+   "text": "The Raptors are expecting to be without star forward Kawhi Leonard for \u201ca period of weeks\u201d as a result of the swelling in his left knee, sources tell Shams Charania of ESPN (Twitter link). Issuing a formal update on Leonard, the Raptors said today in a press release that he\u2019ll undergo treatment and a rehab [\u2026]",
+   "at": "2026-10-27T15:46+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": 14,
+    "out_max_days": null
+   },
+   "production_extraction": {
+    "out_min_days": null,
+    "out_max_days": null
+   }
+  },
+  {
+   "title": "Kawhi Leonard will be out at least 1 week because of swelling in left knee, Raptors say",
+   "text": "Leonard, 35, was sidelined for Toronto's road loss to the Minnesota Timberwolves this past Sunday.",
+   "at": "2026-10-27T16:01+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": 7,
+    "out_max_days": null
+   },
+   "production_extraction": {
+    "out_min_days": 7,
+    "out_max_days": null
+   }
+  },
+  {
+   "title": "Kawhi Leonard Out Multiple Weeks With Swelling In Left Knee",
+   "text": " Kawhi Leonard is expected to be out multiple weeks due to swelling in his left knee. An MRI didn't show any structural damage in Leonard's knee, but they are going go give him rest before ramping back up. \n Leonard and the Toronto Raptors signed a two-year, $115 million extension in September following his trade from the Los Angeles Clippers. \n In two games this season back with the Raptors, Leon",
+   "at": "2026-10-27T16:31+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": 14,
+    "out_max_days": null
+   },
+   "production_extraction": {
+    "out_min_days": 14,
+    "out_max_days": null
+   }
+  },
+  {
+   "title": "Kawhi Leonard is out with swelling in left knee, will be re-evaluated in one week",
+   "text": "Expect him to miss more time than that, the Raptors will have him in bubble wrap all season.",
+   "at": "2026-10-27T16:31+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": 7,
+    "out_max_days": null
+   },
+   "production_extraction": {
+    "out_min_days": null,
+    "out_max_days": null
+   }
+  },
+  {
+   "title": "Sixers Apply For Disabled Player Exception For Hukporti",
+   "text": "The Sixers have applied to the NBA for a disabled player exception in the wake of Ariel Hukporti\u2019s season-ending Achilles tear, reports Jake Fischer of Bleacher Report and The Stein Line (Twitter link). Hukporti sustained the Achilles injury in his preseason debut and underwent surgery shortly thereafter. A team can be granted a disabled player [\u2026]",
+   "at": "2026-10-27T17:01+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": 200,
+    "out_max_days": 200
+   },
+   "production_extraction": {
+    "out_min_days": 200,
+    "out_max_days": 200
+   }
+  },
+  {
+   "title": "Derrick White: Probable for Tuesday",
+   "text": "White (right hip) is probable for Tuesday's game against the Nets.\n\n        Visit RotoWire.com for more analysis on this update.",
+   "at": "2026-10-27T17:16+00:00",
+   "status": "probable",
+   "label": {
+    "out_min_days": null,
+    "out_max_days": null
+   },
+   "production_extraction": {
+    "out_min_days": null,
+    "out_max_days": null
+   }
+  },
+  {
+   "title": "Jaren Jackson: Expected to miss at least six weeks",
+   "text": "Jackson has been diagnosed with a torn MCL in his right knee and will be sidelined for 6-to-8 weeks, per Shams Charania of ESPN.\n\n        Visit RotoWire.com for more analysis on this update.",
+   "at": "2026-10-27T19:31+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": 42,
+    "out_max_days": 56
+   },
+   "production_extraction": {
+    "out_min_days": 42,
+    "out_max_days": 56
+   }
+  },
+  {
+   "title": "Jaren Jackson Jr. To Miss 6-8 Weeks Due To Torn MCL",
+   "text": "Jazz forward Jaren Jackson Jr. has been diagnosed with a torn MCL in his right knee and is expected to miss approximately six-to-eight weeks of action, sources tell Shams Charania and Tim MacMahon of ESPN (Twitter link). Jackson won\u2019t require surgery to repair the tear, Charania and MacMahon add. Jackson suffered the injury early in [\u2026]",
+   "at": "2026-10-27T19:31+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": 42,
+    "out_max_days": 56
+   },
+   "production_extraction": {
+    "out_min_days": 42,
+    "out_max_days": 56
+   }
+  },
+  {
+   "title": "Rui Hachimura: Ruled out for Wednesday",
+   "text": "Hachimura (quadriceps) has been ruled out for Wednesday's game against the Lakers, Joey Linn of SI.com reports.\n\n        Visit RotoWire.com for more analysis on this update.",
+   "at": "2026-10-27T20:01+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": null,
+    "out_max_days": null
+   },
+   "production_extraction": {
+    "out_min_days": null,
+    "out_max_days": null
+   }
+  },
+  {
+   "title": "Lauri Markkanen: Day-to-day with wrist sprain",
+   "text": "Markkanen is day-to-day with a right wrist sprain, per NBA reporter Marc Stein.\n\n        Visit RotoWire.com for more analysis on this update.",
+   "at": "2026-10-27T20:16+00:00",
+   "status": "questionable",
+   "label": {
+    "out_min_days": 0,
+    "out_max_days": 3
+   },
+   "production_extraction": {
+    "out_min_days": 0,
+    "out_max_days": 3
+   }
+  },
+  {
+   "title": "Jazz All-Star Jaren Jackson Jr. could miss two months with knee injury",
+   "text": "Two-time All-Star Jaren Jackson Jr. suffered a torn MCL Monday against the Grizzlies and will be out 6 to 8 weeks, per report.",
+   "at": "2026-10-27T20:16+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": 42,
+    "out_max_days": 56
+   },
+   "production_extraction": {
+    "out_min_days": 42,
+    "out_max_days": 56
+   }
+  },
+  {
+   "title": "Alperen Sengun: Won't play vs. Milwaukee",
+   "text": "Sengun (back) has been ruled out for Wednesday's game against the Bucks.\n\n        Visit RotoWire.com for more analysis on this update.",
+   "at": "2026-10-27T20:31+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": null,
+    "out_max_days": null
+   },
+   "production_extraction": {
+    "out_min_days": null,
+    "out_max_days": null
+   }
+  },
+  {
+   "title": "Yaxel Lendeborg: Iffy for Wednesday",
+   "text": "Lendeborg (foot) is questionable for Wednesday's game against Minnesota.\n\n        Visit RotoWire.com for more analysis on this update.",
+   "at": "2026-10-27T20:46+00:00",
+   "status": "questionable",
+   "label": {
+    "out_min_days": null,
+    "out_max_days": null
+   },
+   "production_extraction": {
+    "out_min_days": null,
+    "out_max_days": null
+   }
+  },
+  {
+   "title": "Lauri Markkanen Day-To-Day With Wrist Sprain",
+   "text": "According to NBA reporter Marc Stein, Utah Jazz forward Lauri Markkanen (wrist) is considered day-to-day with a right wrist sprain. [\u2026]",
+   "at": "2026-10-27T21:01+00:00",
+   "status": "questionable",
+   "label": {
+    "out_min_days": 0,
+    "out_max_days": 3
+   },
+   "production_extraction": {
+    "out_min_days": 0,
+    "out_max_days": 3
+   }
+  },
+  {
+   "title": "Ivica Zubac: Won't play Wednesday",
+   "text": "Zubac (ankle) is out for Wednesday's game against the 76ers.\n\n        Visit RotoWire.com for more analysis on this update.",
+   "at": "2026-10-27T21:31+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": null,
+    "out_max_days": null
+   },
+   "production_extraction": {
+    "out_min_days": null,
+    "out_max_days": null
+   }
+  },
+  {
+   "title": "Jaren Jackson Jr. Out 6-8 Weeks With Torn MCL In Right Knee",
+   "text": " Jaren Jackson Jr. suffered a torn MCL in his right knee during Monday's home loss by the Utah Jazz to the Memphis Grizzlies. The Jazz said Tuesday he will be re-evaluated in six weeks. \n Sources told ESPN that Jackson faces a recovery window of six to eight weeks. \n The injury occurred when Grizzlies guard Ty Jerome fell into Jackson, which caused his knee to buckle. \n Utah acquired the two-time ",
+   "at": "2026-10-27T21:31+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": 42,
+    "out_max_days": 56
+   },
+   "production_extraction": {
+    "out_min_days": 42,
+    "out_max_days": 56
+   }
+  },
+  {
+   "title": "Lauri Markkanen Day-To-Day With Sprained Right Wrist",
+   "text": " The Utah Jazz listed Lauri Markkanen as day to day Tuesday with a sprained right wrist. Markkanen exited Monday's home loss to the Memphis Grizzlies in the first half after suffering the injury. \n The team is hopeful Markkanen will avoid a lengthy absence.  \n Markkanen's status carries added weight given Utah's thinning frontcourt. Jaren Jackson Jr. tore the MCL in his right knee in the same game",
+   "at": "2026-10-27T21:31+00:00",
+   "status": "questionable",
+   "label": {
+    "out_min_days": 0,
+    "out_max_days": 3
+   },
+   "production_extraction": {
+    "out_min_days": 0,
+    "out_max_days": 3
+   }
+  },
+  {
+   "title": "Chet Holmgren: Won't play Wednesday",
+   "text": "Holmgren (knee) has been ruled out for Wednesday's game against the Mavericks.\n\n        Visit RotoWire.com for more analysis on this update.",
+   "at": "2026-10-27T21:46+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": null,
+    "out_max_days": null
+   },
+   "production_extraction": {
+    "out_min_days": null,
+    "out_max_days": null
+   }
+  },
+  {
+   "title": "Cameron Johnson: Doubtful for Wednesday",
+   "text": "Johnson (ankle) is doubtful to face the Pelicans on Wednesday.\n\n        Visit RotoWire.com for more analysis on this update.",
+   "at": "2026-10-27T22:46+00:00",
+   "status": "doubtful",
+   "label": {
+    "out_min_days": null,
+    "out_max_days": null
+   },
+   "production_extraction": {
+    "out_min_days": null,
+    "out_max_days": null
+   }
+  },
+  {
+   "title": "Anthony Edwards: Set to undergo knee surgery",
+   "text": "Edwards will undergo arthroscopic right knee surgery and is expected to miss up to two months, Shams Charania of ESPN reports.\n\n        Visit RotoWire.com for more analysis on this update.",
+   "at": "2026-10-27T23:01+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": null,
+    "out_max_days": 60
+   },
+   "production_extraction": {
+    "out_min_days": null,
+    "out_max_days": 60
+   }
+  },
+  {
+   "title": "Anthony Edwards Needs Knee Surgery, Could Miss Two Months",
+   "text": "Timberwolves star guard Anthony Edwards will undergo an arthroscopic procedure on his right knee and miss up to two months, ESPN\u2019s Shams Charania tweets. More to come\u2026",
+   "at": "2026-10-27T23:01+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": null,
+    "out_max_days": 60
+   },
+   "production_extraction": {
+    "out_min_days": null,
+    "out_max_days": 60
+   }
+  },
+  {
+   "title": "Anthony Edwards injury update: Timberwolves star set to miss significant time",
+   "text": "Minnesota Timberwolves All-Star Anthony Edwards is undergoing knee surgery and will miss around two months, according to multiple reports.",
+   "at": "2026-10-27T23:16+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": 60,
+    "out_max_days": 60
+   },
+   "production_extraction": {
+    "out_min_days": 60,
+    "out_max_days": 60
+   }
+  },
+  {
+   "title": "Anthony Edwards to have surgery on ailing right knee, could miss two months",
+   "text": "Edwards had looked like a serious MVP candidate to open the season, leading Minnesota to a 4-0 start.",
+   "at": "2026-10-27T23:16+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": 60,
+    "out_max_days": 60
+   },
+   "production_extraction": {
+    "out_min_days": 60,
+    "out_max_days": 60
+   }
+  },
+  {
+   "title": "Anthony Edwards reportedly needs procedure on ailing right knee, expected to miss up to 2 months",
+   "text": "Minnesota Timberwolves star Anthony Edwards needs an arthroscopic procedure on his right knee and could miss up to two months, ESPN\u2019s Shams Charania reports.",
+   "at": "2026-10-27T23:16+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": null,
+    "out_max_days": 60
+   },
+   "production_extraction": {
+    "out_min_days": null,
+    "out_max_days": 60
+   }
+  },
+  {
+   "title": "AJ Dybantsa (ankle) upgraded to questionable vs. Cavs",
+   "text": "AJ Dybantsa was upgraded to questionable for Wednesday against the Cleveland Cavaliers, per the Wizards\u2019 injury report. Dybantsa, the No. 1 pick in the 2026 NBA Draft, has missed Washington\u2019s first four games after spraining his left ankle in the team\u2019s preseason finale. The 6-foot-9 wing led all NCAA Division I scorers with 25.0 points [\u2026]",
+   "at": "2026-10-27T23:16+00:00",
+   "status": "questionable",
+   "label": {
+    "out_min_days": null,
+    "out_max_days": null
+   },
+   "production_extraction": {
+    "out_min_days": null,
+    "out_max_days": null
+   }
+  },
+  {
+   "title": "Timberwolves star Anthony Edwards headed for knee surgery that will keep him out multiple months, per report",
+   "text": "Edwards and the Timberwolves are off to a roaring 3-1 start this season",
+   "at": "2026-10-27T23:31+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": 14,
+    "out_max_days": null
+   },
+   "production_extraction": {
+    "out_min_days": 60,
+    "out_max_days": null
+   }
+  },
+  {
+   "title": "Anthony Edwards To Undergo Procedure On Right Knee, To Miss Up To 2 Months",
+   "text": " Minnesota Timberwolves star Anthony Edwards will undergo an arthroscopic procedure on his ailing right knee that will sideline him for up to two months, sources told ESPN's Shams Charania. \n Edwards had been listed as questionable on the Wolves' injury report before Monday's game against the Cleveland Cavaliers, the second night of a back-to-back, but he played a season-high 41 minutes and scored",
+   "at": "2026-10-28T00:30+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": null,
+    "out_max_days": 60
+   },
+   "production_extraction": {
+    "out_min_days": null,
+    "out_max_days": 60
+   }
+  },
+  {
+   "title": "Anthony Edwards To Undergo Knee Procedure, Out Up To Two Months",
+   "text": " The Minnesota Timberwolves will be without Anthony Edwards for up to two months as he will undergo an arthroscopic procedure on his right knee. \n The news comes one night after Edwards scored 47 points in a 127-125 overtime loss to the Cleveland Cavaliers. Edwards logged a season-high 41 minutes on the second night of a back-to-back. \n Edwards entered Monday's game listed as questionable, but he ",
+   "at": "2026-10-28T01:31+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": null,
+    "out_max_days": 60
+   },
+   "production_extraction": {
+    "out_min_days": null,
+    "out_max_days": 60
+   }
+  },
+  {
+   "title": "Egor Demin: Injury 'nothing serious'",
+   "text": "Demin (leg) stated he isn't sure if he will be able to play in Friday's game against Detroit, Erik Slater of ClutchPoints.com reports.\n\n        Visit RotoWire.com for more analysis on this update.",
+   "at": "2026-10-28T04:00+00:00",
+   "status": "questionable",
+   "label": {
+    "out_min_days": null,
+    "out_max_days": null
+   },
+   "production_extraction": {
+    "out_min_days": null,
+    "out_max_days": null
+   }
+  },
+  {
+   "title": "Anthony Edwards out two months in Timberwolves injury nightmare",
+   "text": "In a young NBA season that's already been littered with bad injury news, the Timberwolves were the latest to be affected.",
+   "at": "2026-10-28T04:00+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": 60,
+    "out_max_days": 60
+   },
+   "production_extraction": {
+    "out_min_days": 60,
+    "out_max_days": 60
+   }
+  },
+  {
+   "title": "AJ Dybantsa: Will debut Wednesday",
+   "text": "Dybantsa (ankle) will make his NBA debut Wednesday against the Cavaliers, Shams Charania of ESPN reports.\n\n        Visit RotoWire.com for more analysis on this update.",
+   "at": "2026-10-28T16:32+00:00",
+   "status": "available",
+   "label": {
+    "out_min_days": null,
+    "out_max_days": null
+   },
+   "production_extraction": {
+    "out_min_days": null,
+    "out_max_days": null
+   }
+  },
+  {
+   "title": "Tyrese Haliburton: To miss time with hamstring issue",
+   "text": "Haliburton (hamstring) will miss time, though his timetable has yet to be announced, Shams Charania of ESPN reports.\n\n        Visit RotoWire.com for more analysis on this update.",
+   "at": "2026-10-28T17:46+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": null,
+    "out_max_days": null
+   },
+   "production_extraction": {
+    "out_min_days": null,
+    "out_max_days": null
+   }
+  },
+  {
+   "title": "Alex Caruso: Return timeline uncertain",
+   "text": "Caruso is expected to miss time due to an ankle sprain, Clemente Almanza of USA Today reports.\n\n        Visit RotoWire.com for more analysis on this update.",
+   "at": "2026-10-28T18:16+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": null,
+    "out_max_days": null
+   },
+   "production_extraction": {
+    "out_min_days": null,
+    "out_max_days": null
+   }
+  },
+  {
+   "title": "Wizards\u2019 Justin Champagnie Undergoes Foot Surgery",
+   "text": "Wizards wing Justin Champagnie underwent surgery on Wednesday to repair a fracture in his right foot, The Athletic\u2019s Josh Robbins reports (Twitter link). The team hopes that Champagnie will be able to return by the All-Star break, Robbins adds. He suffered the injury during Monday\u2019s game in Charlotte and had already been ruled out of [\u2026]",
+   "at": "2026-10-28T18:46+00:00",
+   "status": "out",
+   "label": {
+    "out_min_days": null,
+    "out_max_days": 107
+   },
+   "production_extraction": {
+    "out_min_days": null,
+    "out_max_days": null
+   }
+  },
+  {
+   "title": "Mavericks Injury Update: Santi Aldama could join the active roster this week",
+   "text": "Aldama practiced with the Texas Legends on Tuesday and could return to the Mavericks\u2019 active roster on Friday or Monday.",
+   "at": "2026-10-28T18:46+00:00",
+   "status": "probable",
+   "label": {
+    "out_min_days": 3,
+    "out_max_days": 6
+   },
+   "production_extraction": {
+    "out_min_days": 3,
+    "out_max_days": 6
+   }
+  }
+ ]
+}

@@ -1,6 +1,6 @@
 """Head-to-head test of AI models on OUR tasks (run by .github/workflows/llm-eval.yml).
 
-Tasks, with the exact prompts the app uses:
+Tasks, with the exact prompts the app uses (timelines are scored against tests/fixtures/timeline_labels.json):
   news    one news blurb -> player / status / kind / minutes effect        (high volume, simple)
   advice  one expert article -> in-season calls + per-player takes        (low volume, nuanced; feeds expert grading)
 
@@ -21,7 +21,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from app import news, sources  # noqa: E402
 
 STATE = os.path.join(os.path.dirname(__file__), "..", "data", "state")
-KEY = os.environ["OPENROUTER_API_KEY"]
+KEY = os.environ.get("OPENROUTER_API_KEY", "")
+LABELS = os.path.join(os.path.dirname(__file__), "..", "tests", "fixtures", "timeline_labels.json")
 CONFIGS = [  # (label, model, extra request params)
     ("Claude Haiku 5.5", "anthropic/claude-haiku-5.5", {}),
     ("Claude Haiku 5.5 + reasoning (low)", "anthropic/claude-haiku-5.5", {"reasoning": {"effort": "low"}}),
@@ -59,6 +60,43 @@ def norm(x):
     return (str(x or "")).strip().lower()
 
 
+def family(label):
+    return next(c[1] for c in CONFIGS if c[0] == label).split("/")[0]
+
+
+def panel(label, labels):
+    """Who judges `label` by consensus: one model per OTHER family (same-family models agree with each other,
+    so letting Haiku vote for Haiku inflated its score)."""
+    out, fams = [], {family(label)}
+    for x in labels:
+        if family(x) not in fams:
+            out.append(x)
+            fams.add(family(x))
+    return out
+
+
+def timeline_match(pred, label):
+    """(min, max) days vs the hand label: each end within max(3 days, 15%), and None only matches None."""
+    for p, l in zip(pred, label):
+        if (p is None) != (l is None):
+            return False
+        if p is not None and abs(p - l) > max(3, 0.15 * l):
+            return False
+    return True
+
+
+def score_timelines(preds, items):
+    """(raw accuracy, accuracy after the app's validation rules) of extracted timelines vs labels."""
+    raw = eff = 0
+    for (pmin, pmax), it in zip(preds, items):
+        lab = (it["label"]["out_min_days"], it["label"]["out_max_days"])
+        raw += timeline_match((pmin, pmax), lab)
+        norm = lambda mn, mx: news._window({"kind": "injury", "status": it.get("status"), "out_min_days": mn, "out_max_days": mx},
+                                           lambda _p: None) or (None, None)
+        eff += timeline_match(norm(pmin, pmax), norm(*lab))
+    return raw / max(1, len(items)), eff / max(1, len(items))
+
+
 def main():
     old = json.load(open(os.path.join(STATE, "news.json"))) if os.path.exists(os.path.join(STATE, "news.json")) else []
     blurbs = [n for n in reversed(old) if n.get("text")][:N_NEWS]
@@ -78,8 +116,13 @@ def main():
             print("skip", src["name"], e)
     print(f"{len(blurbs)} news blurbs, {len(arts)} articles")
 
-    res = collections.defaultdict(lambda: {"news": [], "advice": []})
+    labeled = json.load(open(LABELS))["items"]
+    res = collections.defaultdict(lambda: {"news": [], "advice": [], "timeline": []})
     for label, model, extra in CONFIGS:
+        for it in labeled:
+            x = call(model, extra, news.NEWS_PROMPT, f"Title: {it['title']}\n\n{it['text']}")
+            j = x.get("json") or {}
+            res[label]["timeline"].append((j.get("out_min_days"), j.get("out_max_days")))
         for b in blurbs:
             res[label]["news"].append(call(model, extra, news.NEWS_PROMPT, f"Title: {b['title']}\n\n{b['text']}"))
         for a in arts:
@@ -90,7 +133,7 @@ def main():
     labels = [c[0] for c in CONFIGS]
     report = {"at": time.strftime("%Y-%m-%dT%H:%MZ", time.gmtime()), "n_news": len(blurbs), "n_advice": len(arts), "models": []}
     for label in labels:
-        others = [x for x in labels if x != label]
+        others = panel(label, labels)
         # news: field agreement with the majority of the other models
         agree = collections.Counter()
         tot = collections.Counter()
@@ -142,6 +185,8 @@ def main():
             "news_agree_avg": round(sum(agree.values()) / max(1, sum(tot.values())), 3),
             "calls_precision": round(P / pr_n, 3) if pr_n else None, "calls_recall": round(R / pr_n, 3) if pr_n else None,
             "takes_recall": round(sum(tk) / len(tk), 3) if tk else None,
+            "timeline_raw": round(score_timelines(res[label]["timeline"], labeled)[0], 3),
+            "timeline_effective": round(score_timelines(res[label]["timeline"], labeled)[1], 3),
             "sec_median": round(statistics.median([x["sec"] for x in allc]), 2) if allc else None,
             "cost_total": round(sum(costs), 5), "cost_per_news": round(statistics.mean(nc), 6) if nc else None,
             "cost_per_article": round(statistics.mean(ac), 6) if ac else None,

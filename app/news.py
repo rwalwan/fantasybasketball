@@ -23,10 +23,10 @@ from . import sources
 STATE = os.path.join(os.path.dirname(__file__), "..", "data", "state")
 UA = {"User-Agent": "we-back-lock-desk (personal fantasy assistant; github.com/rwalwan/fantasybasketball)"}
 MODEL = os.environ.get("OPENROUTER_MODEL") or "anthropic/claude-haiku-5.5"                 # news, why-notes, reasons
-# Expert articles are ~7% of calls but feed expert grading, so they get the stronger model (~$7/month extra).
-# Model test on our own tasks (tools/llm_eval.py, Oct 2026): Haiku 5.5 was the most accurate on news blurbs; adding
-# reasoning made it worse; Sonnet 5.5 costs ~15x per call. Override either with the repo variables.
-ADVICE_MODEL = os.environ.get("OPENROUTER_MODEL_ADVICE") or "anthropic/claude-sonnet-5.5"
+# Expert articles use the same model by default. The Oct 2026 eval couldn't tell models apart on articles (5
+# articles, every model 100%), and their output is display-only, so Sonnet's ~15x cost wasn't justified (review
+# finding 13). Override with the OPENROUTER_MODEL_ADVICE repo variable.
+ADVICE_MODEL = os.environ.get("OPENROUTER_MODEL_ADVICE") or MODEL
 
 ADVICE_RE = re.compile(r"(?i)waiver|start|sit\b|pickup|pick-up|add|drop|sell|buy|trade|stream|sleeper|target|risers|fallers|week \d|rest of season|ros\b|must-|hold")
 DRAFT_TITLE_RE = re.compile(r"(?i)draft|adp|mock|preseason|auction|keeper|dynasty|cheat sheet")
