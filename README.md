@@ -16,13 +16,19 @@ Live site: https://rwalwan.github.io/fantasybasketball/
 
 | Piece | What it does |
 |---|---|
-| `app/` (Python) | Data, memory store, context model, news, and expert grading |
-| `site/` | Static app that recomputes in the browser every minute |
-| `tools/` | Moves, the AI model eval, and the site health check |
+| `app/` (Python) | Data, memory store, projections (fitted blend), matchup context, usage model, availability model, news + expert grading, other-league study |
+| `site/` | Static app (installable on a phone home screen) that recomputes in the browser every minute |
+| `tools/` | Moves + win-chance log, AI model eval, state save/restore, step health, site check |
 | `worker/` | Cloudflare Worker: lineup snapshots and the 15-minute job trigger |
-| `.github/workflows/` | Update job every 15 minutes, worker deploy, and the AI model eval |
+| `research/` | Scripts that fit the data-driven constants (return rates, usage model, volatility) |
+| `tests/` | `tests/run_all.sh` - run on every push |
 
-Saved state lives on the `state` branch.
+Workflows: **Update** (every 15 minutes), **Other Lock-In leagues** (daily, 8:07 AM PT), **AI model eval** (manual),
+**Tests** (every push), **Worker** (on worker changes). Saved state lives on the `state` branch (daily copy on
+`state-backup`).
+
+**On a phone:** open the site, then Share -> Add to Home Screen (iPhone) or menu -> Install app (Android). The
+installed app keeps its own storage: tap ⚙ Backend once and paste your setup link.
 
 ## License
 
