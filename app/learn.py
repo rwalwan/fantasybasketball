@@ -12,6 +12,9 @@ import os
 import sys
 
 from . import memory, sleeper
+from .availability import healthy_at
+from .engine import team_game_dates, week_dates
+from .lockin import expected_max
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 LEAGUE_ID = os.environ.get("FBB_LEAGUE_ID", "1400915575915491328")
@@ -25,7 +28,9 @@ def _future(t, now):
 def record(con, plan, now):
     week = plan.get("week")
     for idx, s in enumerate(plan.get("slots", [])):
-        if s["action"] in ("lock", "pass", "confirm", "keep") and s.get("score") is not None:
+        # 'keep' (counts automatically, nothing left to decide) is not a decision: recording it gave week 1 a
+        # fake scorecard and overwrote the real pre-deadline call for the same game
+        if s["action"] in ("lock", "pass", "confirm") and s.get("score") is not None and (s.get("deadline") or {}).get("tip"):
             dl = (s.get("deadline") or {}).get("tip")
             if dl and not _future(dl, now):
                 continue                                    # keep the last call made before the deadline
@@ -46,6 +51,32 @@ def record(con, plan, now):
     con.commit()
 
 
+def continuation(later):
+    """Points the slot would have ended with by passing and then following the engine's stopping rule on the
+    player's remaining games THIS week. later = [(score or None if he sat, projected mean), ...] in order."""
+    n = len(later)
+    for j, (sc, _mu) in enumerate(later):
+        if j == n - 1:
+            return float(sc or 0.0)                 # last game is forced (0 if he sits)
+        if sc is None:
+            continue
+        W = 0.0
+        for k in range(n - 1, j, -1):               # bar = value of the games after this one
+            mu, q = later[k][1], healthy_at(k - j)
+            W = q * mu if k == n - 1 else q * expected_max(mu, W) + (1 - q) * W
+        if sc >= W:
+            return float(sc)
+    return 0.0
+
+
+def grade_lock_call(score, call, later):
+    """(counterfactual of passing, regret) - regret > 0 means the call cost points. Same rule whether or not
+    the call was followed, so the grade measures the call, not the manager."""
+    cf = round(continuation(later), 1) if later else float(score)
+    regret = cf - score if call == "lock" else score - cf
+    return cf, round(regret, 1)
+
+
 def grade(con, season, current_week, lineups_by_week):
     """Grade every ungraded decision from finished weeks."""
     weeks = [w for (w,) in con.execute("SELECT DISTINCT week FROM decisions WHERE regret IS NULL AND week < ?", (current_week,))]
@@ -53,9 +84,17 @@ def grade(con, season, current_week, lineups_by_week):
         return 0
     rosters = sleeper.rosters(LEAGUE_ID)
     mine = next(r for r in rosters if r.get("owner_id") == USER_ID)
-    fp = {}
-    for pid, d, f in con.execute("SELECT pid, date, fp FROM games WHERE season=?", (season,)):
+    fp, proj, team = {}, {}, {}
+    for pid, d, f, tm, pr in con.execute("SELECT pid, date, fp, team, COALESCE(proj_rw, proj_model) FROM games WHERE season=? ORDER BY date", (season,)):
         fp[(pid, d)] = f
+        team[pid] = tm
+        if pr:
+            proj[(pid, d)] = pr
+    avg = {}
+    for (pid, _d), f in fp.items():
+        avg.setdefault(pid, []).append(f)
+    sched = sleeper.schedule(season)
+    tg = team_game_dates(sched)
     n = 0
     for w in weeks:
         mu = next(m for m in sleeper.matchups(LEAGUE_ID, w) if m["roster_id"] == mine["roster_id"])
@@ -67,14 +106,13 @@ def grade(con, season, current_week, lineups_by_week):
                 final = final_by_pid.get(pid)
                 if final is None:
                     final = spts[idx] / 10 if idx < len(spts) else None
-                later = sorted((dd, f) for (p, dd), f in fp.items() if p == pid and dd > (d or ""))
-                cf = later[0][1] if later else 0.0                 # what waiting on him would have produced
-                if mx_call == "lock":
-                    followed = int(final is not None and abs(final - score) < 0.05)
-                    regret = cf - score                            # > 0: locking cost points
-                else:
-                    followed = int(final is not None and abs(final - score) >= 0.05)
-                    regret = score - (final if final is not None else cf)   # > 0: waiting cost points
+                # his remaining games in the SAME week (a DNP is a game he can't lock), replayed with the stopping rule
+                days = set(week_dates(sched, w))
+                mean = sum(avg.get(pid, [0])) / max(1, len(avg.get(pid, [])))
+                later = [(fp.get((pid, dd)), proj.get((pid, dd), mean)) for dd in sorted(tg.get(team.get(pid), {}))
+                         if dd in days and dd > (d or "")]
+                cf, regret = grade_lock_call(score, mx_call, later)
+                followed = int(final is not None and ((abs(final - score) < 0.05) == (mx_call == "lock")))
                 con.execute("UPDATE decisions SET final=?, cf=?, regret=?, followed=? WHERE week=? AND idx=? AND pid=? AND kind=? AND date=?",
                             (final, cf, round(regret, 1), followed, w, idx, pid, kind, d))
             elif kind == "move":
@@ -126,6 +164,12 @@ def main():
         return
     con = memory.connect()
     now = dt.datetime.now(dt.timezone.utc)
+    if con.execute("SELECT v FROM kv WHERE k='learn_grade_v'").fetchone() != ("2",):
+        # one-time cleanup of the v1 scorecard: drop 'keep' rows (no deadline = no decision), regrade the rest
+        con.execute("DELETE FROM decisions WHERE kind='lock-call' AND deadline IS NULL")
+        con.execute("UPDATE decisions SET final=NULL, cf=NULL, regret=NULL, followed=NULL WHERE kind='lock-call'")
+        con.execute("INSERT OR REPLACE INTO kv VALUES('learn_grade_v','2')")
+        con.commit()
     record(con, plan, now)
     try:
         lg = sleeper.league(LEAGUE_ID)
