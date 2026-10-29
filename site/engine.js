@@ -283,7 +283,13 @@ export class WeekPlan {
   }
   lockState(p) {
     const pl = this.played(p);
-    if (this.locks[p] === true) return { st: "locked", g: pl.at(-1) || null };
+    if (this.locks[p] === true) {
+      // the locked game is the one whose score Sleeper shows for him, not his latest game (Oct 29: Gobert's locked 55
+      // turned into Wednesday's 12.5 once he played again; the projection lost 64 points across three slots)
+      const raw = this.matchup.players_points?.[p], pts = raw == null ? null : Math.round(raw) / 10;
+      const g = pts == null ? pl.at(-1) : pl.find(x => Math.abs(x.fp - pts) < 0.01) || { ...(pl.at(-1) || { date: null }), fp: pts };
+      return { st: "locked", g: g || null };
+    }
     const lv = this.livePlayed(p);
     if (lv.length) return { st: "live", g: lv.at(-1) };
     // tipped but no stat line yet (Sleeper's first box score row lags the tip by a few minutes): still live, 0 so far.
@@ -388,8 +394,13 @@ export class WeekPlan {
       if (st === "locked") ev = ls[p].g?.fp || 0;
       else if (st === "live") {
         const g = ls[p].g, t = this.tip(p, g.date), frac = t ? Math.min(1, Math.max(0, (this.now - new Date(t)) / (150 * 60000))) : 0.5;
-        const mu = this.b.gameMu(p, g.date);
-        ev = g.fp + (1 - frac) * mu * 0.95; sd = qsd(this.qOf(p)) * mu * Math.sqrt(1 - frac);
+        // his final = points so far + the rest of his projection; a weak final can be passed on for his remaining
+        // games, so the slot is worth E[max(final, W_rest)], not the final alone (Oct 29: live slots having bad games
+        // were counted at their final only, which put the opponent at 364 and the win chance at 99%)
+        const mu = this.b.gameMu(p, g.date), rem = (1 - frac) * mu * 0.95, Wr = cont[p]?.W || 0, Qp = this.qOf(p);
+        let m1 = 0, m2 = 0;
+        for (const r of Qp) { const v = Math.max(g.fp + rem * r, Wr); m1 += v; m2 += v * v; }
+        ev = m1 / Qp.length; sd = Math.sqrt(Math.max(0, m2 / Qp.length - ev * ev));
       } else {
         const x = open.find(y => y.i === i);
         if (x && opts.humanLocks && lockable[i]) {
@@ -776,9 +787,17 @@ export function tradeIdeas(valuer, book, mine, others, limit = 15) {
 
 // Waiver suggestions worth showing: a real edge (2+ pts this week or 1+ every week after), top 8, with the
 // expert consensus attached
+// A move is suggested only if its gain is bigger than what we don't know: this week's gain (2+ points, not costing
+// value later), or a per-week gain above the uncertainty of the two projections (Oct 29: Collier for Derrick Jones
+// Jr. at +1/week was suggested; each early-season average is uncertain by ~3 FP/G).
 export function selectAdds(moves, consensus = {}, limit = 8) {
-  return moves.filter(m => m.weekGain >= 2 || m.rosGain >= 1).slice(0, limit).map(m => ({ ...m, experts: consensus[m.pid] || null }));
+  return moves.filter(m => (m.weekGain >= 2 && m.rosGain >= 0) || m.rosGain >= (m.noise ?? 1))
+    .slice(0, limit).map(m => ({ ...m, experts: consensus[m.pid] || null }));
 }
+// standard error of a player's projected FP/G: his game-to-game spread over the games behind his average
+// (this season's games + PRIOR_GAMES pseudo-games of last season)
+const spreadOf = Q => { const m = Q.reduce((a, b) => a + b, 0) / Q.length; return Math.sqrt(Q.reduce((a, b) => a + (b - m) ** 2, 0) / Q.length); };
+export const projSE = (wp, p) => spreadOf(wp.qOf(p)) * wp.b.baseline(p) / Math.sqrt((wp.b.games[p] || []).length + PRIOR_GAMES);
 
 // For each free agent, the drop that gains the most: this week's expected locked total (the real plan: open
 // slots, today's games, locks already made) plus rest-of-season value. Protected = players the plan uses.
@@ -794,6 +813,7 @@ export function waiverMoves(wp, valuer, mine, candidates, protect, limit = 8) {
       if (!best || gain > best.gain) best = { drop: d, gain, week, perWeek };
     }
     if (best && best.gain > 0.3) out.push({ ...fa, drop: best.drop, dropName: wp.b.name(best.drop),
+      noise: Math.round(Math.hypot(projSE(wp, fa.pid), projSE(wp, best.drop)) * 10) / 10,
       gain: Math.round(best.gain * 10) / 10, weekGain: Math.round(best.week * 10) / 10, rosGain: Math.round(best.perWeek * 10) / 10,
       bid: Math.min(40, Math.max(1, Math.round(best.perWeek * 3 + Math.max(0, best.week) * 0.5 + Math.min(fa.trend || 0, 20000) / 5000))) });
   }
