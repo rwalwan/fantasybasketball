@@ -21,6 +21,9 @@ const p1 = mk([g(mon, "complete"), g(wed, "complete"), g(fri, "pre_game")], { G:
 const s1 = p1.slots.find(x => x.slot === "C");
 console.log("1) locked slot:", s1.score, "| outlook", p1.outlook.mean);
 assert.equal(s1.score, 55); assert.equal(p1.outlook.mean, 55);
+// a momentary 0 from Sleeper (recomputing) doesn't wipe the lock
+const z = mk([g(mon, "complete"), g(wed, "complete"), g(fri, "pre_game")], { G: [[mon, 55, 30, "a"]] }, 0, { G: true }, "2026-11-05T05:00:00Z").build();
+assert.equal(z.slots.find(x => x.slot === "C").score, 55);
 
 // 2) live with 4 points, ~75% through, one more game Friday: the slot is worth about his Friday value, not ~11
 const p2 = mk([g(wed, "in_progress"), g(fri, "pre_game")], { G: [[wed, 4, 25, "b"]] }, 40, {}, "2026-11-05T01:50:00Z",

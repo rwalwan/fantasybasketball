@@ -293,7 +293,9 @@ export class WeekPlan {
     if (this.locks[p] === true) {
       // the locked game is the one whose score Sleeper shows for him, not his latest game (Oct 29: Gobert's locked 55
       // turned into Wednesday's 12.5 once he played again; the projection lost 64 points across three slots)
-      const raw = this.matchup.players_points?.[p], pts = raw == null ? null : Math.round(raw) / 10;
+      // A 0 is treated as missing: Sleeper briefly returns zeros while it recomputes (Oct 29: Luka's locked 78.5 read
+      // as 0 in one fetch), and a locked game is never a 0.
+      const raw = this.matchup.players_points?.[p], pts = raw ? Math.round(raw) / 10 : null;
       const g = pts == null ? pl.at(-1) : pl.find(x => Math.abs(x.fp - pts) < 0.01) || { ...(pl.at(-1) || { date: null }), fp: pts };
       return { st: "locked", g: g || null };
     }
