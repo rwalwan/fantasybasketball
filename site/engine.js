@@ -49,6 +49,12 @@ export function contStats(Q, games) {
   return { W, sd: W.map((w, j) => Math.sqrt(Math.max(0, M2[j] - w * w))) };
 }
 // volatility tier for a player whose typical game is `base` FP: bench guys swing far more than stars
+// a player's own spread (app/volatility.py): R_p = 1 + r (R - 1), floored at 0, mean kept at 1
+export function volQ(Q, r) {
+  if (!r || r === 1) return Q;
+  const v = Q.map(x => Math.max(0, 1 + r * (x - 1))), m = v.reduce((a, b) => a + b, 0) / v.length;
+  return v.map(x => x / m);
+}
 export function tierQ(tiers, base, fallback) {
   if (!tiers?.length) return fallback;
   return (tiers.find(t => t.max == null || base <= t.max) || tiers.at(-1)).quantiles;
@@ -70,7 +76,8 @@ export const usesFaab = (settings, rosters = []) => settings?.waiver_type === 2 
 export const B2B_FACTOR = 0.93, PRIOR_GAMES = 8;   // b2b/non-b2b play-rate ratio (availability_model.json)
 
 export class Book {
-  constructor({ scoring, players, priors, gamelog, weights, ctx, avail, usage }) {
+  constructor({ scoring, players, priors, gamelog, weights, ctx, avail, usage, vol }) {
+    this.vol = vol || {};                // pid -> r: his own game-to-game spread vs his tier's (app/volatility.py)
     this.usage = usage || {};            // pid -> {date: [factor, reasons?]} teammates out etc. (app/usage.py)
     this.avail = avail || null;          // {model, players: {pid: {status, q: {date: p}}}} (app/availability.py)
     this.sc = scoring;
@@ -268,7 +275,7 @@ export class WeekPlan {
   played(p) { return (this.b.games[p] || []).filter(g => this.days.includes(g.date) && this.final(p, g.date)); }
   livePlayed(p) { return (this.b.games[p] || []).filter(g => this.days.includes(g.date) && !this.final(p, g.date)); }
   tip(p, d) { return this.tips[`${d}|${this.b.team(p)}`]; }
-  qOf(p) { return tierQ(this.QT, this.b.baseline(p), this.Q); }
+  qOf(p) { return volQ(tierQ(this.QT, this.b.baseline(p), this.Q), this.b.vol?.[p]); }
   tipped(p, d) { const t = this.tip(p, d); return t ? new Date(t) <= this.now : d < this.today; }
   upcoming(p) {
     const t = this.b.team(p), done = new Set(this.played(p).map(g => g.date)), all = Object.keys(this.tg[t] || {});
@@ -686,7 +693,7 @@ export class Valuer {
   // per-week lock-in value (undiscounted) for each remaining week: [w0, w1, ...]
   weekly(p) {
     if (this.memo.has(p)) return this.memo.get(p);
-    const t = this.b.team(p), base = this.b.baseline(p), Qp = tierQ(this.QT, base, this.Q);
+    const t = this.b.team(p), base = this.b.baseline(p), Qp = volQ(tierQ(this.QT, base, this.Q), this.b.vol?.[p]);
     const all = Object.keys(this.tg[t] || {}).sort(), ahead = all.filter(d => d >= this.today);
     const out = this.weeks.map(({ days }) => {
       const games = all.filter(d => days.includes(d)).map(d => {

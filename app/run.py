@@ -14,6 +14,8 @@ from . import news as newsmod
 from . import memory, insights, availability
 from . import usage as usagemod
 from .engine import free_agent_watch, team_game_dates, week_dates
+from . import volatility
+from .scoring import fantasy_points
 from .lineups import LineupTracker
 from .model import PlayerBook
 
@@ -56,6 +58,27 @@ def main():
                 prior_min[r["player_id"]] = memory.minutes(st) / st["gp"]
     except Exception as e:  # prior season is a nice-to-have
         print("prior season unavailable:", e, file=sys.stderr)
+
+    # per-player game-to-game spread (app/volatility.py): last season's games (fetched once, cached) + this season's
+    try:
+        last = {}
+        for w in range(1, 27):
+            try:
+                rows = sleeper.week_stats(prev, w, final=True)
+            except Exception:
+                break
+            for r in rows or []:
+                st = r.get("stats") or {}
+                if r.get("date") and memory.minutes(st) >= volatility.M["min_minutes"]:
+                    last.setdefault(r["player_id"], []).append(fantasy_points(st, book.scoring))
+        cur = {p: [g[1] for g in book.done(p) if (g[2] or 0) >= volatility.M["min_minutes"]] for p in book.games}
+        vol = volatility.build(cur, last)
+        os.makedirs(os.path.join(ROOT, "site", "static"), exist_ok=True)
+        with open(os.path.join(ROOT, "site", "static", "volatility.json"), "w") as f:
+            json.dump(vol, f, separators=(",", ":"))
+        print(f"volatility: {len(vol)} players off their tier's spread (last season: {len(last)} players)")
+    except Exception as e:
+        print("volatility failed:", e, file=sys.stderr)
 
     # memory: every final game with its context; then matchup context for every upcoming game
     con = memory.connect()
