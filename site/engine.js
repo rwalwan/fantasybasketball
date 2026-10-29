@@ -433,8 +433,19 @@ export class WeekPlan {
       for (let k = draws.length - 1; k >= 0; k--) { keep[k] = V; const g = draws[k].g; V = g.q * expectedMax(g.Q || Q, g.mu, V) + (1 - g.q) * V; }
       return { V, keep };
     };
-    const openToday = this.slots.map((s, i) => ({ s, i, p: starters[i] })).filter(x => !fixed.has(x.p)).map((x, k) => ({ ...x, k }));
+    // A slot whose game is in progress still has a same-day option: if his final is weak, pass and slide in a player
+    // whose game tips 2.5 h+ after his did. Its first draw is the live game itself: points so far + the rest of his
+    // projection, with the spread of the remaining part only.
+    const liveDraw = p => {
+      const g = ls[p].g, tip = this.tip(p, g.date); if (!tip) return null;
+      const frac = Math.min(1, Math.max(0, (this.now - new Date(tip)) / GAME_MS)), rem = (1 - frac) * this.b.gameMu(p, g.date) * 0.95;
+      const mu = g.fp + rem, Qp = this.qOf(p);
+      return { date: g.date, tip, opp: this.tg[this.b.team(p)]?.[g.date]?.opp || "", q: 1, mu: Math.round(mu * 10) / 10, Q: mu > 0 ? Qp.map(r => (g.fp + rem * r) / mu) : Qp, live: true };
+    };
+    const openToday = this.slots.map((s, i) => ({ s, i, p: starters[i] }))
+      .filter(x => !locked.has(x.p) && !willLock.has(x.p)).map((x, k) => ({ ...x, k }));
     const plans = openToday.map(x => {
+      if (liveNow.has(x.p)) { const g = liveDraw(x.p); return { x, a: x.p, draws: g ? [{ p: x.p, g }] : [], tail: afterToday(x.p), live: true }; }
       const a = assignedTo[x.i] && !willLock.has(assignedTo[x.i]) ? assignedTo[x.i] : null;
       const ga = a ? todayGame(a) : null;
       return { x, a, draws: ga ? [{ p: a, g: ga }] : [], tail: a ? (ga ? afterToday(a) : cont[a].W) : 0 };
@@ -477,7 +488,17 @@ export class WeekPlan {
       const out = { slot, pid: p, name, status: this.b.status(p), today: null, later: null };
       if (s.st === "locked") return { ...out, action: "locked", score: s.g?.fp ?? null, inferred: !!s.inferred,
         detail: s.g ? `Locked ${s.g.fp.toFixed(1)} (${s.g.date})${s.inferred ? " — read from Sleeper's score; tap Not locked if that's wrong" : ""}.` : "Locked." };
-      if (s.st === "live") return { ...out, action: "live", score: s.g.fp, detail: `Game in progress: ${s.g.fp.toFixed(1)} so far. The lock call comes after the final buzzer.` };
+      if (s.st === "live") {
+        const lp = planByIdx[i];
+        if (lp?.draws[1]) {
+          const { V, keep } = fold(lp.draws, lp.tail), f = lp.draws[0], r = lp.draws[1];
+          out.today = { pid: p, name, tip: f.g.tip, opp: f.g.opp, mu: f.g.mu, keepBar: r1(keep[0]), move: false, live: true, gain: r1(V - lp.tail), bestTime: null,
+                        relief: { pid: r.p, name: nm(r.p), tip: r.g.tip, opp: r.g.opp, mu: r.g.mu, swapAfter: swapAfterOf(f.g), keepBar: r1(keep[1]) } };
+          return { ...out, action: "live", score: s.g.fp,
+            detail: `Game in progress: ${s.g.fp.toFixed(1)} so far (~${f.g.mu.toFixed(1)} projected final). After the final buzzer: lock if he ends at ${keep[0].toFixed(1)} or more; otherwise put ${nm(r.p)} in this slot before his ${r.g.opp ? `game vs ${r.g.opp}` : "game"} tips.` };
+        }
+        return { ...out, action: "live", score: s.g.fp, detail: `Game in progress: ${s.g.fp.toFixed(1)} so far. The lock call comes after the final buzzer.` };
+      }
 
       // today's sequence for this slot (empty if the slot is being locked)
       const pl = planByIdx[i];
