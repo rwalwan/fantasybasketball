@@ -3,7 +3,7 @@
 The engine draws every game as projection x R, with R from the spread of the player's FP/G tier (app/data/
 game_ratio_quantiles.json). Lock-In keeps the best game, so a player who booms more than his tier is worth more.
 Per player: r = sd(FP / his mean) / sd of his tier's R. Production uses R_p = 1 + r_hat (R_tier - 1).
-  prior   = 1 + a (r_last_season - 1)            (1 if no last season)
+  prior   = m + a (r_last_season - m)            (m if no last season; m = the typical player's r, fitted)
   r_hat   = prior + (r_this_season - prior) n / (n + k)       n = games so far this season
 a and k are fitted to the spread of the REST of the season (checkpoints n = 0, 5, 10, 20, 30, 40), then the per-player
 spread is checked against the tier spread on those future games: pinball loss over the quantiles (all, and the top
@@ -31,7 +31,7 @@ def tier_sd(mu):
     return float(tier(mu).std())
 
 
-p = g[g.played & (g["min"] >= 10)].sort_values("date")
+p = g[g.played].sort_values("date")       # every game played, like the tier tables (short games count in Lock-In)
 seasons = sorted(p.season_year.unique())
 by = {k: v.fp.values for k, v in p.groupby(["season_year", "player"])}
 
@@ -59,21 +59,18 @@ for si, s in enumerate(seasons):
 R = pd.DataFrame(rows)
 
 
-def predict(d, a, k):
-    prior = np.where(np.isnan(d.r_prev), 1.0, 1 + a * (d.r_prev - 1))
+def predict(d, a, k, m=1.0):
+    prior = np.where(np.isnan(d.r_prev), m, m + a * (d.r_prev - m))
     w = np.where(d.n >= 5, d.n / (d.n + k), 0.0)
     cur = np.where(np.isnan(d.r_cur), prior, d.r_cur)
     return prior + (cur - prior) * w
 
 
 fit = R[R.season != seasons[0]]        # seasons with a previous season available
-best = None
-for a in np.arange(0, 1.01, 0.05):
-    for k in (2, 5, 8, 10, 15, 20, 25, 30, 40, 60, 80, 120):
-        e = float(np.mean((predict(fit, a, k) - fit.r_fut) ** 2))
-        if best is None or e < best[0]:
-            best = (e, round(float(a), 2), k)
-_, A, K = best
+GRID = [(a, k, m) for a in np.arange(0, 1.01, 0.05) for k in (5, 10, 20, 30, 40, 60, 80, 120, 160, 240, 320)
+        for m in np.arange(0.84, 1.001, 0.02)]
+best = min((float(np.mean((predict(fit, a, k, m) - fit.r_fut) ** 2)), round(float(a), 2), k, round(float(m), 2)) for a, k, m in GRID)
+_, A, K, MM = best
 base_mse = float(np.mean((1 - fit.r_fut) ** 2))
 
 
@@ -89,7 +86,7 @@ def pinball(qs, x, top=False):
 
 ev = {"tier": [0.0, 0.0], "player": [0.0, 0.0]}
 nev = 0
-for (i, row), rh in zip(fit.iterrows(), predict(fit, A, K)):
+for (i, row), rh in zip(fit.iterrows(), predict(fit, A, K, MM)):
     Qt = tier(row.mu)
     Qp = np.maximum(0, 1 + rh * (Qt - 1))
     Qp = Qp / Qp.mean()
@@ -98,24 +95,23 @@ for (i, row), rh in zip(fit.iterrows(), predict(fit, A, K)):
         ev[name][1] += pinball(Q, row.fut, top=True) * len(row.fut)
     nev += len(row.fut)
 score = {k: {"pinball_all": round(v[0] / nev, 5), "pinball_top30": round(v[1] / nev, 5)} for k, v in ev.items()}
-by_n = {int(n): {"n": int(len(d)), "mse_player": round(float(np.mean((predict(d, A, K) - d.r_fut) ** 2)), 4),
+by_n = {int(n): {"n": int(len(d)), "mse_player": round(float(np.mean((predict(d, A, K, MM) - d.r_fut) ** 2)), 4),
                  "mse_tier": round(float(np.mean((1 - d.r_fut) ** 2)), 4)} for n, d in fit.groupby("n")}
 # held out: fit a, k on one season, score the other (two seasons have a previous season)
 loso = {}
 for s_out in sorted(fit.season.unique()):
     tr, te = fit[fit.season != s_out], fit[fit.season == s_out]
-    b2 = min(((float(np.mean((predict(tr, a, k) - tr.r_fut) ** 2)), a, k) for a in np.arange(0, 1.01, 0.05)
-              for k in (2, 5, 8, 10, 15, 20, 25, 30, 40, 60, 80, 120)))
+    b2 = min((float(np.mean((predict(tr, a, k, m) - tr.r_fut) ** 2)), a, k, m) for a, k, m in GRID)
     acc = {"tier": [0.0, 0.0], "player": [0.0, 0.0]}; m = 0
-    for (i, row), rh in zip(te.iterrows(), predict(te, b2[1], b2[2])):
+    for (i, row), rh in zip(te.iterrows(), predict(te, b2[1], b2[2], b2[3])):
         Qt = tier(row.mu); Qp = np.maximum(0, 1 + rh * (Qt - 1)); Qp = Qp / Qp.mean()
         for name, Q in (("tier", Qt), ("player", Qp)):
             acc[name][0] += pinball(Q, row.fut) * len(row.fut); acc[name][1] += pinball(Q, row.fut, top=True) * len(row.fut)
         m += len(row.fut)
-    loso[s_out] = {"a": round(float(b2[1]), 2), "k": b2[2],
+    loso[s_out] = {"a": round(float(b2[1]), 2), "k": b2[2], "m": round(float(b2[3]), 2),
                    "pinball_all_tier": round(acc["tier"][0] / m, 5), "pinball_all_player": round(acc["player"][0] / m, 5),
                    "pinball_top30_tier": round(acc["tier"][1] / m, 5), "pinball_top30_player": round(acc["player"][1] / m, 5)}
-out = {"note": __doc__.strip().split("\n")[0], "a_prev": A, "k_games": K, "mse": round(best[0], 4), "mse_tier_only": round(base_mse, 4),
+out = {"note": __doc__.strip().split("\n")[0], "a_prev": A, "k_games": K, "m_typical": MM, "mse": round(best[0], 4), "mse_tier_only": round(base_mse, 4),
        "rows": int(len(fit)), "player_seasons": int(fit[fit.n == 0].shape[0]), "by_checkpoint": by_n, "future_games": nev,
        "pinball": score, "held_out_season": loso, "r_future_sd": round(float(fit.r_fut.std()), 3)}
 json.dump(out, open(sys.argv[3], "w"), indent=1)

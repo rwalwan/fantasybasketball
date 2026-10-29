@@ -2,14 +2,14 @@
 
 Every game is drawn as projection x R. R used to come only from the spread of the player's FP/G tier, so two players
 with the same average had the same chance of a big night. Lock-In keeps the best game, so a boom-or-bust player is
-worth more than a steady one: some players really do boom more than their tier (split-half and season-to-season
-correlation), but only partly, so the player's own spread is shrunk:
-  r       = sd(FP / his mean) / sd of his tier's R          (games of 10+ minutes)
-  prior   = 1 + 0.3 (r_last_season - 1)                     (1 if no last season)
-  r_hat   = prior + (r_this_season - prior) n / (n + 40)    n = games this season
-The engine uses R_p = 1 + r_hat (R_tier - 1), mean kept at 1. On held-out seasons this beat the tier spread on every
-measure (future spread error -18%; quantile loss -0.6% overall and -0.8% on the top 30% of games, the ones lock
-calls depend on).
+worth more than a steady one. Some players really do boom more than their tier, but only partly, so the player's
+own spread is shrunk hard:
+  r       = sd(FP / his mean) / sd of his tier's R          (every game he played, like the tier tables)
+  prior   = 0.98 + 0.2 (r_last_season - 0.98)               (0.98 = the typical player; used if no last season)
+  r_hat   = prior + (r_this_season - prior) n / (n + 120)   n = games this season
+The engine uses R_p = 1 + r_hat (R_tier - 1), mean kept at 1. On both held-out seasons this beat the tier spread:
+future spread error -9%, quantile loss -0.3% overall and -0.35% on the top 30% of games (the ones lock calls use).
+A small, consistent edge: it separates real boom-or-bust players from steady ones by about +/-1 FP a week.
 """
 import json
 import os
@@ -34,14 +34,18 @@ def ratio(fps):
 
 def build(this_season, last_season):
     """{pid: r_hat} from {pid: [FP of games with 10+ min]} for this season and last season."""
-    a, k = M["a_prev"], M["k_games"]
+    a, k, m = M["a_prev"], M["k_games"], M["m_typical"]
     lo, hi = M["clip"]
     out = {}
     for pid in set(this_season) | set(last_season):
+        if str(pid).startswith("TEAM_"):
+            continue                                      # team-total rows in Sleeper's stats
         prev, cur = last_season.get(pid) or [], this_season.get(pid) or []
         rp = ratio(prev) if len(prev) >= 20 and np.mean(prev) >= 10 else None
-        prior = 1 + a * (rp - 1) if rp is not None else 1.0
+        prior = m + a * (rp - m) if rp is not None else m
         rc = ratio(cur) if len(cur) >= 5 else None
+        if rp is None and rc is None:
+            continue                                      # nothing known about him: his tier's spread
         r = prior + (rc - prior) * len(cur) / (len(cur) + k) if rc is not None else prior
         r = min(hi, max(lo, r))
         if abs(r - 1) >= 0.02:

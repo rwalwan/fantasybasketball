@@ -69,9 +69,9 @@ def main():
                 break
             for r in rows or []:
                 st = r.get("stats") or {}
-                if r.get("date") and memory.minutes(st) >= volatility.M["min_minutes"]:
+                if r.get("date") and memory.minutes(st) > volatility.M["min_minutes"]:
                     last.setdefault(r["player_id"], []).append(fantasy_points(st, book.scoring))
-        cur = {p: [g[1] for g in book.done(p) if (g[2] or 0) >= volatility.M["min_minutes"]] for p in book.games}
+        cur = {p: [g[1] for g in book.done(p) if (g[2] or 0) > volatility.M["min_minutes"]] for p in book.games}
         vol = volatility.build(cur, last)
         os.makedirs(os.path.join(ROOT, "site", "static"), exist_ok=True)
         with open(os.path.join(ROOT, "site", "static", "volatility.json"), "w") as f:
