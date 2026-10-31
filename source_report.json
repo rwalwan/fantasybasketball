@@ -1,0 +1,200 @@
+{
+ "at": "2026-10-28T22:01+00:00",
+ "sources": [
+  {
+   "name": "RotoWire news",
+   "kind": "rss",
+   "role": "news",
+   "url": "https://www.rotowire.com/rss/news.php?sport=NBA",
+   "ok": true,
+   "items": 5,
+   "newest": "2026-10-28T02:55+00:00",
+   "relevant": 0.6,
+   "why": "ok"
+  },
+  {
+   "name": "RealGM",
+   "kind": "rss",
+   "role": "news",
+   "url": "https://basketball.realgm.com/rss/wiretap/0/0.xml",
+   "ok": true,
+   "items": 31,
+   "newest": "2026-10-28T21:17+00:00",
+   "relevant": 0.94,
+   "why": "ok"
+  },
+  {
+   "name": "HoopsHype",
+   "kind": "rss",
+   "role": "news",
+   "url": "https://hoopshype.com/feed/",
+   "ok": false,
+   "why": "error: 404 Client Error: OK for url: https://www.hoopshype.com/feed/"
+  },
+  {
+   "name": "Hoops Rumors",
+   "kind": "rss",
+   "role": "news",
+   "url": "https://www.hoopsrumors.com/feed",
+   "ok": true,
+   "items": 15,
+   "newest": "2026-10-28T21:51+00:00",
+   "relevant": 0.93,
+   "why": "ok"
+  },
+  {
+   "name": "ESPN NBA",
+   "kind": "rss",
+   "role": "news",
+   "url": "https://www.espn.com/espn/rss/nba/news",
+   "ok": false,
+   "why": "error: no element found: line 1, column 0"
+  },
+  {
+   "name": "Yahoo NBA",
+   "kind": "rss",
+   "role": "news",
+   "url": "https://sports.yahoo.com/nba/rss/",
+   "ok": true,
+   "items": 50,
+   "newest": "2026-10-28T20:51+00:00",
+   "relevant": 0.96,
+   "why": "ok"
+  },
+  {
+   "name": "CBS NBA",
+   "kind": "rss",
+   "role": "news",
+   "url": "https://www.cbssports.com/rss/headlines/nba/",
+   "ok": true,
+   "items": 36,
+   "newest": "2026-10-28T21:45+00:00",
+   "relevant": 0.94,
+   "why": "ok"
+  },
+  {
+   "name": "RotoBaller",
+   "kind": "rss",
+   "role": "mixed",
+   "url": "https://www.rotoballer.com/category/nba/feed",
+   "ok": true,
+   "items": 15,
+   "newest": "2026-10-28T19:43+00:00",
+   "relevant": 1.0,
+   "why": "ok"
+  },
+  {
+   "name": "RotoBaller waivers",
+   "kind": "rss",
+   "role": "advice",
+   "url": "https://www.rotoballer.com/category/nba/nba-waiver-wire/feed",
+   "ok": true,
+   "items": 15,
+   "newest": "2026-10-25T12:08+00:00",
+   "relevant": 1.0,
+   "why": "ok"
+  },
+  {
+   "name": "Razzball",
+   "kind": "rss",
+   "role": "advice",
+   "url": "https://basketball.razzball.com/feed/",
+   "ok": false,
+   "why": "robots.txt disallows"
+  },
+  {
+   "name": "Fantrax HQ",
+   "kind": "rss",
+   "role": "advice",
+   "url": "https://fantraxhq.com/category/nba/feed/",
+   "ok": false,
+   "why": "error: 410 Client Error: Gone for url: https://fantraxhq.com/category/nba/feed/"
+  },
+  {
+   "name": "Fantrax HQ fantasy",
+   "kind": "rss",
+   "role": "advice",
+   "url": "https://fantraxhq.com/category/fantasy-basketball/feed/",
+   "ok": false,
+   "why": "error: 410 Client Error: Gone for url: https://fantraxhq.com/category/fantasy-basketball/feed/"
+  },
+  {
+   "name": "FantasyPros NBA",
+   "kind": "rss",
+   "role": "advice",
+   "url": "https://www.fantasypros.com/feed/nba/",
+   "ok": false,
+   "why": "error: no element found: line 1, column 0"
+  },
+  {
+   "name": "Yahoo fantasy basketball",
+   "kind": "rss",
+   "role": "advice",
+   "url": "https://sports.yahoo.com/fantasy/basketball/rss/",
+   "ok": false,
+   "why": "error: 404 Client Error: Not Found for url: https://sports.yahoo.com/fantasy/basketball/rss/"
+  },
+  {
+   "name": "FanDuel Research NBA",
+   "kind": "rss",
+   "role": "advice",
+   "url": "https://www.fanduel.com/research/nba/feed",
+   "ok": false,
+   "why": "error: 404 Client Error: Not Found for url: https://www.fanduel.com/research/nba/feed"
+  },
+  {
+   "name": "Fantasy Six Pack",
+   "kind": "rss",
+   "role": "advice",
+   "url": "https://fantasysixpack.net/category/fantasy-basketball/feed/",
+   "ok": true,
+   "items": 10,
+   "newest": "2026-10-28T16:09+00:00",
+   "relevant": 1.0,
+   "why": "ok"
+  },
+  {
+   "name": "Sports Illustrated fantasy",
+   "kind": "rss",
+   "role": "advice",
+   "url": "https://www.si.com/.rss/full/fantasy",
+   "ok": false,
+   "why": "error: 404 Client Error: Not Found for url: https://www.si.com/.rss/full/fantasy"
+  },
+  {
+   "name": "NBC Sports NBA",
+   "kind": "rss",
+   "role": "news",
+   "url": "https://www.nbcsports.com/rss/nba",
+   "ok": false,
+   "why": "error: 404 Client Error: Not Found for url: https://www.nbcsports.com/rss/nba"
+  },
+  {
+   "name": "Reddit r/fantasybball",
+   "kind": "rss",
+   "role": "advice",
+   "url": "https://www.reddit.com/r/fantasybball/top/.rss?t=day",
+   "ok": false,
+   "why": "robots.txt disallows"
+  },
+  {
+   "name": "Hashtag Basketball",
+   "kind": "html",
+   "role": "advice",
+   "url": "https://hashtagbasketball.com/fantasy-basketball-news",
+   "ok": false,
+   "why": "error: 404 Client Error: Not Found for url: https://hashtagbasketball.com/fantasy-basketball-news"
+  },
+  {
+   "name": "Basketball Monster news",
+   "kind": "html",
+   "role": "news",
+   "url": "https://basketballmonster.com/playernews.aspx",
+   "ok": false,
+   "items": 0,
+   "newest": null,
+   "relevant": 0.0,
+   "why": "too few items"
+  }
+ ]
+}
