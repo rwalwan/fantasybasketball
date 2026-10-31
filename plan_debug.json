@@ -1,0 +1,1425 @@
+{
+ "at": "2026-10-31T00:01:22.353Z",
+ "today": "2026-10-30",
+ "week": 2,
+ "expectedTotal": 0,
+ "slots": [
+  {
+   "slot": "PG",
+   "pid": "1970",
+   "name": "Luka Dončić",
+   "status": null,
+   "today": null,
+   "later": null,
+   "action": "locked",
+   "score": 78.5,
+   "inferred": false,
+   "detail": "Locked 78.5 (2026-10-27).",
+   "ev": 78.5,
+   "sd": 0
+  },
+  {
+   "slot": "SG",
+   "pid": "1830",
+   "name": "Derrick White",
+   "status": null,
+   "today": null,
+   "later": null,
+   "action": "live",
+   "score": 6,
+   "detail": "Game in progress: 6.0 so far. The lock call comes after the final buzzer.",
+   "ev": 41.7,
+   "sd": 6.1
+  },
+  {
+   "slot": "G",
+   "pid": "1747",
+   "name": "Jamal Murray",
+   "status": null,
+   "today": null,
+   "later": null,
+   "action": "locked",
+   "score": 54.5,
+   "inferred": false,
+   "detail": "Locked 54.5 (2026-10-26).",
+   "ev": 54.5,
+   "sd": 0
+  },
+  {
+   "slot": "SF",
+   "pid": "1433",
+   "name": "Kevin Durant",
+   "status": null,
+   "today": null,
+   "later": null,
+   "action": "locked",
+   "score": 54.5,
+   "inferred": false,
+   "detail": "Locked 54.5 (2026-10-26).",
+   "ev": 54.5,
+   "sd": 0
+  },
+  {
+   "slot": "PF",
+   "pid": "2296",
+   "name": "Sandro Mamukelashvili",
+   "status": null,
+   "today": null,
+   "later": null,
+   "action": "locked",
+   "score": 39.5,
+   "inferred": false,
+   "detail": "Locked 39.5 (2026-10-28).",
+   "ev": 39.5,
+   "sd": 0
+  },
+  {
+   "slot": "F",
+   "pid": "1959",
+   "name": "Grayson Allen",
+   "status": null,
+   "today": null,
+   "later": null,
+   "action": "live",
+   "score": 12,
+   "detail": "Game in progress: 12.0 so far. The lock call comes after the final buzzer.",
+   "ev": 33.3,
+   "sd": 3.8
+  },
+  {
+   "slot": "C",
+   "pid": "1350",
+   "name": "Rudy Gobert",
+   "status": null,
+   "today": null,
+   "later": null,
+   "action": "locked",
+   "score": 55,
+   "inferred": false,
+   "detail": "Locked 55.0 (2026-10-26).",
+   "ev": 55,
+   "sd": 0
+  },
+  {
+   "slot": "C",
+   "pid": "2275",
+   "name": "Day'Ron Sharpe",
+   "status": null,
+   "today": null,
+   "later": null,
+   "action": "live",
+   "score": 6,
+   "detail": "Game in progress: 6.0 so far. The lock call comes after the final buzzer.",
+   "ev": 43.9,
+   "sd": 1.6
+  },
+  {
+   "slot": "UTIL",
+   "pid": "2136",
+   "name": "Onyeka Okongwu",
+   "status": null,
+   "today": null,
+   "later": null,
+   "action": "locked",
+   "score": 66,
+   "inferred": false,
+   "detail": "Locked 66.0 (2026-10-29).",
+   "ev": 66,
+   "sd": 0
+  },
+  {
+   "slot": "UTIL",
+   "pid": "2733",
+   "name": "Alex Sarr",
+   "status": null,
+   "today": null,
+   "later": null,
+   "action": "locked",
+   "score": 10,
+   "inferred": false,
+   "detail": "Locked 10.0 (2026-10-28).",
+   "ev": 10,
+   "sd": 0
+  }
+ ],
+ "actions": [],
+ "idle": [],
+ "outlook": {
+  "mean": 476.91632561691983,
+  "var": 54.06034812787357,
+  "sd": 7.352574251775603,
+  "winProb": 0.9410880481450246,
+  "opp": {
+   "mean": 426.2052434353885,
+   "var": 994.8415020986231
+  }
+ },
+ "adds": [],
+ "trades": [
+  {
+   "partner": "OUTOUTOUT",
+   "roster_id": 5,
+   "give": [
+    "1350",
+    "1883"
+   ],
+   "get": [
+    "4862"
+   ],
+   "giveNames": [
+    "Rudy Gobert",
+    "Wendell Carter Jr."
+   ],
+   "getNames": [
+    "Caleb Wilson"
+   ],
+   "dm": 2.6,
+   "dt": 1.8,
+   "theirFit": [
+    {
+     "slot": "C",
+     "in": "1350",
+     "out": "4862",
+     "gain": -3.2,
+     "inName": "Rudy Gobert",
+     "outName": "Caleb Wilson"
+    },
+    {
+     "slot": "C",
+     "in": "1883",
+     "out": "2302",
+     "gain": 5.6,
+     "inName": "Wendell Carter Jr.",
+     "outName": "Neemias Queta"
+    }
+   ],
+   "myFit": [
+    {
+     "slot": "PF",
+     "in": "4862",
+     "out": "1350",
+     "gain": 3.2,
+     "inName": "Caleb Wilson",
+     "outName": "Rudy Gobert"
+    }
+   ],
+   "marketGive": 47,
+   "marketGet": 50,
+   "uncertain": [],
+   "reason": "Wilson is a +3.3/wk upgrade at PF over Gobert, and Carter's +5.4/wk at C over Queta gives OUTOUTOUT a bigger C fix. Their net gain is +1.7 versus our +2.7."
+  },
+  {
+   "partner": "OUTOUTOUT",
+   "roster_id": 5,
+   "give": [
+    "1883",
+    "2733"
+   ],
+   "get": [
+    "2285"
+   ],
+   "giveNames": [
+    "Wendell Carter Jr.",
+    "Alex Sarr"
+   ],
+   "getNames": [
+    "Trey Murphy III"
+   ],
+   "dm": 2.7,
+   "dt": 1.5,
+   "theirFit": [
+    {
+     "slot": "C",
+     "in": "2733",
+     "out": "2285",
+     "gain": -3.4,
+     "inName": "Alex Sarr",
+     "outName": "Trey Murphy III"
+    },
+    {
+     "slot": "C",
+     "in": "1883",
+     "out": "2302",
+     "gain": 5.6,
+     "inName": "Wendell Carter Jr.",
+     "outName": "Neemias Queta"
+    }
+   ],
+   "myFit": [
+    {
+     "slot": "SF",
+     "in": "2285",
+     "out": "2733",
+     "gain": 3.4,
+     "inName": "Trey Murphy III",
+     "outName": "Alex Sarr"
+    }
+   ],
+   "marketGive": 36,
+   "marketGet": 39,
+   "uncertain": [],
+   "reason": "Murphy's 41.0 projection rests mostly on last season's 46.5, so early-season noise matters less; he adds +3.2/wk at SF over Sarr. Sarr fills their C spot."
+  },
+  {
+   "partner": "OUTOUTOUT",
+   "roster_id": 5,
+   "give": [
+    "1350",
+    "1830"
+   ],
+   "get": [
+    "4864"
+   ],
+   "giveNames": [
+    "Rudy Gobert",
+    "Derrick White"
+   ],
+   "getNames": [
+    "Yaxel Lendeborg"
+   ],
+   "dm": 1.9,
+   "dt": 2.4,
+   "theirFit": [
+    {
+     "slot": "SG",
+     "in": "1830",
+     "out": "4864",
+     "gain": -7.1,
+     "inName": "Derrick White",
+     "outName": "Yaxel Lendeborg"
+    },
+    {
+     "slot": "C",
+     "in": "1350",
+     "out": "2302",
+     "gain": 10.2,
+     "inName": "Rudy Gobert",
+     "outName": "Neemias Queta"
+    }
+   ],
+   "myFit": [
+    {
+     "slot": "PF",
+     "in": "4864",
+     "out": "1830",
+     "gain": 7.1,
+     "inName": "Yaxel Lendeborg",
+     "outName": "Derrick White"
+    },
+    {
+     "slot": "UTIL",
+     "in": "1883",
+     "out": "1350",
+     "gain": -4.7,
+     "inName": "Wendell Carter Jr.",
+     "outName": "Rudy Gobert"
+    }
+   ],
+   "marketGive": 71,
+   "marketGet": 79,
+   "uncertain": [],
+   "reason": "Lendeborg's +7/wk over White at PF is the main gain, and his last three games (61.5/71.5/51) back it up. Gobert at C over Queta (+10.1/wk) is the bigger fix for them."
+  },
+  {
+   "partner": "SreckTheBoss",
+   "roster_id": 4,
+   "give": [
+    "1830",
+    "2136"
+   ],
+   "get": [
+    "2574"
+   ],
+   "giveNames": [
+    "Derrick White",
+    "Onyeka Okongwu"
+   ],
+   "getNames": [
+    "Amen Thompson"
+   ],
+   "dm": 1.1,
+   "dt": 0.2,
+   "theirFit": [
+    {
+     "slot": "G",
+     "in": "1830",
+     "out": "2574",
+     "gain": -5.7,
+     "inName": "Derrick White",
+     "outName": "Amen Thompson"
+    },
+    {
+     "slot": "C",
+     "in": "2136",
+     "out": "2131",
+     "gain": 5.5,
+     "inName": "Onyeka Okongwu",
+     "outName": "Saddiq Bey"
+    }
+   ],
+   "myFit": [
+    {
+     "slot": "SF",
+     "in": "2574",
+     "out": "2136",
+     "gain": 7.2,
+     "inName": "Amen Thompson",
+     "outName": "Onyeka Okongwu"
+    },
+    {
+     "slot": "UTIL",
+     "in": "1883",
+     "out": "1830",
+     "gain": -5.6,
+     "inName": "Wendell Carter Jr.",
+     "outName": "Derrick White"
+    }
+   ],
+   "marketGive": 68,
+   "marketGet": 70,
+   "uncertain": [],
+   "reason": "Amen Thompson at SF adds +7.2/wk over Okongwu, with Carter's -6.6 at UTIL netting us +0.6. Amen's 47.9 last-season baseline drives the projection more than his hot last-three. For SreckTheBoss, Okongwu fills their C hole over Bey (+5.6) whi"
+  },
+  {
+   "partner": "darksteel123",
+   "roster_id": 11,
+   "give": [
+    "1830",
+    "1883"
+   ],
+   "get": [
+    "1074"
+   ],
+   "giveNames": [
+    "Derrick White",
+    "Wendell Carter Jr."
+   ],
+   "getNames": [
+    "Paul George"
+   ],
+   "dm": 1,
+   "dt": 0.3,
+   "theirFit": [
+    {
+     "slot": "SG",
+     "in": "1830",
+     "out": "1074",
+     "gain": -1.5,
+     "inName": "Derrick White",
+     "outName": "Paul George"
+    },
+    {
+     "slot": "UTIL",
+     "in": "1883",
+     "out": "4754",
+     "gain": 2.1,
+     "inName": "Wendell Carter Jr.",
+     "outName": "Dylan Harper"
+    }
+   ],
+   "myFit": [
+    {
+     "slot": "PF",
+     "in": "1074",
+     "out": "1830",
+     "gain": 1.5,
+     "inName": "Paul George",
+     "outName": "Derrick White"
+    }
+   ],
+   "marketGive": 51,
+   "marketGet": 46,
+   "uncertain": [],
+   "reason": "Paul George replaces White at PF for +1.5/wk, a +1.4 gain. For them, Carter fixes UTIL over Collier (+1/wk), offset by White's -1.5/wk drop from losing George at SG."
+  },
+  {
+   "partner": "darksteel123",
+   "roster_id": 11,
+   "give": [
+    "2136",
+    "2733"
+   ],
+   "get": [
+    "2304"
+   ],
+   "giveNames": [
+    "Onyeka Okongwu",
+    "Alex Sarr"
+   ],
+   "getNames": [
+    "Franz Wagner"
+   ],
+   "dm": 0.9,
+   "dt": 0.2,
+   "theirFit": [
+    {
+     "slot": "C",
+     "in": "2136",
+     "out": "2304",
+     "gain": -4,
+     "inName": "Onyeka Okongwu",
+     "outName": "Franz Wagner"
+    },
+    {
+     "slot": "UTIL",
+     "in": "2733",
+     "out": "4754",
+     "gain": 4.4,
+     "inName": "Alex Sarr",
+     "outName": "Dylan Harper"
+    }
+   ],
+   "myFit": [
+    {
+     "slot": "PF",
+     "in": "2304",
+     "out": "2733",
+     "gain": 5.8,
+     "inName": "Franz Wagner",
+     "outName": "Alex Sarr"
+    },
+    {
+     "slot": "UTIL",
+     "in": "1883",
+     "out": "2136",
+     "gain": -4.1,
+     "inName": "Wendell Carter Jr.",
+     "outName": "Onyeka Okongwu"
+    }
+   ],
+   "marketGive": 53,
+   "marketGet": 51,
+   "uncertain": [],
+   "reason": "Franz fills our PF at +5.8/wk, netting +0.9 overall; they fix UTIL by slotting Sarr over Harper for +0.2. Early blends lean on last season."
+  },
+  {
+   "partner": "SreckTheBoss",
+   "roster_id": 4,
+   "give": [
+    "1883",
+    "2136"
+   ],
+   "get": [
+    "2054"
+   ],
+   "giveNames": [
+    "Wendell Carter Jr.",
+    "Onyeka Okongwu"
+   ],
+   "getNames": [
+    "Zion Williamson"
+   ],
+   "dm": 0.6,
+   "dt": 0.7,
+   "theirFit": [
+    {
+     "slot": "C",
+     "in": "2136",
+     "out": "2054",
+     "gain": -1.2,
+     "inName": "Onyeka Okongwu",
+     "outName": "Zion Williamson"
+    },
+    {
+     "slot": "UTIL",
+     "in": "1883",
+     "out": "2131",
+     "gain": 1.4,
+     "inName": "Wendell Carter Jr.",
+     "outName": "Saddiq Bey"
+    }
+   ],
+   "myFit": [
+    {
+     "slot": "PF",
+     "in": "2054",
+     "out": "2136",
+     "gain": 1.2,
+     "inName": "Zion Williamson",
+     "outName": "Onyeka Okongwu"
+    }
+   ],
+   "marketGive": 44,
+   "marketGet": 36,
+   "uncertain": [],
+   "reason": "Zion at PF adds +1.3/wk over Okongwu, netting us +1.1; early projections lean on last season. Fixes their UTIL with Carter over Collier (+0.9/wk)."
+  },
+  {
+   "partner": "SreckTheBoss",
+   "roster_id": 4,
+   "give": [
+    "1350",
+    "1959"
+   ],
+   "get": [
+    "2054"
+   ],
+   "giveNames": [
+    "Rudy Gobert",
+    "Grayson Allen"
+   ],
+   "getNames": [
+    "Zion Williamson"
+   ],
+   "dm": 0.7,
+   "dt": 0.3,
+   "theirFit": [
+    {
+     "slot": "C",
+     "in": "1350",
+     "out": "2054",
+     "gain": -0.6,
+     "inName": "Rudy Gobert",
+     "outName": "Zion Williamson"
+    },
+    {
+     "slot": "UTIL",
+     "in": "1959",
+     "out": "2131",
+     "gain": 0.1,
+     "inName": "Grayson Allen",
+     "outName": "Saddiq Bey"
+    }
+   ],
+   "myFit": [
+    {
+     "slot": "PF",
+     "in": "2054",
+     "out": "1959",
+     "gain": 6.6,
+     "inName": "Zion Williamson",
+     "outName": "Grayson Allen"
+    },
+    {
+     "slot": "UTIL",
+     "in": "1883",
+     "out": "1350",
+     "gain": -4.7,
+     "inName": "Wendell Carter Jr.",
+     "outName": "Rudy Gobert"
+    }
+   ],
+   "marketGive": 42,
+   "marketGet": 36,
+   "uncertain": [],
+   "reason": "Zion at PF adds +6.9/wk over Allen, with Carter's -5.6 at UTIL netting us +0.6. Gobert's cold last three (12.5) is a small sample early on. For SreckTheBoss, the swap is near-neutral (+0.2), with Allen replacing Bey at UTIL (-0.1)."
+  },
+  {
+   "partner": "darksteel123",
+   "roster_id": 11,
+   "give": [
+    "1959",
+    "2090"
+   ],
+   "get": [
+    "2304"
+   ],
+   "giveNames": [
+    "Grayson Allen",
+    "Ty Jerome"
+   ],
+   "getNames": [
+    "Franz Wagner"
+   ],
+   "dm": 0.6,
+   "dt": 0.5,
+   "theirFit": [
+    {
+     "slot": "SG",
+     "in": "2090",
+     "out": "2304",
+     "gain": -0.5,
+     "inName": "Ty Jerome",
+     "outName": "Franz Wagner"
+    },
+    {
+     "slot": "UTIL",
+     "in": "1959",
+     "out": "4754",
+     "gain": 0.8,
+     "inName": "Grayson Allen",
+     "outName": "Dylan Harper"
+    }
+   ],
+   "myFit": [
+    {
+     "slot": "PF",
+     "in": "2304",
+     "out": "2090",
+     "gain": 0.5,
+     "inName": "Franz Wagner",
+     "outName": "Ty Jerome"
+    },
+    {
+     "slot": "UTIL",
+     "in": "1883",
+     "out": "1959",
+     "gain": 1.3,
+     "inName": "Wendell Carter Jr.",
+     "outName": "Grayson Allen"
+    }
+   ],
+   "marketGive": 58,
+   "marketGet": 51,
+   "uncertain": [],
+   "reason": "Mostly last season's data early on; Franz's blended 48.8 edges Jerome's 47.8, Jerome is day-to-day, and Carter adds +0.8 at UTIL for +0.6/wk."
+  }
+ ],
+ "starters_debug": [
+  {
+   "pid": "1970",
+   "name": "Luka Dončić",
+   "sleeper": 785,
+   "manualLock": true,
+   "state": {
+    "st": "locked",
+    "g": {
+     "date": "2026-10-27",
+     "fp": 78.5,
+     "min": 36.75,
+     "gid": "1393723774267817984"
+    }
+   },
+   "played": [
+    [
+     "2026-10-27",
+     78.5
+    ]
+   ]
+  },
+  {
+   "pid": "1830",
+   "name": "Derrick White",
+   "sleeper": 60,
+   "manualLock": null,
+   "state": {
+    "st": "live",
+    "g": {
+     "date": "2026-10-30",
+     "fp": 6,
+     "min": 6.13,
+     "gid": "1393285928524468224"
+    }
+   },
+   "played": [
+    [
+     "2026-10-26",
+     32
+    ],
+    [
+     "2026-10-27",
+     41
+    ]
+   ]
+  },
+  {
+   "pid": "1747",
+   "name": "Jamal Murray",
+   "sleeper": 545,
+   "manualLock": true,
+   "state": {
+    "st": "locked",
+    "g": {
+     "date": "2026-10-26",
+     "fp": 54.5,
+     "min": 35.87,
+     "gid": "1393723771256307712"
+    }
+   },
+   "played": [
+    [
+     "2026-10-26",
+     54.5
+    ],
+    [
+     "2026-10-28",
+     45
+    ]
+   ]
+  },
+  {
+   "pid": "1433",
+   "name": "Kevin Durant",
+   "sleeper": 545,
+   "manualLock": true,
+   "state": {
+    "st": "locked",
+    "g": {
+     "date": "2026-10-26",
+     "fp": 54.5,
+     "min": 29.85,
+     "gid": "1393723769662472192"
+    }
+   },
+   "played": [
+    [
+     "2026-10-26",
+     54.5
+    ],
+    [
+     "2026-10-28",
+     42.5
+    ]
+   ]
+  },
+  {
+   "pid": "2296",
+   "name": "Sandro Mamukelashvili",
+   "sleeper": 395,
+   "manualLock": true,
+   "state": {
+    "st": "locked",
+    "g": {
+     "date": "2026-10-28",
+     "fp": 39.5,
+     "min": 30.08,
+     "gid": "1393723787131748352"
+    }
+   },
+   "played": [
+    [
+     "2026-10-27",
+     33.5
+    ],
+    [
+     "2026-10-28",
+     39.5
+    ]
+   ]
+  },
+  {
+   "pid": "1959",
+   "name": "Grayson Allen",
+   "sleeper": 120,
+   "manualLock": null,
+   "state": {
+    "st": "live",
+    "g": {
+     "date": "2026-10-30",
+     "fp": 12,
+     "min": 10.7,
+     "gid": "1393285925051584512"
+    }
+   },
+   "played": [
+    [
+     "2026-10-26",
+     23
+    ],
+    [
+     "2026-10-28",
+     31
+    ]
+   ]
+  },
+  {
+   "pid": "1350",
+   "name": "Rudy Gobert",
+   "sleeper": 550,
+   "manualLock": true,
+   "state": {
+    "st": "locked",
+    "g": {
+     "date": "2026-10-26",
+     "fp": 55,
+     "min": 35.62,
+     "gid": "1393723764625113088"
+    }
+   },
+   "played": [
+    [
+     "2026-10-26",
+     55
+    ],
+    [
+     "2026-10-28",
+     12.5
+    ]
+   ]
+  },
+  {
+   "pid": "2275",
+   "name": "Day'Ron Sharpe",
+   "sleeper": 60,
+   "manualLock": null,
+   "state": {
+    "st": "live",
+    "g": {
+     "date": "2026-10-30",
+     "fp": 6,
+     "min": 6.02,
+     "gid": "1393285927010324481"
+    }
+   },
+   "played": [
+    [
+     "2026-10-27",
+     19
+    ]
+   ]
+  },
+  {
+   "pid": "2136",
+   "name": "Onyeka Okongwu",
+   "sleeper": 660,
+   "manualLock": true,
+   "state": {
+    "st": "locked",
+    "g": {
+     "date": "2026-10-29",
+     "fp": 66,
+     "min": 32.63,
+     "gid": "1393723788809469952"
+    }
+   },
+   "played": [
+    [
+     "2026-10-26",
+     36.5
+    ],
+    [
+     "2026-10-28",
+     29.5
+    ],
+    [
+     "2026-10-29",
+     66
+    ]
+   ]
+  },
+  {
+   "pid": "2733",
+   "name": "Alex Sarr",
+   "sleeper": 100,
+   "manualLock": true,
+   "state": {
+    "st": "locked",
+    "g": {
+     "date": "2026-10-28",
+     "fp": 10,
+     "min": 25.87,
+     "gid": "1393723776029425664"
+    }
+   },
+   "played": [
+    [
+     "2026-10-26",
+     29
+    ],
+    [
+     "2026-10-28",
+     39.5
+    ]
+   ]
+  }
+ ],
+ "values": {
+  "Rudy Gobert": 45.2,
+  "Kevin Durant": 54.9,
+  "Andrew Wiggins": 35.9,
+  "Derrick Jones Jr.": 31.4,
+  "Jamal Murray": 58.7,
+  "Derrick White": 46.1,
+  "Wendell Carter Jr.": 40.5,
+  "Grayson Allen": 39.2,
+  "Luka Dončić": 78.3,
+  "Mikal Bridges": 32.2,
+  "Ty Jerome": 48.1,
+  "Onyeka Okongwu": 44.6,
+  "Day'Ron Sharpe": 32.8,
+  "Sandro Mamukelashvili": 31.6,
+  "Jalen Duren": 46.3,
+  "Alex Sarr": 42.8
+ },
+ "grid": [
+  {
+   "name": "Luka Dončić",
+   "pos": "PG",
+   "starter": true,
+   "locked": true,
+   "status": null,
+   "cells": [
+    null,
+    {
+     "kind": "played",
+     "fp": 78.5,
+     "opp": "POR",
+     "started": true
+    },
+    {
+     "kind": "live",
+     "opp": "LAC",
+     "fp": null
+    },
+    null,
+    {
+     "kind": "upcoming",
+     "mu": 60.9,
+     "opp": "GSW",
+     "tip": "2026-10-31T02:00Z"
+    },
+    null,
+    {
+     "kind": "upcoming",
+     "mu": 59.7,
+     "opp": "TOR",
+     "tip": "2026-11-02T02:00Z"
+    }
+   ]
+  },
+  {
+   "name": "Jamal Murray",
+   "pos": "PG",
+   "starter": true,
+   "locked": true,
+   "status": null,
+   "cells": [
+    {
+     "kind": "played",
+     "fp": 54.5,
+     "opp": "GSW",
+     "started": false
+    },
+    null,
+    {
+     "kind": "played",
+     "fp": 45,
+     "opp": "NOP",
+     "started": true
+    },
+    null,
+    {
+     "kind": "upcoming",
+     "mu": 47.5,
+     "opp": "PHX",
+     "tip": "2026-10-31T02:00Z"
+    },
+    null,
+    null
+   ]
+  },
+  {
+   "name": "Kevin Durant",
+   "pos": "PF/SF",
+   "starter": true,
+   "locked": true,
+   "status": null,
+   "cells": [
+    {
+     "kind": "played",
+     "fp": 54.5,
+     "opp": "ATL",
+     "started": true
+    },
+    null,
+    {
+     "kind": "played",
+     "fp": 42.5,
+     "opp": "MIL",
+     "started": true
+    },
+    null,
+    {
+     "kind": "live",
+     "opp": "DAL",
+     "fp": null
+    },
+    {
+     "kind": "upcoming",
+     "mu": 43.3,
+     "opp": "OKC",
+     "tip": "2026-11-01T00:30Z"
+    },
+    null
+   ]
+  },
+  {
+   "name": "Ty Jerome",
+   "pos": "PG/SG",
+   "starter": false,
+   "locked": false,
+   "status": "DTD",
+   "cells": [
+    {
+     "kind": "played",
+     "fp": 35.5,
+     "opp": "UTA",
+     "started": true
+    },
+    null,
+    null,
+    {
+     "kind": "played",
+     "fp": 24,
+     "opp": "POR",
+     "started": true
+    },
+    null,
+    {
+     "kind": "upcoming",
+     "mu": 44.2,
+     "opp": "SAC",
+     "tip": "2026-11-01T00:00Z"
+    },
+    null
+   ]
+  },
+  {
+   "name": "Derrick White",
+   "pos": "PG/SG",
+   "starter": true,
+   "locked": false,
+   "status": null,
+   "cells": [
+    {
+     "kind": "played",
+     "fp": 32,
+     "opp": "CHI",
+     "started": true
+    },
+    {
+     "kind": "played",
+     "fp": 41,
+     "opp": "BKN",
+     "started": true
+    },
+    null,
+    null,
+    {
+     "kind": "live",
+     "opp": "CHI",
+     "fp": 6
+    },
+    null,
+    {
+     "kind": "upcoming",
+     "mu": 39.4,
+     "opp": "ORL",
+     "tip": "2026-11-01T20:30Z"
+    }
+   ]
+  },
+  {
+   "name": "Rudy Gobert",
+   "pos": "C",
+   "starter": true,
+   "locked": true,
+   "status": null,
+   "cells": [
+    {
+     "kind": "played",
+     "fp": 55,
+     "opp": "CLE",
+     "started": true
+    },
+    null,
+    {
+     "kind": "played",
+     "fp": 12.5,
+     "opp": "GSW",
+     "started": true
+    },
+    null,
+    {
+     "kind": "live",
+     "opp": "LAC",
+     "fp": null
+    },
+    {
+     "kind": "upcoming",
+     "mu": 38.5,
+     "opp": "SAS",
+     "tip": "2026-11-01T00:00Z"
+    },
+    null
+   ]
+  },
+  {
+   "name": "Onyeka Okongwu",
+   "pos": "C",
+   "starter": true,
+   "locked": true,
+   "status": null,
+   "cells": [
+    {
+     "kind": "played",
+     "fp": 36.5,
+     "opp": "HOU",
+     "started": true
+    },
+    null,
+    {
+     "kind": "played",
+     "fp": 29.5,
+     "opp": "MIA",
+     "started": true
+    },
+    {
+     "kind": "played",
+     "fp": 66,
+     "opp": "CLE",
+     "started": true
+    },
+    null,
+    {
+     "kind": "upcoming",
+     "mu": 40.6,
+     "opp": "NOP",
+     "tip": "2026-10-31T23:00Z"
+    },
+    null
+   ]
+  },
+  {
+   "name": "Alex Sarr",
+   "pos": "C/PF",
+   "starter": true,
+   "locked": true,
+   "status": null,
+   "cells": [
+    {
+     "kind": "played",
+     "fp": 29,
+     "opp": "CHA",
+     "started": true
+    },
+    null,
+    {
+     "kind": "played",
+     "fp": 39.5,
+     "opp": "CLE",
+     "started": true
+    },
+    null,
+    {
+     "kind": "live",
+     "opp": "CHA",
+     "fp": 12
+    },
+    null,
+    null
+   ]
+  },
+  {
+   "name": "Wendell Carter Jr.",
+   "pos": "C",
+   "starter": false,
+   "locked": false,
+   "status": null,
+   "cells": [
+    null,
+    null,
+    {
+     "kind": "played",
+     "fp": 30.5,
+     "opp": "TOR",
+     "started": true
+    },
+    null,
+    {
+     "kind": "live",
+     "opp": "TOR",
+     "fp": 9.5
+    },
+    null,
+    {
+     "kind": "upcoming",
+     "mu": 38.8,
+     "opp": "BOS",
+     "tip": "2026-11-01T20:30Z"
+    }
+   ]
+  },
+  {
+   "name": "Grayson Allen",
+   "pos": "SF/SG",
+   "starter": true,
+   "locked": false,
+   "status": null,
+   "cells": [
+    {
+     "kind": "played",
+     "fp": 23,
+     "opp": "WAS",
+     "started": true
+    },
+    null,
+    {
+     "kind": "played",
+     "fp": 31,
+     "opp": "DET",
+     "started": true
+    },
+    null,
+    {
+     "kind": "live",
+     "opp": "WAS",
+     "fp": 12
+    },
+    {
+     "kind": "upcoming",
+     "mu": 34.6,
+     "opp": "PHI",
+     "tip": "2026-10-31T22:00Z"
+    },
+    null
+   ]
+  },
+  {
+   "name": "Andrew Wiggins",
+   "pos": "PF/SF/SG",
+   "starter": false,
+   "locked": false,
+   "status": null,
+   "cells": [
+    {
+     "kind": "played",
+     "fp": 20,
+     "opp": "DAL",
+     "started": true
+    },
+    null,
+    {
+     "kind": "played",
+     "fp": 33,
+     "opp": "ATL",
+     "started": true
+    },
+    null,
+    {
+     "kind": "live",
+     "opp": "IND",
+     "fp": null
+    },
+    null,
+    null
+   ]
+  },
+  {
+   "name": "Day'Ron Sharpe",
+   "pos": "C",
+   "starter": true,
+   "locked": false,
+   "status": null,
+   "cells": [
+    null,
+    {
+     "kind": "played",
+     "fp": 19,
+     "opp": "BOS",
+     "started": true
+    },
+    null,
+    null,
+    {
+     "kind": "live",
+     "opp": "DET",
+     "fp": 6
+    },
+    null,
+    {
+     "kind": "upcoming",
+     "mu": 45.4,
+     "opp": "IND",
+     "tip": "2026-11-01T22:00Z"
+    }
+   ]
+  },
+  {
+   "name": "Sandro Mamukelashvili",
+   "pos": "C/PF",
+   "starter": true,
+   "locked": true,
+   "status": null,
+   "cells": [
+    null,
+    {
+     "kind": "played",
+     "fp": 33.5,
+     "opp": "POR",
+     "started": true
+    },
+    {
+     "kind": "played",
+     "fp": 39.5,
+     "opp": "LAC",
+     "started": true
+    },
+    null,
+    {
+     "kind": "upcoming",
+     "mu": 33.7,
+     "opp": "GSW",
+     "tip": "2026-10-31T02:00Z"
+    },
+    null,
+    {
+     "kind": "upcoming",
+     "mu": 27.7,
+     "opp": "TOR",
+     "tip": "2026-11-02T02:00Z"
+    }
+   ]
+  },
+  {
+   "name": "Mikal Bridges",
+   "pos": "PF/SF/SG",
+   "starter": false,
+   "locked": false,
+   "status": null,
+   "cells": [
+    null,
+    {
+     "kind": "played",
+     "fp": 31.5,
+     "opp": "DET",
+     "started": true
+    },
+    {
+     "kind": "played",
+     "fp": 4,
+     "opp": "CHI",
+     "started": true
+    },
+    null,
+    {
+     "kind": "live",
+     "opp": "PHI",
+     "fp": 6
+    },
+    null,
+    null
+   ]
+  },
+  {
+   "name": "Derrick Jones Jr.",
+   "pos": "PF/SF",
+   "starter": false,
+   "locked": false,
+   "status": null,
+   "cells": [
+    null,
+    null,
+    {
+     "kind": "played",
+     "fp": 37,
+     "opp": "LAL",
+     "started": true
+    },
+    null,
+    {
+     "kind": "live",
+     "opp": "MIN",
+     "fp": null
+    },
+    null,
+    {
+     "kind": "upcoming",
+     "mu": 30.6,
+     "opp": "GSW",
+     "tip": "2026-11-02T01:30Z"
+    }
+   ]
+  }
+ ]
+}

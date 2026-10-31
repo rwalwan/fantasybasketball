@@ -1,0 +1,21 @@
+{
+ "leagues": 65,
+ "weeks": [
+  1
+ ],
+ "decision_points": 0,
+ "starter_weeks": 0,
+ "unchecked_starter_weeks": 6653,
+ "player_weeks": 0,
+ "method": "lineup-checked weeks only; DNPs count as 0; production bar (RotoWire x scale, tiers, b2b); CI by NBA player-week",
+ "eligible_points": 0,
+ "opponent_model_ready": false,
+ "at": "2026-10-30",
+ "candidates": 66,
+ "snapshot_rows": 722,
+ "verified": {
+  "checked": 66,
+  "lock_in": 65,
+  "not_lock_in": 0
+ }
+}
