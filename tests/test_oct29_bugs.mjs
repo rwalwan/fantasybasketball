@@ -37,3 +37,14 @@ assert.ok(ev2 > 30, `a bad live game can be passed for Friday: ${ev2}`);
 const moves = [{ pid: "a", weekGain: 0, rosGain: 1, noise: 1.8 }, { pid: "b", weekGain: 0, rosGain: 4, noise: 1.8 }, { pid: "c", weekGain: 2.5, rosGain: 0.2, noise: 1.8 }];
 assert.deepEqual(selectAdds(moves).map(m => m.pid), ["b", "c"]);
 console.log("ok: oct 29 bugs");
+
+// Oct 31: Sleeper's score included Wendell Carter Jr.'s 40 (latest game), but our lineup record said he played it
+// from the bench, so his slot was valued without it. Sleeper only credits lineup games: matching points = it counted.
+{
+  const wpB = mk([g(mon, "complete"), g(wed, "complete"), g(fri, "pre_game")], { G: [[mon, 30.5, 30, "a"], [wed, 40, 30, "b"]] }, 400, {}, "2026-11-05T05:00:00Z");
+  wpB.elig = (p, d) => (d === wed ? false : true);
+  const st = wpB.lockState("G");
+  console.log("bench record vs Sleeper's 40:", st.st, st.g.fp);
+  assert.equal(st.st, "open"); assert.equal(st.g.fp, 40);
+}
+console.log("ok: oct 31 bench record");

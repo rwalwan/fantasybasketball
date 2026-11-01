@@ -315,7 +315,11 @@ export class WeekPlan {
     const countable = pl.filter(g => this.elig(p, g.date) !== false), latest = countable.at(-1) || pl.at(-1);
     if (this.locks[p] !== false && countable.length && this.elig(p, pl.at(-1).date) !== false)
       for (const g of countable.slice(0, -1)) if (Math.abs(g.fp - pts) < 0.01 && Math.abs(latest.fp - pts) >= 0.01) return { st: "locked", g, inferred: true };
-    const last = pl.at(-1), e = this.elig(p, last.date);
+    const last = pl.at(-1);
+    // Sleeper credits a starter only with a game he played from the lineup: if his slot shows his latest game's
+    // points, that game counted, whatever our lineup record says (Oct 31: Wendell Carter Jr.'s 40 in Sleeper's score
+    // was treated as a bench game, so the plan valued his slot without it)
+    const e = pts > 0 && Math.abs(last.fp - pts) < 0.01 ? true : this.elig(p, last.date);
     if (e === false) return { st: "bench", g: last };
     return { st: e === true ? "open" : "confirm", g: last };
   }
