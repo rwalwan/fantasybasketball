@@ -194,6 +194,15 @@ export function humanLockRate(rows, ratio) {
 }
 
 // eligibility from recorded lineup snapshots: true/false once the game's lineup was frozen at tip, else null
+// Copies of the week's matchups from other Sleeper hosts, attached to each primary matchup as .alt (Nov 1: three
+// hosts, three different scores for the same matchup). disagree = the copies' totals differ for this roster.
+export function mergeMatchups(primary, alts = []) {
+  return (primary || []).map(m => {
+    const alt = alts.filter(Array.isArray).map(a => a.find(x => x.roster_id === m.roster_id)).filter(Boolean)
+      .map(x => ({ starters: x.starters, starters_points: x.starters_points, players_points: x.players_points, points: x.points }));
+    return { ...m, alt, disagree: alt.some(x => x.points !== m.points) };
+  });
+}
 export function eligFromSnaps(snaps, overrides = {}) {
   return (pid, date) => {
     const k = `${date}|${pid}`;
@@ -294,15 +303,27 @@ export class WeekPlan {
     const i = (this.matchup.starters || []).indexOf(p), sp = this.matchup.starters_points;
     return i >= 0 && Array.isArray(sp) && sp[i] != null ? sp[i] : this.matchup.players_points?.[p];
   }
+  // the same slot's score in every copy of the matchup we fetched (Sleeper's servers can disagree)
+  slotCandidates(p) {
+    return [this.matchup, ...(this.matchup.alt || [])].map(m => {
+      const i = (m.starters || []).indexOf(p);
+      return i >= 0 && Array.isArray(m.starters_points) && m.starters_points[i] != null ? m.starters_points[i] : m.players_points?.[p];
+    }).filter(v => v != null);
+  }
   lockState(p) {
     const pl = this.played(p);
     if (this.locks[p] === true) {
-      // the locked game is the one whose score Sleeper shows for him, not his latest game (Oct 29: Gobert's locked 55
-      // turned into Wednesday's 12.5 once he played again; the projection lost 64 points across three slots)
-      // A 0 is treated as missing: Sleeper briefly returns zeros while it recomputes (Oct 29: Luka's locked 78.5 read
-      // as 0 in one fetch), and a locked game is never a 0.
-      const raw = this.slotPoints(p), pts = raw ? Math.round(raw) / 10 : null;
-      const g = pts == null ? pl.at(-1) : pl.find(x => Math.abs(x.fp - pts) < 0.01) || { ...(pl.at(-1) || { date: null }), fp: pts };
+      // 1) the game you marked (saved as "pid|date" when you tap "I locked this")
+      const dated = Object.keys(this.locks).filter(k => k.startsWith(`${p}|`) && this.locks[k] === true).map(k => k.slice(p.length + 1)).sort().at(-1);
+      const gd = dated && pl.find(x => x.date === dated);
+      if (gd) return { st: "locked", g: gd };
+      // 2) else the game whose score Sleeper shows for his slot, not his latest game (Oct 29: Gobert's locked 55 turned
+      //    into Wednesday's 12.5). Sleeper's servers can disagree (Nov 1: Durant 54.5 on one, his later 34 on another,
+      //    i.e. that copy lost the lock): a lock freezes an EARLIER game, so the earliest game any copy shows wins.
+      //    A 0 is treated as missing (Sleeper briefly returns zeros while recomputing), a locked game is never a 0.
+      const cands = this.slotCandidates(p).filter(v => v).map(v => Math.round(v) / 10);
+      const hit = cands.map(pts => pl.find(x => Math.abs(x.fp - pts) < 0.01)).filter(Boolean).sort((a, b) => (a.date < b.date ? -1 : 1))[0];
+      const g = hit || (cands.length ? { ...(pl.at(-1) || { date: null }), fp: cands[0] } : pl.at(-1));
       return { st: "locked", g: g || null };
     }
     const lv = this.livePlayed(p);

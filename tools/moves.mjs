@@ -4,7 +4,7 @@
 // written once (OpenRouter key stays server-side; never shipped to the browser).
 import { stageOf, calibration } from "./winprob.mjs";
 import fs from "node:fs";
-import { Book, WeekPlan, Valuer, eligFromSnaps, selectAdds, weekDays, tradeIdeas, waiverMoves, playerValue } from "../site/engine.js";
+import { Book, WeekPlan, Valuer, eligFromSnaps, mergeMatchups, selectAdds, weekDays, tradeIdeas, waiverMoves, playerValue } from "../site/engine.js";
 
 const LEAGUE = "1400915575915491328", USER = "1388708038000533504";
 const S1 = "https://api.sleeper.app/v1", S2 = "https://api.sleeper.com";
@@ -22,7 +22,7 @@ const schedule = await get(`${S2}/schedule/nba/regular/${season}`);
 const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
 const week = schedule.filter(g => g.week && g.date <= today).map(g => g.week).sort((a, b) => a - b).at(-1) || 1;
 const [rosters, matchups, users, stats, proj, trending] = await Promise.all([
-  get(`${S1}/league/${LEAGUE}/rosters`), get(`${S1}/league/${LEAGUE}/matchups/${week}`), get(`${S1}/league/${LEAGUE}/users`),
+  get(`${S1}/league/${LEAGUE}/rosters`), get(`${S1}/league/${LEAGUE}/matchups/${week}`).then(async m => mergeMatchups(m, [await get(`https://api.sleeper.com/v1/league/${LEAGUE}/matchups/${week}`).catch(() => null)])), get(`${S1}/league/${LEAGUE}/users`),
   get(`${S2}/stats/nba/${season}/${week}?season_type=regular`), get(`${S2}/projections/nba/${season}/${week}?season_type=regular`),
   get(`${S1}/players/nba/trending/add?lookback_hours=24&limit=50`).catch(() => [])]);
 const userName = Object.fromEntries(users.map(u => [u.user_id, u.display_name]));
@@ -107,7 +107,7 @@ fs.writeFileSync("site/static/plan.json", JSON.stringify({ week, generated: out.
 // full plan snapshot on the state branch, for debugging what the engine saw
 fs.writeFileSync(stateFile("plan_debug.json"), JSON.stringify({ at: new Date().toISOString(), today, week, expectedTotal: plan.expectedTotal,
   slots: plan.slots, actions: plan.actions, idle: plan.idle, outlook: plan.outlook, adds: out.adds, trades: out.trades,
-  starters_debug: (my.starters || []).map(p => ({ pid: p, name: book.name(p), sleeper: my.players_points?.[p] ?? null, slot: wp.slotPoints(p) ?? null, manualLock: locks[p] ?? null,
+  starters_debug: (my.starters || []).map(p => ({ pid: p, name: book.name(p), sleeper: my.players_points?.[p] ?? null, slot: wp.slotPoints(p) ?? null, copies: wp.slotCandidates(p), manualLock: locks[p] ?? null,
     state: wp.lockState(p), played: wp.played(p).map(g => [g.date, g.fp]) })),
   values: Object.fromEntries((mine.players || []).map(p => [book.name(p), Math.round(valuer.perWeek(p) * 10) / 10])),
   grid: plan.grid.map(r => ({ name: r.name, pos: r.pos, starter: r.starter, locked: r.locked, status: r.status, cells: r.cells })) }, null, 1));

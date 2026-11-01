@@ -1,4 +1,4 @@
-import { Book, WeekPlan, Valuer, eligFromSnaps, usesFaab, waiverMoves, weekDays, teamGames, fits, range80 } from "./engine.js";
+import { Book, WeekPlan, Valuer, eligFromSnaps, mergeMatchups, usesFaab, waiverMoves, weekDays, teamGames, fits, range80 } from "./engine.js";
 
 // ---- config -----------------------------------------------------------------------------------
 const LEAGUE = "1400915575915491328", USER = "1388708038000533504";
@@ -66,7 +66,7 @@ async function loadLive() {
   const tipDays = days.filter(d => d >= today || d === days.find(x => x >= today));
   const [schedule, rosters, matchups, stats, proj, trending, snapsGh, overridesGh, locksGh, oppSnaps, backend, tips, news, claims, moves, context, insights, learning, avail, usage, others, health, winprob] = await Promise.all([
     get(`${S2}/schedule/nba/regular/${season}`).catch(() => base.schedule),
-    get(`${S1}/league/${LEAGUE}/rosters`), get(`${S1}/league/${LEAGUE}/matchups/${week}`),
+    get(`${S1}/league/${LEAGUE}/rosters`), get(`${S1}/league/${LEAGUE}/matchups/${week}`).then(async m => mergeMatchups(m, [await get(`https://api.sleeper.com/v1/league/${LEAGUE}/matchups/${week}`).catch(() => null)])),
     get(`${S2}/stats/nba/${season}/${week}?season_type=regular`), get(`${S2}/projections/nba/${season}/${week}?season_type=regular`),
     get(`${S1}/players/nba/trending/add?lookback_hours=24&limit=50`).catch(() => []),
     soft(`${STATE}lineups_${season}_w${week}.json`), soft(`${STATE}eligibility_overrides.json`), soft(`${STATE}locks_w${week}.json`),
@@ -148,7 +148,10 @@ const LABEL = { lock: "Lock", keep: "Counts", pass: "Pass", start: "Start", lock
 function render() {
   const c = compute(), { plan, my, opp, mine } = c;
   const oppOwner = live.rosters.find(r => r.roster_id === opp?.roster_id)?.owner_id;
-  $("score").innerHTML = `<b>${r1((my.points || 0) / 10)}</b> – ${r1((opp?.points || 0) / 10)}<span>score now vs ${esc(base.users[oppOwner] || "opponent")} ${usesFaab(base.league.settings, live.rosters) ? ` · FAAB $${base.league.settings.waiver_budget - (mine.settings?.waiver_budget_used || 0)}` : ""}</span>`;
+  // Sleeper's servers can return different copies of the same matchup (Nov 1): say so instead of picking one silently
+  const copies = m => [m?.points, ...(m?.alt || []).map(a => a.points)].filter(v => v != null).map(v => r1(v / 10));
+  const split = my.disagree || opp?.disagree ? `<span class="pos" style="display:block;color:var(--risk)">⚠ Sleeper's servers disagree right now: you ${[...new Set(copies(my))].join(" / ")}, them ${[...new Set(copies(opp))].join(" / ")}. Locks you marked are held at the game you locked.</span>` : "";
+  $("score").innerHTML = `<b>${r1((my.points || 0) / 10)}</b> – ${r1((opp?.points || 0) / 10)}<span>score now vs ${esc(base.users[oppOwner] || "opponent")} ${usesFaab(base.league.settings, live.rosters) ? ` · FAAB $${base.league.settings.waiver_budget - (mine.settings?.waiver_budget_used || 0)}` : ""}</span>${split}`;
   $("metatext").textContent = `${base.league.name} · week ${base.week} · live ${live.at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
 
   // ONE source: plan.actions (top summary), plan.slots (cards + table). Phone alerts read the same lists.
@@ -172,7 +175,7 @@ function render() {
     const td = s.today ? `<div class="nums">today: <b>${esc(s.today.name)}</b> ${esc(tipTime(s.today.tip))}${s.today.keepBar > 0.05 ? ` · keep if ≥ ${r1(s.today.keepBar)}` : ""}${s.today.relief ? ` · else ${esc(s.today.relief.name)}` : ""}</div>` : "";
     let acts2 = "";
     if (s.action === "confirm") acts2 = `<button data-elig="${s.gameDate}|${s.pid}" data-v="1">He was starting</button><button data-elig="${s.gameDate}|${s.pid}" data-v="0">He was on my bench</button>`;
-    if (["lock", "pass", "confirm", "keep"].includes(s.action)) acts2 += `<button data-lock="${s.pid}">I locked this</button>`;
+    if (["lock", "pass", "confirm", "keep"].includes(s.action)) acts2 += `<button data-lock="${s.pid}" data-date="${esc(s.gameDate || "")}">I locked this</button>`;
     if (s.action === "locked") acts2 = `<button data-unlock="${s.pid}">Not locked</button>`;
     return `<div class="slot ${s.action}"><div class="top"><span><span class="pos">${esc(s.slot)}</span> <span class="nm">${esc(s.name)}</span>${s.status ? `<span class="st">${esc(s.status)}</span>` : ""}</span><span class="tag">${LABEL[s.action] || s.action}</span></div><p>${esc(s.detail)}</p>${nums}${td}${acts2 ? `<div class="acts">${acts2}</div>` : ""}</div>`;
   }).join("");
@@ -373,7 +376,11 @@ document.addEventListener("click", e => {
     document.querySelector('#tabs button[data-t="trades"]').click(); render(); return;
   }
   if (b.dataset.elig) { saveAnswer("elig", b.dataset.elig, b.dataset.v === "1"); render(); }
-  if (b.dataset.lock) { saveAnswer(`locks_w${base.week}`, b.dataset.lock, true); render(); }
+  if (b.dataset.lock) {           // which game too, so a lock holds even when Sleeper's servers disagree (Nov 1)
+    saveAnswer(`locks_w${base.week}`, b.dataset.lock, true);
+    if (b.dataset.date) saveAnswer(`locks_w${base.week}`, `${b.dataset.lock}|${b.dataset.date}`, true);
+    render();
+  }
   if (b.dataset.unlock) { saveAnswer(`locks_w${base.week}`, b.dataset.unlock, false); render(); }
 });
 

@@ -56,3 +56,19 @@ console.log("ok: oct 31 bench record");
   assert.equal(wpS.lockState("G").g.fp, 21);
 }
 console.log("ok: oct 31 slot points");
+
+// Nov 1: Sleeper's servers disagreed (Durant 54.5 on one copy, his later 34 on another). A lock freezes an earlier
+// game, so the earliest game any copy shows wins; a lock saved with its date wins over every copy.
+{
+  const { mergeMatchups } = await import("../site/engine.js");
+  const games = { G: [[mon, 54.5, 30, "a"], [wed, 41, 30, "b"], [fri, 34, 30, "c"]] };
+  const sch = [g(mon, "complete"), g(wed, "complete"), g(fri, "complete")];
+  const w1 = mk(sch, games, 340, { G: true }, "2026-11-08T05:00:00Z");
+  w1.matchup = mergeMatchups([{ roster_id: 1, starters: ["G"], starters_points: [340], points: 340 }],
+                             [[{ roster_id: 1, starters: ["G"], starters_points: [545], points: 545 }]])[0];
+  assert.equal(w1.matchup.disagree, true);
+  assert.equal(w1.lockState("G").g.fp, 54.5, "the copy where the lock held");
+  const w2 = mk(sch, games, 340, { G: true, [`G|${wed}`]: true }, "2026-11-08T05:00:00Z");
+  assert.equal(w2.lockState("G").g.fp, 41, "the game you marked");
+}
+console.log("ok: nov 1 conflicting copies");
