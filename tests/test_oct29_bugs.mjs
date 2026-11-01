@@ -48,3 +48,11 @@ console.log("ok: oct 29 bugs");
   assert.equal(st.st, "open"); assert.equal(st.g.fp, 40);
 }
 console.log("ok: oct 31 bench record");
+
+// Oct 31: starters_points (the slot score, sums to the matchup score) beats players_points when they disagree
+{
+  const wpS = mk([g(mon, "complete"), g(wed, "complete"), g(fri, "pre_game")], { G: [[mon, 33.5, 30, "a"], [wed, 21, 30, "b"]] }, 335, { G: true }, "2026-11-05T05:00:00Z");
+  wpS.matchup.starters_points = [210];
+  assert.equal(wpS.lockState("G").g.fp, 21);
+}
+console.log("ok: oct 31 slot points");

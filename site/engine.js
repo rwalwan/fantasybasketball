@@ -288,6 +288,12 @@ export class WeekPlan {
                opp: this.tg[t][d].opp, b2b, tip: this.tip(p, d) };
     });
   }
+  // A starter's score as his SLOT counts it: starters_points (these sum to the matchup score). players_points can
+  // differ (Oct 31: Mamukelashvili's slot counted 21 while players_points said 33.5), so it's only the fallback.
+  slotPoints(p) {
+    const i = (this.matchup.starters || []).indexOf(p), sp = this.matchup.starters_points;
+    return i >= 0 && Array.isArray(sp) && sp[i] != null ? sp[i] : this.matchup.players_points?.[p];
+  }
   lockState(p) {
     const pl = this.played(p);
     if (this.locks[p] === true) {
@@ -295,7 +301,7 @@ export class WeekPlan {
       // turned into Wednesday's 12.5 once he played again; the projection lost 64 points across three slots)
       // A 0 is treated as missing: Sleeper briefly returns zeros while it recomputes (Oct 29: Luka's locked 78.5 read
       // as 0 in one fetch), and a locked game is never a 0.
-      const raw = this.matchup.players_points?.[p], pts = raw ? Math.round(raw) / 10 : null;
+      const raw = this.slotPoints(p), pts = raw ? Math.round(raw) / 10 : null;
       const g = pts == null ? pl.at(-1) : pl.find(x => Math.abs(x.fp - pts) < 0.01) || { ...(pl.at(-1) || { date: null }), fp: pts };
       return { st: "locked", g: g || null };
     }
@@ -306,7 +312,7 @@ export class WeekPlan {
     const t = this.b.team(p), done = new Set((this.b.games[p] || []).map(g => g.date));
     const fresh = this.teamDays(t).find(d => this.tipped(p, d) && !this.final(p, d) && !done.has(d));
     if (fresh && !OUT.has(this.b.status(p)) && this.elig(p, fresh) !== false) return { st: "live", g: { date: fresh, fp: 0, min: 0, gid: null } };
-    const raw = this.matchup.players_points?.[p];
+    const raw = this.slotPoints(p);
     if (!pl.length || raw == null) return { st: "none", g: null };
     const pts = Math.round(raw) / 10;
     // Sleeper's points for a starter = his locked game, or else his latest COUNTABLE game. So an earlier game
