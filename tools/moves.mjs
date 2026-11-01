@@ -9,7 +9,10 @@ import { Book, WeekPlan, Valuer, eligFromSnaps, selectAdds, weekDays, tradeIdeas
 const LEAGUE = "1400915575915491328", USER = "1388708038000533504";
 const S1 = "https://api.sleeper.app/v1", S2 = "https://api.sleeper.com";
 const MODEL = process.env.OPENROUTER_MODEL || "anthropic/claude-haiku-5.5";
-const get = async u => { const r = await fetch(u, { headers: { "user-agent": "we-back-lock-desk" } }); if (!r.ok) throw new Error(`${r.status} ${u}`); return r.json(); };
+// Sleeper's CDN can hand back copies from hours earlier (Oct 31: one player's slot read 33.5, 39.5 and 21 in three runs;
+// 21 was current), so live Sleeper requests carry a unique query string and no-cache headers.
+const bust = u => /sleeper\.(app|com)/.test(u) ? `${u}${u.includes("?") ? "&" : "?"}_=${Date.now()}` : u;
+const get = async u => { const r = await fetch(bust(u), { headers: { "user-agent": "we-back-lock-desk", "cache-control": "no-cache" } }); if (!r.ok) throw new Error(`${r.status} ${u}`); return r.json(); };
 const st = n => JSON.parse(fs.readFileSync(`site/static/${n}.json`, "utf8"));
 const stateFile = n => `data/state/${n}`;
 const readState = (n, d) => { try { return JSON.parse(fs.readFileSync(stateFile(n), "utf8")); } catch { return d; } };

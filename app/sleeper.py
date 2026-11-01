@@ -23,7 +23,10 @@ def _get(url: str, cache_name: str | None = None, max_age_s: float = 0):
                 return json.load(f)
     for attempt in range(3):
         try:
-            r = requests.get(url, headers={"User-Agent": UA}, timeout=60)
+            # live requests bypass Sleeper's CDN, which can return copies from hours earlier (Oct 31)
+            live = not (cache_name and max_age_s)
+            r = requests.get(url, headers={"User-Agent": UA, **({"Cache-Control": "no-cache"} if live else {})},
+                             params={"_": int(time.time() * 1000)} if live else None, timeout=60)
             r.raise_for_status()
             data = r.json()
             break

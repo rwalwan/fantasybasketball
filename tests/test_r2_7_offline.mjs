@@ -5,8 +5,8 @@ import fs from "node:fs";
 import vm from "node:vm";
 
 const store = new Map(), handlers = {};
-const caches = { open: async () => ({ put: async (req, res) => store.set(req.url, res), addAll: async () => {} }),
-  match: async req => store.get(req.url)?.clone(), keys: async () => [], delete: async () => true };
+const caches = { open: async () => ({ put: async (req, res) => store.set(typeof req === "string" ? req : req.url, res), addAll: async () => {} }),
+  match: async req => store.get(typeof req === "string" ? req : req.url)?.clone(), keys: async () => [], delete: async () => true };
 let online = true;
 const ctx = { self: { addEventListener: (t, f) => (handlers[t] = f), location: { origin: "https://rwalwan.github.io" }, skipWaiting() {}, clients: { claim() {} } },
   caches, Headers, Response, URL, Promise, Object, String, Date,
@@ -15,11 +15,12 @@ vm.runInNewContext(fs.readFileSync(new URL("../site/sw.js", import.meta.url), "u
 const fetchVia = async url => { let p; handlers.fetch({ request: { method: "GET", url }, respondWith: x => (p = x) }); return p; };
 
 const url = "https://api.sleeper.com/stats/nba/2026/2?season_type=regular";
-const a = await fetchVia(url);
+const a = await fetchVia(url + "&_=1");
 assert.equal(a.headers.get("x-lockdesk-cached"), null, "online: the live response, unmarked");
 await new Promise(r => setTimeout(r, 20));
 online = false;
-const b = await fetchVia(url);
+const b = await fetchVia(url + "&_=2");                 // a different cache-buster still finds the saved copy
+assert.equal(store.size, 1, "one cached copy per address");
 assert.equal(b.headers.get("x-lockdesk-cached"), "1", "offline: the saved copy, marked");
 assert.ok(+b.headers.get("x-lockdesk-saved") > 0, "with the time it was saved");
 assert.deepEqual(await b.json(), { pts: 41 });

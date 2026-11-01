@@ -23,7 +23,9 @@ const etToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Americ
 // offline: the home-screen app's service worker serves the last saved copy, marked x-lockdesk-cached -> banner
 let offlineSince = null;
 const get = async (url, opt = {}) => {
-  const r = await fetch(url, { cache: "no-store", ...opt });
+  // Sleeper's CDN can serve copies from hours earlier: a unique query string gets the current one
+  const u = /sleeper\.(app|com)/.test(url) && !opt.method ? `${url}${url.includes("?") ? "&" : "?"}_=${Date.now()}` : url;
+  const r = await fetch(u, { cache: "no-store", ...opt });
   if (!r.ok) throw new Error(`${r.status} ${url}`);
   if (r.headers.get("x-lockdesk-cached")) offlineSince = Math.min(offlineSince ?? Infinity, +r.headers.get("x-lockdesk-saved") || 0);
   return r.json();

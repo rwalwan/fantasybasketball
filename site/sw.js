@@ -2,7 +2,9 @@
 // the cached copy is used only when the network fails, so the app still opens offline with the last data.
 // Cached copies carry the time they were saved, and a copy served offline is marked (x-lockdesk-cached) so the
 // page says it is showing old data (review 2, finding 7e).
-const CACHE = "lockdesk-v2";
+const CACHE = "lockdesk-v3";
+// one cached copy per address: the "_" cache-busting parameter is dropped from the key (else every minute adds a copy)
+const keyOf = req => { const u = new URL(req.url); u.searchParams.delete("_"); return u.toString(); };
 const SHELL = ["./", "index.html", "app.js", "engine.js", "manifest.webmanifest", "icons/icon-192.png", "icons/apple-touch-icon.png"];
 const SLEEPER = /^https:\/\/api\.sleeper\.(app|com)\//;
 const withHeaders = (res, extra) => res.blob().then(b => {
@@ -19,8 +21,8 @@ self.addEventListener("fetch", e => {
   const sameOrigin = new URL(req.url).origin === self.location.origin, sleeper = SLEEPER.test(req.url);
   if (!sameOrigin && !sleeper) return;
   e.respondWith(fetch(req).then(res => {
-    if (res.ok) { const copy = res.clone(); withHeaders(copy, { "x-lockdesk-saved": String(Date.now()) }).then(r => caches.open(CACHE).then(c => c.put(req, r))).catch(() => {}); }
+    if (res.ok) { const copy = res.clone(); withHeaders(copy, { "x-lockdesk-saved": String(Date.now()) }).then(r => caches.open(CACHE).then(c => c.put(keyOf(req), r))).catch(() => {}); }
     return res;
-  }).catch(() => caches.match(req, { ignoreSearch: sameOrigin })
+  }).catch(() => caches.match(keyOf(req))
     .then(r => r ? withHeaders(r, { "x-lockdesk-cached": "1" }) : Response.error())));
 });
