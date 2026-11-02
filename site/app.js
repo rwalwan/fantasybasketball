@@ -1,4 +1,4 @@
-import { Book, WeekPlan, Valuer, eligFromSnaps, mergeMatchups, usesFaab, waiverMoves, weekDays, teamGames, fits, range80 } from "./engine.js";
+import { Book, WeekPlan, Valuer, eligFromSnaps, mergeMatchups, irMoves, usesFaab, waiverMoves, weekDays, teamGames, fits, range80 } from "./engine.js";
 
 // ---- config -----------------------------------------------------------------------------------
 const LEAGUE = "1400915575915491328", USER = "1388708038000533504";
@@ -141,7 +141,10 @@ function compute() {
   for (const x of waivers.list) Object.assign(x, best[x.pid] ? { drop: best[x.pid].dropName, gain: best[x.pid].gain, weekGain: best[x.pid].weekGain,
     rosGain: best[x.pid].rosGain, bid: best[x.pid].bid } : { drop: null, gain: 0, bid: 0 });
   waivers.list.sort((a, b) => b.gain - a.gain);
-  return { book, wp, valuer, plan, oppPlan, waivers, mine, my, opp };
+  // IR: healthy players still on IR (who to drop to bring them back, or release them), Out players with an open IR spot
+  const banked = new Set(plan.slots.filter(s => ["locked", "keep", "live"].includes(s.action)).map(s => s.pid));
+  const ir = irMoves(wp, valuer, mine, base.league.roster_positions, banked);
+  return { book, wp, valuer, plan, oppPlan, waivers, mine, my, opp, ir };
 }
 
 const LABEL = { lock: "Lock", keep: "Counts", pass: "Pass", start: "Start", locked: "Locked", confirm: "Confirm", live: "Live", "fallback-risk": "Fallback" };
@@ -167,6 +170,8 @@ function render() {
   const mline = ol?.opp ? `<div class="pos" style="margin-bottom:6px" title="Projected final: locked games + live games' remaining projection + the expected value of every open slot. Range = 80% likely band. Win chance = probability your final beats theirs.">Projected final: you <b>${r1(ol.mean)}</b> <span class="pos">(${band(ol.mean, ol.sd)})</span> vs ${esc(base.users[oppOwner] || "opponent")} <b>${r1(ol.opp.mean)}</b> <span class="pos">(${band(ol.opp.mean, Math.sqrt(ol.opp.var))})</span> · win chance <b>${pct(ol.winProb)}</b></div>` : "";
   $("now").innerHTML = mline + (nextBy ? `<b>Next deadline:</b> <span class="when">${until(nextBy)}</span> (${esc(tipTime(nextBy))})` : "<b>No deadlines pending.</b>") +
     `<ul>${acts.filter(a => a.kind !== "pass").map(a => { const [w, ...rest] = a.text.split(" "); return `<li><b>${esc(w)}</b> ${esc(rest.join(" "))} <span class="pos">· ${esc(when(a))}</span></li>`; }).join("")}` +
+    c.ir.activate.map(x => `<li><b>IR</b> ${esc(x.name)} is ${esc(x.status)}: ${x.call === "activate" ? `activate him, drop ${esc(x.best.dropName)}` : "release him"} <span class="pos">· Sleeper blocks adds until he's off IR · Moves tab</span></li>`).join("") +
+    c.ir.toIR.map(x => `<li><b>IR</b> move ${esc(x.name)} (${esc(x.status)}) to IR <span class="pos">· frees a roster spot</span></li>`).join("") +
     (passes.length ? `<li><b>Pass</b> ${passes.map(a => esc(a.text.replace(/^Don't lock /, ""))).join(", ")} <span class="pos">· waiting is worth more</span></li>` : "") +
     (topAdd ? `<li><b>Waiver</b> add ${esc(topAdd.name)}, drop ${esc(topAdd.dropName)}${usesFaab(base.league.settings, live.rosters) ? ` — bid $${topAdd.bid}` : ""} <span class="pos">· Moves tab</span></li>` : "") + `</ul>`;
 
@@ -209,6 +214,7 @@ function render() {
   renderExperts();
   renderNews();
   renderMoves();
+  renderIR(c.ir);
   renderResearch(c);
   renderInsights(c);
   $("foot").textContent = `Plan's expected total from open slots: ${r1(plan.expectedTotal || 0)}. Recomputed every minute from Sleeper (scores, schedule, injuries). A game is lockable only if he was starting when it tipped; lineups are recorded by the scheduled job (every 15 min) and by this page while it's open. ${live.backend ? "Answers sync to your backend, and lineups are recorded every minute." : "Answers are saved in this browser only (backend not connected)."}`;
@@ -252,6 +258,20 @@ function renderTrades(c) {
     `<tr><td colspan="6" class="pos">No trades found that help both sides right now.</td></tr>`;
 }
 
+function renderIR(ir) {
+  const sg = v => (v >= 0 ? "+" : "") + r1(v);
+  const card = x => {
+    const b = x.best, rows = x.options.slice(0, 6).map(o => `<tr><td>${esc(o.dropName)}${o.protected ? ' <span class="pos">(score banked this week)</span>' : ""}</td><td class="n">${sg(o.weekGain)}</td><td class="n">${sg(o.rosGain)}</td><td class="n"><b>${sg(o.gain)}</b></td></tr>`).join("");
+    const verdict = x.call === "activate"
+      ? `Activate him and drop <b>${esc(b.dropName)}</b>: ${sg(b.gain)} points over the rest of the season (${sg(b.weekGain)} this week, ${sg(b.rosGain)}/week after).${Math.abs(b.rosGain) < b.noise ? ` The per-week gain is inside the projections' uncertainty (±${r1(b.noise)}), so it's close.` : ""}`
+      : `Release him: no drop beats keeping your current roster.`;
+    return `<div class="slot lock"><div class="top"><span><span class="nm">${esc(x.name)}</span> <span class="pos">on IR, now ${esc(x.status)} · ${r1(x.perWeek)}/week</span></span><span class="tag">${x.call === "activate" ? "activate" : "release"}</span></div>` +
+      `<p>${verdict} Sleeper blocks adds and trades while he sits on IR healthy.</p>` +
+      `<div class="wrap"><table><tr><th>Drop</th><th>This week</th><th>Per week after</th><th>Season total</th></tr>${rows}</table></div></div>`;
+  };
+  $("ir").innerHTML = ir.activate.map(card).join("") + ir.toIR.map(x => `<div class="slot start"><div class="top"><span class="nm">${esc(x.name)}</span><span class="tag">to IR</span></div><p>${esc(x.name)} is ${esc(x.status)} and an IR spot is open: move him there to free a roster spot.</p></div>`).join("")
+    || `<div class="box"><div class="row"><span class="pos">Nothing to do: nobody healthy on IR, and no Out player needs an open IR spot.</span></div></div>`;
+}
 function renderMoves() {
   const m = live.moves || { adds: [], trades: [] };
   $("movesmeta").textContent = m.generated ? `Suggestions updated ${new Date(m.generated).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}; refreshed every 15 minutes.` : "";

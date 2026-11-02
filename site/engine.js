@@ -788,6 +788,34 @@ export class Valuer {
 }
 
 const swapIn = (roster, out, inn) => roster.filter(p => !out.includes(p)).concat(inn);
+
+// IR (Sleeper allows only players listed Out/IR/Suspended there; a healthy player left on IR blocks adds and trades).
+// For each IR player who is healthy again: every way to bring him back - drop each active player in turn, valued like
+// a waiver move (this week's expected locked points + rest-of-season value) - against simply releasing him.
+// Also: an active player who is Out while an IR spot is open can go to IR for free (a roster spot opens up).
+export function irMoves(wp, valuer, mine, rosterPositions, protect = new Set()) {
+  const reserve = mine.reserve || [], active = (mine.players || []).filter(p => !reserve.includes(p));
+  const status = p => wp.b.status(p), name = p => wp.b.name(p), r1 = v => Math.round(v * 10) / 10;
+  const out = { activate: [], toIR: [] };
+  const baseWeek = wp.weekTotal(active), baseRos = valuer.team(active);
+  for (const r of reserve) {
+    if (OUT.has(status(r))) continue;                                   // still IR-eligible: nothing to do
+    const opts = active.map(d => {
+      const roster = swapIn(active, [d], [r]);
+      const week = wp.weekTotal(roster) - baseWeek, perWeek = valuer.team(roster) - baseRos;
+      return { drop: d, dropName: name(d), gain: r1(week + perWeek * valuer.discSum), weekGain: r1(week), rosGain: r1(perWeek),
+               noise: r1(Math.hypot(projSE(wp, r), projSE(wp, d))), protected: protect.has(d) };
+    }).sort((a, b) => b.gain - a.gain);
+    const best = opts.find(o => !o.protected) || null;
+    // releasing him instead = gain 0 (the active roster doesn't change)
+    out.activate.push({ pid: r, name: name(r), status: status(r) || "healthy", perWeek: r1(valuer.perWeek(r)),
+      call: best && best.gain > 0 ? "activate" : "release", best, options: opts });
+  }
+  const irSpots = rosterPositions.filter(s => s === "IR").length - reserve.length;
+  if (irSpots > 0) for (const p of active) if (OUT.has(status(p)) && !protect.has(p))
+    out.toIR.push({ pid: p, name: name(p), status: status(p) });
+  return out;
+}
 export const teamValue = (valuer, players) => valuer.team(players);
 
 export function tradeIdeas(valuer, book, mine, others, limit = 15) {

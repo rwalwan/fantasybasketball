@@ -4,7 +4,7 @@
 // written once (OpenRouter key stays server-side; never shipped to the browser).
 import { stageOf, calibration } from "./winprob.mjs";
 import fs from "node:fs";
-import { Book, WeekPlan, Valuer, eligFromSnaps, mergeMatchups, selectAdds, weekDays, tradeIdeas, waiverMoves, playerValue } from "../site/engine.js";
+import { Book, WeekPlan, Valuer, eligFromSnaps, mergeMatchups, irMoves, selectAdds, weekDays, tradeIdeas, waiverMoves, playerValue } from "../site/engine.js";
 
 const LEAGUE = "1400915575915491328", USER = "1388708038000533504";
 const S1 = "https://api.sleeper.app/v1", S2 = "https://api.sleeper.com";
@@ -107,6 +107,7 @@ fs.writeFileSync("site/static/plan.json", JSON.stringify({ week, generated: out.
 // full plan snapshot on the state branch, for debugging what the engine saw
 fs.writeFileSync(stateFile("plan_debug.json"), JSON.stringify({ at: new Date().toISOString(), today, week, expectedTotal: plan.expectedTotal,
   slots: plan.slots, actions: plan.actions, idle: plan.idle, outlook: plan.outlook, adds: out.adds, trades: out.trades,
+  ir: irMoves(wp, valuer, mine, league.roster_positions, new Set(plan.slots.filter(s => ["locked", "keep", "live"].includes(s.action)).map(s => s.pid))),
   starters_debug: (my.starters || []).map(p => ({ pid: p, name: book.name(p), sleeper: my.players_points?.[p] ?? null, slot: wp.slotPoints(p) ?? null, copies: wp.slotCandidates(p), manualLock: locks[p] ?? null,
     state: wp.lockState(p), played: wp.played(p).map(g => [g.date, g.fp]) })),
   values: Object.fromEntries((mine.players || []).map(p => [book.name(p), Math.round(valuer.perWeek(p) * 10) / 10])),
