@@ -505,11 +505,18 @@ export class WeekPlan {
       const a = assignedTo[x.i] && !willLock.has(assignedTo[x.i]) ? assignedTo[x.i] : null;
       return { x, a, draws: [], tail: open.some(y => y.i === x.i) ? tailOf(x) : (a ? cont[a].W : 0) };
     });
-    // who may start in slot x today: its week-long player, bench players whose games are allocated to it, or bench
-    // players allocated nowhere. A player whose later games are another slot's fallback can't also be locked here
-    // today without taking those games away from that slot.
-    const assignedSet = new Set(Object.values(assignedTo).filter(Boolean)), owner = mainStreams.owner || {};
-    const allowed = (x, p) => assignedTo[x.i] === p || owner[p] === x.i || (!assignedSet.has(p) && owner[p] == null);
+    // who may start in slot x today: any bench player (his later games only fill gaps in some slot's fallback), its own
+    // week-long player, or another slot's week-long player when the two could trade slots (each fits the other's) -
+    // slot labels don't matter between interchangeable players (Nov 2: Okongwu, Sharpe and Carter all fit C and UTIL,
+    // so Carter starts at C and Derrick White at UTIL instead of Sharpe). A week-long player can't start in a slot whose
+    // own player couldn't take his place: his later games are that other slot's fallback.
+    const slotOf = Object.fromEntries(Object.entries(assignedTo).filter(([, p]) => p).map(([i, p]) => [p, +i]));
+    const sdef = Object.fromEntries(this.slots.map((s, i) => [i, s]));
+    const allowed = (x, p) => {
+      if (!(p in slotOf) || slotOf[p] === x.i) return true;
+      const q = assignedTo[x.i];
+      return !q || fits(sdef[slotOf[p]], this.b.pos(q));
+    };
     const todayCands = pool.filter(p => !willLock.has(p) && todayGame(p));
     const freePlans = plans.filter(pl => !pl.live);
     if (freePlans.length && todayCands.length) {
