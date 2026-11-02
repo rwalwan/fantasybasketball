@@ -393,7 +393,7 @@ export class WeekPlan {
     // games go to ONE slot only (review 2, finding 1): greedily, the (player, slot) pair with the largest gain.
     const merged = (ds, extra) => { const byDay = {}; for (const g of [...ds, ...extra]) if (!byDay[g.date] || g.mu * g.q > byDay[g.date].mu * byDay[g.date].q) byDay[g.date] = g; return Object.keys(byDay).sort().map(d => byDay[d]); };
     const streams = (rows, sol) => {
-      const games = {}, Wr = {}, gain = {};
+      const games = {}, Wr = {}, gain = {}, owner = {};
       rows.forEach((x, r) => { const a = sol.pick[r]; games[x.i] = a ? cont[a].u : []; Wr[x.i] = a ? cont[a].W : 0; gain[x.i] = 0; });
       const used = new Set(sol.pick.filter(Boolean)), idle = pool.filter(p => !used.has(p) && cont[p].u.length);
       for (;;) {
@@ -404,9 +404,9 @@ export class WeekPlan {
           if (d > 1e-9 && (!best || d > best.d)) best = { p, x, ds, w, d };
         }
         if (!best) break;
-        games[best.x.i] = best.ds; Wr[best.x.i] = best.w; gain[best.x.i] += best.d; idle.splice(idle.indexOf(best.p), 1);
+        games[best.x.i] = best.ds; Wr[best.x.i] = best.w; gain[best.x.i] += best.d; owner[best.p] = best.x.i; idle.splice(idle.indexOf(best.p), 1);
       }
-      return { gain, games, total: Object.values(gain).reduce((a, b) => a + b, 0) };
+      return { gain, games, owner, total: Object.values(gain).reduce((a, b) => a + b, 0) };
     };
     const main = solve(open, pool), mainStreams = streams(open, main);
     const assignedTo = {}; open.forEach((x, r) => { assignedTo[x.i] = main.pick[r]; });
@@ -505,11 +505,16 @@ export class WeekPlan {
       const a = assignedTo[x.i] && !willLock.has(assignedTo[x.i]) ? assignedTo[x.i] : null;
       return { x, a, draws: [], tail: open.some(y => y.i === x.i) ? tailOf(x) : (a ? cont[a].W : 0) };
     });
+    // who may start in slot x today: its week-long player, bench players whose games are allocated to it, or bench
+    // players allocated nowhere. A player whose later games are another slot's fallback can't also be locked here
+    // today without taking those games away from that slot.
+    const assignedSet = new Set(Object.values(assignedTo).filter(Boolean)), owner = mainStreams.owner || {};
+    const allowed = (x, p) => assignedTo[x.i] === p || owner[p] === x.i || (!assignedSet.has(p) && owner[p] == null);
     const todayCands = pool.filter(p => !willLock.has(p) && todayGame(p));
     const freePlans = plans.filter(pl => !pl.live);
     if (freePlans.length && todayCands.length) {
       const gainM = freePlans.map(pl => todayCands.map(p => {
-        if (!fits(pl.x.s, this.b.pos(p))) return null;
+        if (!fits(pl.x.s, this.b.pos(p)) || !allowed(pl.x, p)) return null;
         const v = fold([{ p, g: todayGame(p) }], pl.tail).V - pl.tail + (p === pl.x.p ? 0.01 : 0);   // tie: keep who's there
         return v > 0.05 ? v : null;
       }));
@@ -534,7 +539,7 @@ export class WeekPlan {
         if (used.has(b)) continue;
         const gb = todayGame(b); if (!gb) continue;
         for (const pl of plans) {
-          if (!fits(pl.x.s, this.b.pos(b))) continue;
+          if (!fits(pl.x.s, this.b.pos(b)) || !allowed(pl.x, b)) continue;
           const now = fold(pl.draws, pl.tail).V, ins = insertBest(pl, b, gb);
           if (ins && ins.v - now > 0.05 && (!best || ins.v - now > best.gain)) best = { pl, b, d: ins.d, gain: ins.v - now };
         }
