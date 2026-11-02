@@ -261,7 +261,7 @@ function renderTrades(c) {
 function renderIR(ir) {
   const sg = v => (v >= 0 ? "+" : "") + r1(v);
   const card = x => {
-    const b = x.best, rows = x.options.slice(0, 6).map(o => `<tr><td>${esc(o.dropName)}${o.protected ? ' <span class="pos">(score banked this week)</span>' : ""}</td><td class="n">${sg(o.weekGain)}</td><td class="n">${sg(o.rosGain)}</td><td class="n"><b>${sg(o.gain)}</b></td></tr>`).join("");
+    const b = x.best, rows = x.options.slice(0, 6).map(o => `<tr><td>${esc(o.dropName)} <span class="pos">${r1(o.value)}/wk</span>${o.protected ? ' <span class="pos">(score banked this week)</span>' : ""}</td><td class="n">${sg(o.weekGain)}</td><td class="n">${sg(o.rosGain)}</td><td class="n"><b>${sg(o.gain)}</b></td></tr>`).join("");
     const verdict = x.call === "activate"
       ? `Activate him and drop <b>${esc(b.dropName)}</b>: ${sg(b.gain)} points over the rest of the season (${sg(b.weekGain)} this week, ${sg(b.rosGain)}/week after).${Math.abs(b.rosGain) < b.noise ? ` The per-week gain is inside the projections' uncertainty (±${r1(b.noise)}), so it's close.` : ""}`
       : `Release him: no drop beats keeping your current roster.`;

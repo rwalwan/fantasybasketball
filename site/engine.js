@@ -804,8 +804,9 @@ export function irMoves(wp, valuer, mine, rosterPositions, protect = new Set()) 
       const roster = swapIn(active, [d], [r]);
       const week = wp.weekTotal(roster) - baseWeek, perWeek = valuer.team(roster) - baseRos;
       return { drop: d, dropName: name(d), gain: r1(week + perWeek * valuer.discSum), weekGain: r1(week), rosGain: r1(perWeek),
-               noise: r1(Math.hypot(projSE(wp, r), projSE(wp, d))), protected: protect.has(d) };
-    }).sort((a, b) => b.gain - a.gain);
+               noise: r1(Math.hypot(projSE(wp, r), projSE(wp, d))), protected: protect.has(d), value: r1(valuer.perWeek(d)) };
+    // ties (players outside the best lineup change nothing): drop the one worth least on his own
+    }).sort((a, b) => (Math.abs(b.gain - a.gain) > 0.05 ? b.gain - a.gain : a.value - b.value));
     const best = opts.find(o => !o.protected) || null;
     // releasing him instead = gain 0 (the active roster doesn't change)
     out.activate.push({ pid: r, name: name(r), status: status(r) || "healthy", perWeek: r1(valuer.perWeek(r)),
