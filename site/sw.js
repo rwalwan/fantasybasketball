@@ -2,7 +2,7 @@
 // the cached copy is used only when the network fails, so the app still opens offline with the last data.
 // Cached copies carry the time they were saved, and a copy served offline is marked (x-lockdesk-cached) so the
 // page says it is showing old data (review 2, finding 7e).
-const CACHE = "lockdesk-v3";
+const CACHE = "lockdesk-v4";
 // one cached copy per address: the "_" cache-busting parameter is dropped from the key (else every minute adds a copy)
 const keyOf = req => { const u = new URL(req.url); u.searchParams.delete("_"); return u.toString(); };
 const SHELL = ["./", "index.html", "app.js", "engine.js", "manifest.webmanifest", "icons/icon-192.png", "icons/apple-touch-icon.png"];
@@ -20,7 +20,10 @@ self.addEventListener("fetch", e => {
   if (req.method !== "GET") return;
   const sameOrigin = new URL(req.url).origin === self.location.origin, sleeper = SLEEPER.test(req.url);
   if (!sameOrigin && !sleeper) return;
-  e.respondWith(fetch(req).then(res => {
+  // same-origin files are revalidated with the server every time (GitHub Pages lets browsers reuse a copy for 10
+  // minutes, so a just-published engine.js could run stale: Nov 2); a 304 makes this cheap
+  const net = sameOrigin && req.mode !== "navigate" ? new Request(req, { cache: "no-cache" }) : req;
+  e.respondWith(fetch(net).then(res => {
     if (res.ok) { const copy = res.clone(); withHeaders(copy, { "x-lockdesk-saved": String(Date.now()) }).then(r => caches.open(CACHE).then(c => c.put(keyOf(req), r))).catch(() => {}); }
     return res;
   }).catch(() => caches.match(keyOf(req))

@@ -161,7 +161,8 @@ function render() {
   const acts = plan.actions.filter(a => !a.by || new Date(a.by) > new Date());
   const topAdd = live.moves?.adds?.[0];
   const nextBy = acts.filter(a => a.kind !== "pass" && a.by).map(a => a.by).sort()[0];
-  const when = a => a.kind === "relief" ? `between ${tipTime(a.from)} and ${tipTime(a.by)}`
+  // relief: the window opens when the first game should be over (tip + 2.5 h) and closes at the new player's tip
+  const when = a => a.kind === "relief" ? (Date.parse(a.by) - Date.parse(a.from) < 20 * 60000 ? `right after his game ends, before ${tipTime(a.by)} (tight)` : `between ${tipTime(a.from)} and ${tipTime(a.by)}`)
     : a.kind === "move" ? `best ~${tipTime(a.best)}, by ${tipTime(a.by)}` : a.by ? `by ${tipTime(a.by)}` : "";
   const passes = acts.filter(a => a.kind === "pass");
   const ol = plan.outlook;

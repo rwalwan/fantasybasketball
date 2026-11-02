@@ -19,6 +19,6 @@ for tag in ('rel="manifest"', 'apple-mobile-web-app-capable', 'rel="apple-touch-
     assert tag in html, tag
 assert png_size(os.path.join(S, "icons", "apple-touch-icon.png")) == (180, 180)
 sw = open(os.path.join(S, "sw.js")).read()
-assert "fetch(req).then" in sw and ".catch(() => caches.match" in sw, "network first, cache only as fallback"
+assert "fetch(net).then" in sw and ".catch(() => caches.match" in sw and "no-cache" in sw, "network first (revalidated), cache only as fallback"
 assert 'register("sw.js")' in open(os.path.join(S, "app.js")).read()
 print("ok: pwa")
