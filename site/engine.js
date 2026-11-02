@@ -515,41 +515,63 @@ export class WeekPlan {
     const dyn = pool.filter(p => !willLock.has(p) && !liveNow.has(p) && cont[p]?.u.length);
     const gameOn = {};                                                  // date -> [{p, g}]
     for (const p of dyn) for (const g of cont[p].u) if (g.date > this.today || (g.date === this.today && g.tip)) (gameOn[g.date] ||= []).push({ p, g });
-    const dates = Object.keys(gameOn).sort();
-    const sched = Object.fromEntries(dates.map(d => [d, {}]));       // date -> {slot k: {p, g}}
-    const seqW = (k, skip) => { const gs = dates.filter(d => d !== skip && sched[d][k]).map(d => sched[d][k].g); return gs.length ? contStats(Q, gs).W[0] || 0 : 0; };
-    const solveDay = (d, valueOf) => {
-      const cands = gameOn[d] || [];
-      const m = freePlans.map((pl, k) => cands.map(c => (fits(pl.x.s, this.b.pos(c.p)) ? valueOf(k, c) : null)));
-      const pick = cands.length ? maxAssign(m) : [];
-      sched[d] = {};
-      pick.forEach((c, k) => { if (c >= 0 && c < cands.length && m[k][c] != null && m[k][c] > 1e-6) sched[d][k] = cands[c]; });
-    };
-    if (freePlans.length) {
-      for (const d of dates) solveDay(d, (k, c) => c.g.mu * c.g.q);  // start: best expected game per slot per day
+    const later = Object.keys(gameOn).filter(d => d > this.today).sort();
+    // the rest of the week (after today), planned day by day: returns {sched, W per slot, total}
+    const planLater = (without = null) => {
+      const sched = Object.fromEntries(later.map(d => [d, {}]));
+      const seq = (k, skip, add) => {
+        const gs = later.filter(d => d !== skip && sched[d][k]).map(d => ({ date: d, g: sched[d][k].g }));
+        if (add) gs.push(add);
+        return gs.sort((u, v) => (u.date < v.date ? -1 : 1)).map(o => o.g);
+      };
+      const W = gs => (gs.length ? contStats(Q, gs).W[0] || 0 : 0);
+      const solveDay = (d, valueOf) => {
+        const cands = (gameOn[d] || []).filter(c => c.p !== without);
+        const m = freePlans.map((pl, k) => cands.map(c => (fits(pl.x.s, this.b.pos(c.p)) ? valueOf(k, c) : null)));
+        const pick = cands.length ? maxAssign(m) : [];
+        sched[d] = {};
+        pick.forEach((c, k) => { if (c >= 0 && c < cands.length && m[k][c] != null && m[k][c] > 1e-6) sched[d][k] = cands[c]; });
+      };
+      for (const d of later) solveDay(d, (k, c) => c.g.mu * c.g.q);
       for (let pass = 0; pass < 4; pass++) {
         let changed = false;
-        for (const d of dates) {
+        for (const d of later) {
           const before = JSON.stringify(Object.entries(sched[d]).map(([k, c]) => [k, c.p]));
-          const without = freePlans.map((pl, k) => seqW(k, d));
-          solveDay(d, (k, c) => {
-            const gs = dates.filter(x => x !== d && sched[x][k]).map(x => ({ date: x, g: sched[x][k].g })).concat([{ date: d, g: c.g }])
-              .sort((u, v) => (u.date < v.date ? -1 : 1)).map(o => o.g);
-            return (contStats(Q, gs).W[0] || 0) - without[k] + (d === this.today && c.p === freePlans[k].x.p ? 0.01 : 0);   // tie: keep who's there
-          });
+          const wo = freePlans.map((pl, k) => W(seq(k, d)));
+          solveDay(d, (k, c) => W(seq(k, d, { date: d, g: c.g })) - wo[k]);
           if (JSON.stringify(Object.entries(sched[d]).map(([k, c]) => [k, c.p])) !== before) changed = true;
         }
         if (!changed) break;
       }
+      const Ws = freePlans.map((pl, k) => W(seq(k)));
+      return { sched, Ws, total: Ws.reduce((a, b) => a + b, 0) };
+    };
+    if (freePlans.length) {
+      const base = planLater();
+      // Today: a player locked today can't fill any slot later, so his keep-line is the slot's fallback PLUS what the
+      // rest of the week loses without him - measured by re-planning the week without him (others can cover).
+      const cands = gameOn[this.today] || [];
+      const M = cands.map(c => (later.some(d => (gameOn[d] || []).some(x => x.p === c.p)) ? Math.max(0, base.total - planLater(c.p).total) : 0));
+      const val = (k, ci) => { const T = base.Ws[k] + M[ci], g = cands[ci].g; return g.q * expectedMax(g.Q || Q, g.mu, T) + (1 - g.q) * T - T; };
+      const m = freePlans.map((pl, k) => cands.map((c, ci) => {
+        if (!fits(pl.x.s, this.b.pos(c.p))) return null;
+        const v = val(k, ci) + (c.p === pl.x.p ? 0.01 : 0);           // tie: keep who's there
+        return v > 0.05 ? v : null;
+      }));
+      this.lastToday = freePlans.map((pl, k) => [pl.x.s, Math.round(base.Ws[k] * 10) / 10, cands.map((c, ci) => m[k][ci] == null ? null : [this.b.name(c.p), Math.round(M[ci] * 10) / 10, Math.round(m[k][ci] * 100) / 100]).filter(Boolean)]);
+      const todayPick = cands.length ? maxAssign(m) : [];
       freePlans.forEach((pl, k) => {
-        const t = sched[this.today]?.[k];
+        const ci = todayPick[k], t = ci >= 0 && ci < cands.length && m[k][ci] != null ? cands[ci] : null;
         if (t) pl.draws = [{ p: t.p, g: t.g }];
-        const later = dates.filter(d => d > this.today && sched[d][k]);
-        pl.tail = later.length ? contStats(Q, later.map(d => sched[d][k].g)).W[0] || 0 : 0;
-        pl.a = later.length ? sched[later[0]][k].p : null;               // who covers this slot next
-        pl.next = later.length ? sched[later[0]][k] : null;
+        pl.tail = base.Ws[k] + (t ? M[ci] : 0);
+        const nx = later.find(d => base.sched[d][k]);
+        pl.a = nx ? base.sched[nx][k].p : null;                          // who covers this slot next
+        pl.next = nx ? base.sched[nx][k] : null;
       });
+      var schedOut = base.sched;
     }
+    const dates = later, sched = schedOut || {};
+    this.lastSchedule = Object.fromEntries(dates.map(d => [d, Object.fromEntries(Object.entries(sched[d] || {}).map(([k, c]) => [freePlans[k].x.s + k, this.b.name(c.p)]))]));
     const allowed = () => true;                                         // relief: anyone free today
     const used = new Set([...plans.flatMap(pl => pl.draws.map(d => d.p)), ...willLock]);
     const insertBest = (pl, b, gb) => {
