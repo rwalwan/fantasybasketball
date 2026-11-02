@@ -518,7 +518,7 @@ export class WeekPlan {
     for (const p of dyn) for (const g of cont[p].u) if (g.date > this.today || (g.date === this.today && g.tip)) (gameOn[g.date] ||= []).push({ p, g });
     const later = Object.keys(gameOn).filter(d => d > this.today).sort();
     // the rest of the week (after today), planned day by day: returns {sched, W per slot, total}
-    const planLater = (without = null, skipSlot = -1) => {
+    const planLater = (without = null, skipSlot = -1, init = null) => {
       const sched = Object.fromEntries(later.map(d => [d, {}]));
       const seq = (k, skip, add) => {
         const gs = later.filter(d => d !== skip && sched[d][k]).map(d => ({ date: d, g: sched[d][k].g }));
@@ -533,8 +533,11 @@ export class WeekPlan {
         sched[d] = {};
         pick.forEach((c, k) => { if (c >= 0 && c < cands.length && m[k][c] != null && m[k][c] > 1e-6) sched[d][k] = cands[c]; });
       };
-      for (const d of later) solveDay(d, (k, c) => c.g.mu * c.g.q);
-      for (let pass = 0; pass < 4; pass++) {
+      // start from the given plan minus what's excluded (so a re-plan differs from it only by the exclusion, not by
+      // landing in a different local optimum), else from the best expected game per slot per day
+      if (init) for (const d of later) sched[d] = Object.fromEntries(Object.entries(init[d] || {}).filter(([k, c]) => +k !== skipSlot && c.p !== without));
+      else for (const d of later) solveDay(d, (k, c) => c.g.mu * c.g.q);
+      for (let pass = 0; pass < 8; pass++) {
         let changed = false;
         for (const d of later) {
           const before = JSON.stringify(Object.entries(sched[d]).map(([k, c]) => [k, c.p]));
@@ -552,7 +555,7 @@ export class WeekPlan {
       // Today: a player locked today can't fill any slot later, so his keep-line is the slot's fallback PLUS what the
       // rest of the week loses without him - measured by re-planning the week without him (others can cover).
       const cands = gameOn[this.today] || [];
-      const M = cands.map(c => (later.some(d => (gameOn[d] || []).some(x => x.p === c.p)) ? Math.max(0, base.total - planLater(c.p).total) : 0));
+      const M = cands.map(c => (later.some(d => (gameOn[d] || []).some(x => x.p === c.p)) ? Math.max(0, base.total - planLater(c.p, -1, base.sched).total) : 0));
       oppCost = Object.fromEntries(cands.map((c, ci) => [c.p, M[ci]]));
       const val = (k, ci) => { const T = base.Ws[k] + M[ci], g = cands[ci].g; return g.q * expectedMax(g.Q || Q, g.mu, T) + (1 - g.q) * T - T; };
       const m = freePlans.map((pl, k) => cands.map((c, ci) => {
@@ -570,7 +573,7 @@ export class WeekPlan {
         if (t) pl.draws = [{ p: t.p, g: t.g }];
         // keep-line: lock him iff his game beats what the rest of the week loses when this slot is done AND he's gone
         // (the week re-planned without both); fallback + opportunity cost counted his own later games twice (Luka: 130)
-        pl.tail = t ? Math.max(base.Ws[k], base.total - planLater(t.p, k).total) : base.Ws[k];
+        pl.tail = t ? Math.max(base.Ws[k], base.total - planLater(t.p, k, base.sched).total) : base.Ws[k];
         const nx = later.find(d => base.sched[d][k]);
         pl.a = nx ? base.sched[nx][k].p : null;                          // who covers this slot next
         pl.next = nx ? base.sched[nx][k] : null;
