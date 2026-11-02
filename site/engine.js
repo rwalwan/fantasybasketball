@@ -512,6 +512,7 @@ export class WeekPlan {
       return { x, a: null, draws: [], tail: 0 };
     });
     const freePlans = plans.filter(pl => !pl.live);
+    let oppCost = null;
     const dyn = pool.filter(p => !willLock.has(p) && !liveNow.has(p) && cont[p]?.u.length);
     const gameOn = {};                                                  // date -> [{p, g}]
     for (const p of dyn) for (const g of cont[p].u) if (g.date > this.today || (g.date === this.today && g.tip)) (gameOn[g.date] ||= []).push({ p, g });
@@ -552,11 +553,15 @@ export class WeekPlan {
       // rest of the week loses without him - measured by re-planning the week without him (others can cover).
       const cands = gameOn[this.today] || [];
       const M = cands.map(c => (later.some(d => (gameOn[d] || []).some(x => x.p === c.p)) ? Math.max(0, base.total - planLater(c.p).total) : 0));
+      oppCost = Object.fromEntries(cands.map((c, ci) => [c.p, M[ci]]));
       const val = (k, ci) => { const T = base.Ws[k] + M[ci], g = cands[ci].g; return g.q * expectedMax(g.Q || Q, g.mu, T) + (1 - g.q) * T - T; };
       const m = freePlans.map((pl, k) => cands.map((c, ci) => {
         if (!fits(pl.x.s, this.b.pos(c.p))) return null;
-        const v = val(k, ci) + (c.p === pl.x.p ? 0.01 : 0);           // tie: keep who's there
-        return v > 0.05 ? v : null;
+        const v = val(k, ci);
+        if (v <= 0.05) return null;
+        // near-ties (option values within ~0.3 points are inside the model's error): prefer the higher projection
+        // today and whoever is already in the slot, so it doesn't bench Durant for Allen over 0.2 points
+        return v + 0.03 * cands[ci].g.mu * cands[ci].g.q + (c.p === pl.x.p ? 0.05 : 0);
       }));
       this.lastToday = freePlans.map((pl, k) => [pl.x.s, Math.round(base.Ws[k] * 10) / 10, cands.map((c, ci) => m[k][ci] == null ? null : [this.b.name(c.p), Math.round(M[ci] * 10) / 10, Math.round(m[k][ci] * 100) / 100]).filter(Boolean)]);
       const todayPick = cands.length ? maxAssign(m) : [];
@@ -574,17 +579,17 @@ export class WeekPlan {
     this.lastSchedule = Object.fromEntries(dates.map(d => [d, Object.fromEntries(Object.entries(sched[d] || {}).map(([k, c]) => [freePlans[k].x.s + k, this.b.name(c.p)]))]));
     const allowed = () => true;                                         // relief: anyone free today
     const used = new Set([...plans.flatMap(pl => pl.draws.map(d => d.p)), ...willLock]);
+    // relief: a later-tipping player added after the slot's starter (a lock of him also costs what his later games
+    // are worth elsewhere: his own opportunity cost goes into the comparison)
     const insertBest = (pl, b, gb) => {
-      let best = null;
-      for (let pos = 0; pos <= pl.draws.length; pos++) {
-        const d = [...pl.draws.slice(0, pos), { p: b, g: gb }, ...pl.draws.slice(pos)];
-        let ok = true;
-        for (let k = 1; k < d.length; k++) if (Date.parse(d[k].g.tip) < Date.parse(d[k - 1].g.tip) + GAME_MS) ok = false;
-        if (!ok) continue;
-        const v = fold(d, pl.tail).V;
-        if (!best || v > best.v) best = { v, d };
-      }
-      return best;
+      if (!pl.draws.length) return null;                                // empty slots were filled by the assignment above
+      const d = [...pl.draws, { p: b, g: gb }];
+      for (let k = 1; k < d.length; k++) if (Date.parse(d[k].g.tip) < Date.parse(d[k - 1].g.tip) + GAME_MS) return null;
+      const cost = (oppCost && oppCost[b]) || 0;
+      const last = d.length - 1, Tb = pl.tail + cost, g = d[last].g;
+      const vLast = g.q * expectedMax(g.Q || Q, g.mu, Tb) + (1 - g.q) * Tb - cost;   // value if he's the last draw
+      const v = fold(d.slice(0, last), Math.max(pl.tail, vLast)).V;
+      return { v, d };
     };
     for (;;) {
       let best = null;
