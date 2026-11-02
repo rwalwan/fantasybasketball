@@ -557,11 +557,11 @@ export class WeekPlan {
       const val = (k, ci) => { const T = base.Ws[k] + M[ci], g = cands[ci].g; return g.q * expectedMax(g.Q || Q, g.mu, T) + (1 - g.q) * T - T; };
       const m = freePlans.map((pl, k) => cands.map((c, ci) => {
         if (!fits(pl.x.s, this.b.pos(c.p))) return null;
-        const v = val(k, ci);
-        if (v <= 0.05) return null;
-        // near-ties (option values within ~0.3 points are inside the model's error): prefer the higher projection
-        // today and whoever is already in the slot, so it doesn't bench Durant for Allen over 0.2 points
-        return v + 0.03 * cands[ci].g.mu * cands[ci].g.q + (c.p === pl.x.p ? 0.05 : 0);
+        // Starting a player costs nothing in Lock-In (a game that doesn't beat his keep-line just isn't locked), so
+        // today's starters are simply the best expected games today across every slot each player fits; the
+        // opportunity cost only sets the keep-line. (Ranking by option value instead benched Luka and Durant for
+        // ~0.2-point edges inside the model's error.) Ties: whoever is already in the slot.
+        return cands[ci].g.mu * cands[ci].g.q + (c.p === pl.x.p ? 0.5 : 0) + 1e-3 * val(k, ci);
       }));
       this.lastToday = freePlans.map((pl, k) => [pl.x.s, Math.round(base.Ws[k] * 10) / 10, cands.map((c, ci) => m[k][ci] == null ? null : [this.b.name(c.p), Math.round(M[ci] * 10) / 10, Math.round(m[k][ci] * 100) / 100]).filter(Boolean)]);
       const todayPick = cands.length ? maxAssign(m) : [];
