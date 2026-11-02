@@ -406,7 +406,7 @@ export class WeekPlan {
         if (!best) break;
         games[best.x.i] = best.ds; Wr[best.x.i] = best.w; gain[best.x.i] += best.d; idle.splice(idle.indexOf(best.p), 1);
       }
-      return { gain, total: Object.values(gain).reduce((a, b) => a + b, 0) };
+      return { gain, games, total: Object.values(gain).reduce((a, b) => a + b, 0) };
     };
     const main = solve(open, pool), mainStreams = streams(open, main);
     const assignedTo = {}; open.forEach((x, r) => { assignedTo[x.i] = main.pick[r]; });
@@ -495,13 +495,27 @@ export class WeekPlan {
     };
     const openToday = this.slots.map((s, i) => ({ s, i, p: starters[i] }))
       .filter(x => !locked.has(x.p) && !willLock.has(x.p)).map((x, k) => ({ ...x, k }));
+    // Today's starter for each slot is chosen on its own, not inherited from the week plan: a slot isn't tied to one
+    // player in Lock-In, so anyone eligible can start today and the slot falls back to its rest-of-week options
+    // (its player's later games + the bench games allocated to it) if he scores under the keep-line. Nov 2: Wendell
+    // Carter Jr. (40 proj) sat while Day'Ron Sharpe (35) started at C, because Sharpe was C's player for the weekend.
+    const tailOf = x => { const ds = (mainStreams.games[x.i] || []).filter(g => g.date > this.today); return ds.length ? contStats(Q, ds).W[0] || 0 : 0; };
     const plans = openToday.map(x => {
       if (liveNow.has(x.p)) { const g = liveDraw(x.p); return { x, a: x.p, draws: g ? [{ p: x.p, g }] : [], tail: afterToday(x.p), live: true }; }
       const a = assignedTo[x.i] && !willLock.has(assignedTo[x.i]) ? assignedTo[x.i] : null;
-      const ga = a ? todayGame(a) : null;
-      return { x, a, draws: ga ? [{ p: a, g: ga }] : [], tail: a ? (ga ? afterToday(a) : cont[a].W) : 0 };
+      return { x, a, draws: [], tail: open.some(y => y.i === x.i) ? tailOf(x) : (a ? cont[a].W : 0) };
     });
-    const used = new Set([...Object.values(assignedTo).filter(Boolean), ...willLock]);
+    const todayCands = pool.filter(p => !willLock.has(p) && todayGame(p));
+    const freePlans = plans.filter(pl => !pl.live);
+    if (freePlans.length && todayCands.length) {
+      const gainM = freePlans.map(pl => todayCands.map(p => {
+        if (!fits(pl.x.s, this.b.pos(p))) return null;
+        const v = fold([{ p, g: todayGame(p) }], pl.tail).V - pl.tail + (p === pl.x.p ? 0.01 : 0);   // tie: keep who's there
+        return v > 0.05 ? v : null;
+      }));
+      maxAssign(gainM).forEach((c, r) => { if (c >= 0 && c < todayCands.length && gainM[r][c] != null) freePlans[r].draws = [{ p: todayCands[c], g: todayGame(todayCands[c]) }]; });
+    }
+    const used = new Set([...plans.flatMap(pl => pl.draws.map(d => d.p)), ...willLock]);
     const insertBest = (pl, b, gb) => {
       let best = null;
       for (let pos = 0; pos <= pl.draws.length; pos++) {
