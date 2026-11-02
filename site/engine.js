@@ -518,7 +518,7 @@ export class WeekPlan {
     for (const p of dyn) for (const g of cont[p].u) if (g.date > this.today || (g.date === this.today && g.tip)) (gameOn[g.date] ||= []).push({ p, g });
     const later = Object.keys(gameOn).filter(d => d > this.today).sort();
     // the rest of the week (after today), planned day by day: returns {sched, W per slot, total}
-    const planLater = (without = null) => {
+    const planLater = (without = null, skipSlot = -1) => {
       const sched = Object.fromEntries(later.map(d => [d, {}]));
       const seq = (k, skip, add) => {
         const gs = later.filter(d => d !== skip && sched[d][k]).map(d => ({ date: d, g: sched[d][k].g }));
@@ -528,7 +528,7 @@ export class WeekPlan {
       const W = gs => (gs.length ? contStats(Q, gs).W[0] || 0 : 0);
       const solveDay = (d, valueOf) => {
         const cands = (gameOn[d] || []).filter(c => c.p !== without);
-        const m = freePlans.map((pl, k) => cands.map(c => (fits(pl.x.s, this.b.pos(c.p)) ? valueOf(k, c) : null)));
+        const m = freePlans.map((pl, k) => cands.map(c => (k !== skipSlot && fits(pl.x.s, this.b.pos(c.p)) ? valueOf(k, c) : null)));
         const pick = cands.length ? maxAssign(m) : [];
         sched[d] = {};
         pick.forEach((c, k) => { if (c >= 0 && c < cands.length && m[k][c] != null && m[k][c] > 1e-6) sched[d][k] = cands[c]; });
@@ -568,7 +568,9 @@ export class WeekPlan {
       freePlans.forEach((pl, k) => {
         const ci = todayPick[k], t = ci >= 0 && ci < cands.length && m[k][ci] != null ? cands[ci] : null;
         if (t) pl.draws = [{ p: t.p, g: t.g }];
-        pl.tail = base.Ws[k] + (t ? M[ci] : 0);
+        // keep-line: lock him iff his game beats what the rest of the week loses when this slot is done AND he's gone
+        // (the week re-planned without both); fallback + opportunity cost counted his own later games twice (Luka: 130)
+        pl.tail = t ? Math.max(base.Ws[k], base.total - planLater(t.p, k).total) : base.Ws[k];
         const nx = later.find(d => base.sched[d][k]);
         pl.a = nx ? base.sched[nx][k].p : null;                          // who covers this slot next
         pl.next = nx ? base.sched[nx][k] : null;

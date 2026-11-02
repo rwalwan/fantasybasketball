@@ -47,4 +47,21 @@ assert.ok(today.PF === "Sarr" && today.F === "Allen", "Sarr to PF, Allen at F (B
   console.log("today (C, C, UTIL, UTIL):", started);
   assert.deepEqual(started, ["Carter", "Gobert", "Okongwu", "White"]);
 }
+
+// a star who plays every other day starts today, and his keep-line is about his own rest of the week (not counted
+// twice: it read 130 for Luka)
+{
+  const { contStats, tierQ } = await import("../site/engine.js");
+  const ix = [0, 2, 4, 6], sc3 = ix.map(i => ({ week: 3, date: days[i], home: { team: "DAL" }, away: { team: "X" }, status: "pre_game" }));
+  const bk = new Book({ scoring: {}, weights: { rotowire: 1, model: 0, ctx: 0 }, gamelog: {}, players: { L: ["Luka", "DAL", ["PG"], null], W: ["White", "DAL", ["PG"], null] }, priors: { L: 68, W: 37 } });
+  bk.proj = {}; ix.forEach(i => { bk.proj[`L|${days[i]}`] = 68; });
+  const tp = Object.fromEntries(ix.map(i => [`${days[i]}|DAL`, `${days[i]}T23:30:00Z`]));
+  const w3 = new WeekPlan({ Q: QS, book: bk, schedule: sc3, week: 3, today: days[0], now: new Date("2026-11-02T15:00:00Z"),
+    rosterPositions: ["PG", "BN"], roster: { players: ["L"] }, matchup: { starters: ["L"], players_points: {} }, rosters: [], tips: tp, elig: () => true, locks: {} });
+  const s3 = w3.build().slots[0];
+  const Qp = tierQ(QS.tiers, 68, QS.quantiles), own = contStats(QS.quantiles, [1, 2, 3].map(() => ({ mu: 68, q: 0.944, Q: Qp }))).W[0];
+  console.log("star: starts", s3.today?.name, "keep", s3.today?.keepBar, "| his own rest of week", own.toFixed(1));
+  assert.equal(s3.today?.name, "Luka");
+  assert.ok(Math.abs(s3.today.keepBar - own) < 6, "keep-line is his rest-of-week value");
+}
 console.log("ok: today's pick");
