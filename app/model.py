@@ -2,6 +2,8 @@
 from collections import defaultdict
 
 from .scoring import fantasy_points
+import json as _json, os as _os
+BASE = _json.load(open(_os.path.join(_os.path.dirname(__file__), "data", "baseline_model.json")))
 
 # Probability a player suits up, by Sleeper injury_status (applies to his next game).
 STATUS_Q = {None: 0.92, "": 0.92, "Probable": 0.9, "Day-To-Day": 0.75, "GTD": 0.6, "Questionable": 0.55,
@@ -19,6 +21,7 @@ class PlayerBook:
         self.meta = players_meta
         self.games = defaultdict(list)      # pid -> [(date, fp, min, game_id)]
         self.prior = {}                      # pid -> last season FP/G
+        self.prior_min = {}                  # pid -> (last season min/game, games) for the per-minute baseline
         self.proj = {}                       # (pid, date) -> projected FP from Sleeper/RotoWire
         self.w = {"rotowire": 0.5, "model": 0.5}  # source weights, learned from graded accuracy (experts.py)
         self.is_final = None                 # (date, team) -> bool; set by run.py. Live games never feed averages.
@@ -45,6 +48,9 @@ class PlayerBook:
             if gp >= 10:
                 per_game = {k: (st.get(k) or 0) / gp for k in ("pts", "tpm", "reb", "ast", "stl", "blk", "to")}
                 self.prior[r["player_id"]] = fantasy_points(per_game, self.scoring)
+                mins = float(st.get("min") or 0) or float(st.get("sp") or 0) / 60.0
+                if mins > 0:
+                    self.prior_min[r["player_id"]] = (mins / gp, gp)
 
     def add_projections(self, rows):
         for r in rows:
@@ -78,8 +84,16 @@ class PlayerBook:
         return sum(x[1] for x in g) / len(g) if g else None
 
     def baseline(self, pid):
-        """Shrunk per-game average: this season blended with last season (or projection if no history)."""
+        """Shrunk per-game average: this season blended with last season (or projection if no history).
+        With last season's minutes known: FP/G = points per minute x minutes per game, last season's rate and minutes
+        weighted by its size (research/baseline_fit.py; same as site/engine.js)."""
         g = self.done(pid)
+        pm, mins = self.prior_min.get(pid), sum((x[2] or 0) for x in g)
+        if pm and self.prior.get(pid) is not None and pm[0] > 0 and g and mins > 0:
+            w = pm[1] / (pm[1] + BASE["c_size"])
+            rate = (sum(x[1] for x in g) + BASE["R_minutes"] * w * self.prior[pid] / pm[0]) / (mins + BASE["R_minutes"] * w)
+            mpg = (mins + BASE["M_games"] * w * pm[0]) / (len(g) + BASE["M_games"] * w)
+            return rate * mpg
         cur = self.season_avg(pid)
         prior = self.prior.get(pid)
         if prior is None:

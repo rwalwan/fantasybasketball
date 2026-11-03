@@ -74,9 +74,13 @@ export const RETURN_RAMP = [0.86, 0.96];
 // Sleeper's published docs (review 2), so actual spending also counts: any roster with waiver_budget_used > 0.
 export const usesFaab = (settings, rosters = []) => settings?.waiver_type === 2 || rosters.some(r => (r?.settings?.waiver_budget_used || 0) > 0);     // tip to final: used for relief sequencing AND when a relief swap is safe
 export const B2B_FACTOR = 0.93, PRIOR_GAMES = 8;   // b2b/non-b2b play-rate ratio (availability_model.json)
+// per-minute baseline and participation (BASELINE: copy of app/data/baseline_model.json, checked by tests/test_baseline.py)
+export const BASELINE = { R: 200, M: 4, c: 10, part: [0.130, 0.366, 0.474, 0.607, 0.748, 0.929] };
 
 export class Book {
-  constructor({ scoring, players, priors, gamelog, weights, ctx, avail, usage, vol }) {
+  constructor({ scoring, players, priors, gamelog, weights, ctx, avail, usage, vol, priorMin, part }) {
+    this.priorMin = priorMin || {};      // pid -> [last season min/game, games] (per-minute baseline, research/baseline_fit.py)
+    this.part = part || {};              // pid -> play-rate factor from recent participation (healthy players who sat)
     this.vol = vol || {};                // pid -> r: his own game-to-game spread vs his tier's (app/volatility.py)
     this.usage = usage || {};            // pid -> {date: [factor, reasons?]} teammates out etc. (app/usage.py)
     this.avail = avail || null;          // {model, players: {pid: {status, q: {date: p}}}} (app/availability.py)
@@ -129,6 +133,15 @@ export class Book {
   avg(p) { const g = this.done(p); return g.length ? g.reduce((a, x) => a + x.fp, 0) / g.length : null; }
   baseline(p) {
     const g = this.done(p), cur = this.avg(p);
+    // FP/G = points per minute x minutes per game, last season's rate and minutes weighted by how many games it had
+    // (Nov 2: Julian Reese - 13 games at 31 min on a tanking team last season, now a bench player - showed 37.4)
+    const pm = this.priorMin[p], mins = g.reduce((a, x) => a + (x.min || 0), 0);
+    if (pm && this.prior[p] != null && pm[0] > 0 && g.length && mins > 0) {
+      const w = pm[1] / (pm[1] + BASELINE.c), rateLast = this.prior[p] / pm[0];
+      const rate = (g.reduce((a, x) => a + x.fp, 0) + BASELINE.R * w * rateLast) / (mins + BASELINE.R * w);
+      const mpg = (mins + BASELINE.M * w * pm[0]) / (g.length + BASELINE.M * w);
+      return rate * mpg;
+    }
     let prior = this.prior[p];
     if (prior == null) {
       const f = Object.entries(this.proj).filter(([k]) => k.startsWith(p + "|")).map(([, v]) => v);
@@ -155,7 +168,7 @@ export class Book {
     const st = this.status(p), a = this.avail?.players?.[p], M = this.avail?.model || DEFAULT_AVAIL;
     let q;
     if (a && a.status === st && date && a.q[date] != null) q = a.q[date];
-    else if (!st) q = healthyAt(M, (j ?? 0) + 1);
+    else if (!st) q = healthyAt(M, (j ?? 0) + 1) * (this.part[p] ?? 1);   // a healthy player who's been sitting plays less
     else q = statusChain(M, st, j, a?.missed || 0);   // status changed since the job ran: keep his missed count
     if (b2b) q *= B2B_FACTOR;
     return Math.round(q * 100) / 100;

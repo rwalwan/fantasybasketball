@@ -1,0 +1,59 @@
+{
+ "note": "FP/G = points per minute x minutes per game (research/baseline_fit.py, 2021-24): last season's rate counts as R pseudo-minutes, its minutes as M pseudo-games, both scaled by gp_last/(gp_last + c). Participation: P(plays next game) by games played of the team's last 5 (panel, 2021-24).",
+ "R_minutes": 200,
+ "M_games": 4,
+ "c_size": 10,
+ "fit": {
+  "mae_current": 4.63,
+  "mae_per_minute": 4.541,
+  "by_n": {
+   "1": {
+    "current": 4.969,
+    "per_minute": 4.807,
+    "rows": 752
+   },
+   "2": {
+    "current": 4.802,
+    "per_minute": 4.649,
+    "rows": 752
+   },
+   "3": {
+    "current": 4.659,
+    "per_minute": 4.518,
+    "rows": 752
+   },
+   "5": {
+    "current": 4.449,
+    "per_minute": 4.405,
+    "rows": 752
+   },
+   "10": {
+    "current": 4.263,
+    "per_minute": 4.323,
+    "rows": 740
+   }
+  },
+  "small_last_season": {
+   "rows": 153,
+   "current": 5.831,
+   "per_minute": 5.594
+  },
+  "rows": 3748
+ },
+ "participation_last5": [
+  0.13,
+  0.366,
+  0.474,
+  0.607,
+  0.748,
+  0.929
+ ],
+ "participation_n": [
+  14477,
+  9178,
+  9835,
+  10647,
+  14568,
+  47520
+ ]
+}

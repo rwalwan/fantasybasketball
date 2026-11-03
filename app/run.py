@@ -16,6 +16,7 @@ from . import usage as usagemod
 from .engine import free_agent_watch, team_game_dates, week_dates
 from . import volatility
 from .scoring import fantasy_points
+from .model import BASE as BASELINE
 from .lineups import LineupTracker
 from .model import PlayerBook
 
@@ -29,6 +30,7 @@ def main():
     lg = sleeper.league(LEAGUE_ID)
     season = lg["season"]
     sched = sleeper.schedule(season)
+    SCHED_CACHE["sched"] = sched
     week = int(os.environ.get("FBB_WEEK") or current_week(sched, today))
     meta = sleeper.players()
     rosters = sleeper.rosters(LEAGUE_ID)
@@ -259,6 +261,9 @@ def main():
     print(f"week {week}: data for {len(meta)} players, {len(waivers)} free agents watched")
 
 
+SCHED_CACHE = {}
+
+
 def export_static(book, season, week, meta, lg):
     """Slow-changing inputs for the live browser app (site/static/*.json)."""
     out_dir = os.path.join(ROOT, "site", "static")
@@ -274,7 +279,27 @@ def export_static(book, season, week, meta, lg):
                         m.get("fantasy_positions") or [], m.get("injury_status")]
     with open(os.path.join(os.path.dirname(__file__), "data", "game_ratio_quantiles.json")) as f:
         quantiles = experts.calibrated_quantiles(json.load(f))
+    # per-minute baseline inputs, and participation: a healthy bench player who sat out recent team games plays less
+    # (research: P(plays next) by games played of the team's last 5 - 93% / 75% / 61% / 47% / 37% / 13% for 5..0)
+    part = {}
+    tdates = team_game_dates(SCHED_CACHE.get("sched", [])) if SCHED_CACHE.get("sched") else {}
+    for pid, m in meta.items():
+        t, g = m.get("team"), book.done(pid)
+        if not t or m.get("injury_status") or not g:
+            continue
+        if sum(x[2] or 0 for x in g) / len(g) >= 20:
+            continue                                     # rotation player: missed games are injuries, not benchings
+        past = sorted(d for d in tdates.get(t, {}) if book.is_final and book.is_final(d, t))[-5:]
+        if len(past) < 3:
+            continue
+        played = {x[0] for x in g}
+        k = round(5 * sum(d in played for d in past) / len(past))
+        f = BASELINE["participation_last5"][k] / BASELINE["participation_last5"][5]
+        if f < 0.98:
+            part[pid] = round(f, 3)
     for name, obj in (("quantiles", quantiles),
+                      ("priors_min", {p: [round(v[0], 1), v[1]] for p, v in book.prior_min.items()}),
+                      ("participation", part),
                       ("gamelog", dict(season=season, week=week, games=gl)),
                       ("priors", {p: round(v, 1) for p, v in book.prior.items()}),
                       ("players", players),
