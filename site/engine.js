@@ -453,7 +453,13 @@ export class WeekPlan {
       const noLock = solve(open, pool, x.i), restRows = open.filter(y => y.i !== x.i);
       const rest = solve(restRows, pool.filter(p => p !== x.p)), passStreams = streams(open, noLock);
       // opportunity cost with rotation on both sides: everything (this slot passing) - everything else
-      bars[x.i] = Math.max(0, noLock.total + passStreams.total - rest.total - streams(restRows, rest).total);
+      const restStreams = streams(restRows, rest);
+      bars[x.i] = Math.max(0, noLock.total + passStreams.total - rest.total - restStreams.total);
+      (this.barDebug ||= {})[x.p] = { noLock: +noLock.total.toFixed(1), noLockStreams: +passStreams.total.toFixed(1), rest: +rest.total.toFixed(1),
+        restStreams: +restStreams.total.toFixed(1), slotGets: noLock.pick[open.indexOf(x)] && this.b.name(noLock.pick[open.indexOf(x)]),
+        ownW: +(cont[x.p]?.W || 0).toFixed(1), ownGames: (cont[x.p]?.u || []).map(g => [g.date, +g.mu.toFixed(1), g.q]),
+        noLockPick: open.map((y, r) => [y.s, noLock.pick[r] && this.b.name(noLock.pick[r]), +(val(y, noLock.pick[r], y.i !== x.i) ?? 0).toFixed(1)]),
+        restPick: restRows.map((y, r) => [y.s, rest.pick[r] && this.b.name(rest.pick[r])]) };
       altFor[x.i] = noLock.pick[open.indexOf(x)];
       // lock certainty: simulate what this slot ends with if you pass (its games for the rest of the week, played
       // by the stopping rule) and count how often that beats the score in hand

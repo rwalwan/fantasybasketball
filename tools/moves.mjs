@@ -108,7 +108,7 @@ fs.writeFileSync("site/static/plan.json", JSON.stringify({ week, generated: out.
 // full plan snapshot on the state branch, for debugging what the engine saw
 fs.writeFileSync(stateFile("plan_debug.json"), JSON.stringify({ at: new Date().toISOString(), today, week, expectedTotal: plan.expectedTotal,
   slots: plan.slots, actions: plan.actions, idle: plan.idle, outlook: plan.outlook, adds: out.adds, trades: out.trades,
-  week_schedule: wp.lastSchedule, today_options: wp.lastToday,
+  bar_debug: wp.barDebug, week_schedule: wp.lastSchedule, today_options: wp.lastToday,
   ir: irMoves(wp, valuer, mine, league.roster_positions, new Set(plan.slots.filter(s => ["locked", "keep", "live"].includes(s.action)).map(s => s.pid))),
   starters_debug: (my.starters || []).map(p => ({ pid: p, name: book.name(p), sleeper: my.players_points?.[p] ?? null, slot: wp.slotPoints(p) ?? null, copies: wp.slotCandidates(p), manualLock: locks[p] ?? null,
     state: wp.lockState(p), played: wp.played(p).map(g => [g.date, g.fp]) })),
