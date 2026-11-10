@@ -55,5 +55,7 @@ console.log("ok: lock options");
   assert.equal(studyBarScale(null), 1);
   const raw = mk().build().slots[0].bar, cal = mk().build({ barScale: 0.9 }).slots[0].bar;
   assert.ok(Math.abs(cal - 0.9 * raw) < 0.15, `${cal} vs ${raw}`);
+  for (const sc of [0.9, 1]) for (const sl of mk().build({ barScale: sc }).slots) if (sl.pWaitBeats != null)
+    assert.ok(sl.action === "lock" ? sl.pWaitBeats <= 0.55 : sl.pWaitBeats >= 0.45 || sl.score < sl.bar * 0.85, `scale ${sc}: ${JSON.stringify(sl)}`);
   console.log("ok: study bar scale");
 }
