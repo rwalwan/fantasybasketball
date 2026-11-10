@@ -1,0 +1,74 @@
+{
+ "note": "Per-player game-to-game spread: how much of a player's own boom/bust tendency is real (2021-24 box scores).",
+ "a_prev": 0.2,
+ "k_games": 120,
+ "m_typical": 0.98,
+ "mse": 0.031,
+ "mse_tier_only": 0.034,
+ "rows": 3458,
+ "player_seasons": 605,
+ "by_checkpoint": {
+  "0": {
+   "n": 605,
+   "mse_player": 0.0289,
+   "mse_tier": 0.0308
+  },
+  "5": {
+   "n": 605,
+   "mse_player": 0.0302,
+   "mse_tier": 0.0322
+  },
+  "10": {
+   "n": 605,
+   "mse_player": 0.0317,
+   "mse_tier": 0.0339
+  },
+  "20": {
+   "n": 605,
+   "mse_player": 0.0314,
+   "mse_tier": 0.0358
+  },
+  "30": {
+   "n": 553,
+   "mse_player": 0.0333,
+   "mse_tier": 0.0375
+  },
+  "40": {
+   "n": 485,
+   "mse_player": 0.0305,
+   "mse_tier": 0.0343
+  }
+ },
+ "future_games": 170741,
+ "pinball": {
+  "tier": {
+   "pinball_all": 0.12113,
+   "pinball_top30": 0.1005
+  },
+  "player": {
+   "pinball_all": 0.12081,
+   "pinball_top30": 0.10015
+  }
+ },
+ "held_out_season": {
+  "2022-23": {
+   "a": 0.3,
+   "k": 80,
+   "m": 1.0,
+   "pinball_all_tier": 0.12129,
+   "pinball_all_player": 0.12096,
+   "pinball_top30_tier": 0.10081,
+   "pinball_top30_player": 0.10043
+  },
+  "2023-24": {
+   "a": 0.15,
+   "k": 120,
+   "m": 0.96,
+   "pinball_all_tier": 0.12096,
+   "pinball_all_player": 0.12062,
+   "pinball_top30_tier": 0.10019,
+   "pinball_top30_player": 0.09982
+  }
+ },
+ "r_future_sd": 0.181
+}

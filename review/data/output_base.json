@@ -1,0 +1,40 @@
+{
+ "mae_current": 4.63,
+ "mae_per_minute": 4.541,
+ "R_minutes": 200,
+ "M_games": 4,
+ "c_size": 10,
+ "by_n": {
+  "1": {
+   "current": 4.969,
+   "per_minute": 4.807,
+   "rows": 752
+  },
+  "2": {
+   "current": 4.802,
+   "per_minute": 4.649,
+   "rows": 752
+  },
+  "3": {
+   "current": 4.659,
+   "per_minute": 4.518,
+   "rows": 752
+  },
+  "5": {
+   "current": 4.449,
+   "per_minute": 4.405,
+   "rows": 752
+  },
+  "10": {
+   "current": 4.263,
+   "per_minute": 4.323,
+   "rows": 740
+  }
+ },
+ "rows": 3748,
+ "small_last_season": {
+  "rows": 153,
+  "current": 5.831,
+  "per_minute": 5.594
+ }
+}

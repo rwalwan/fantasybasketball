@@ -1,0 +1,80 @@
+5fe777a 2026-11-10 Lock certainty simulates in the calibrated world (projections x bar scale), consistent with the bar
+ddc0d44 2026-11-10 Lock bars calibrated by the other-leagues study when its result is significant (now x0.90)
+12f232c 2026-11-10 GTD/DTD play rates self-calibrate from this season's graded predictions (48% -> 74%)
+be21bc5 2026-11-10 Lock bars: the 'lock' side no longer lets the locked player's later games fill other slots
+c6d8355 2026-11-10 plan_debug: how each lock bar is built (both solutions, streams, the player's own continuation)
+22a7baf 2026-11-09 Lock certainty charges the pass for games it takes from other slots (consistent with the bar)
+93629c3 2026-11-09 Lock style slider, lock certainty, and what-if lock/pass with the resulting lineup changes
+13459b8 2026-11-02 Per-minute baseline and participation (Julian Reese at the top of waivers)
+c8f4d5f 2026-11-02 Rest-of-week plan: each player's later games in one slot, bench players fill gaps; today stays fully dynamic
+6afdcb6 2026-11-02 Re-plans for keep-lines start from the full plan minus the exclusion
+7be85ba 2026-11-02 Keep-line = rest-of-week loss with both the slot and the player gone (re-planned), not fallback + cost
+ea54272 2026-11-02 Today's starters: best expected games today across every eligible slot; opportunity cost only in keep-lines
+27b4528 2026-11-02 Dynamic lineup: relief counts the opportunity cost too; near-ties go to the higher projection
+218ee19 2026-11-02 Dynamic lineup: today's keep-line includes the rest-of-week value a player would take with him
+861526f 2026-11-02 Fully dynamic daily lineup: any player, any slot he fits, every day
+a9cf0d5 2026-11-02 Today's pick: try swapping two week-long players who fit each other's slots
+ea22f9d 2026-11-02 Home-screen app: revalidate site files on every load; clearer tight relief windows
+591bd16 2026-11-02 Today's pick: bench players start in any slot they fit; week-long players stay in their own slot
+97042ca 2026-11-02 Today's pick: bench players can start anywhere, interchangeable starters can trade slots
+f815750 2026-11-02 Today's pick: a slot starts its own player, its allocated bench players, or a free bench player
+1328ffa 2026-11-02 Choose today's starter per slot on its own, not from the week plan
+d785b09 2026-11-02 IR drops: break ties by the player's own value (bench players outside the best lineup score the same)
+d44ff7d 2026-11-02 IR: who to drop to bring a healthy player back, or whether to release him
+9918f19 2026-11-01 Hold marked locks when Sleeper's servers disagree; save which game was locked
+e62419e 2026-10-31 Bypass Sleeper's CDN for live data; one offline-cache copy per address
+a25b597 2026-10-31 Starter scores from starters_points (the slot score), players_points only as fallback
+3d818e0 2026-10-31 A starter whose Sleeper score equals his latest game played it from the lineup
+9c2a044 2026-10-29 Locked score: a momentary 0 from Sleeper is treated as missing, not as the locked game
+adacac3 2026-10-29 Per-player spread: count every game played (like the tier tables), shrink toward the typical player
+3dd5175 2026-10-29 Per-player game-to-game spread: boom-or-bust players are worth more in Lock-In
+f3d7998 2026-10-29 plan_debug: what the job reads for each starter (Sleeper points, manual lock, lock state, games)
+fee7a86 2026-10-29 Fix win-chance swings: locked score from Sleeper, live slots keep the pass option; waiver moves must beat projection noise
+02879f5 2026-10-28 Keep the later-game swap while a starter's game is in progress
+c68327a 2026-10-28 Usage factor switches itself off for a horizon where graded games show it hurts (review 2, next test 3)
+0da0d22 2026-10-28 AI model eval: flag invalid runs and state what the labels can carry (review 2, F13 refinement)
+e0d19a6 2026-10-28 FAAB detection: actual spending also counts (review 2: waiver_type 2 = FAAB has no cited source)
+ff9ba5d 2026-10-28 Test: healthy predictions now carry the b2b flag
+e263f3d 2026-10-28 Next-game healthy play rate by stage of the season, then this season's own (review 2, F2 refinement)
+1798f45 2026-10-28 Remove the unused Python week plan and site/data.json (review 2, F9 refinement)
+d17d6e4 2026-10-28 Home-screen app: offline banner with the saved time; Sleeper data cached as an offline fallback (review 2, finding 7e)
+64b5540 2026-10-28 Other leagues: hashed league ids in the saved database, real ids only in the private cache (review 2, finding 7d)
+85868cb 2026-10-28 step.sh: write stderr to the log file, then echo it (review 2, finding 7c)
+d0ed67f 2026-10-28 15-minute job runs only code that passed Tests (review 2, finding 7b)
+3924e6f 2026-10-28 State restore: swap a corrupt file for the state-backup copy, else move it aside (review 2, finding 7a)
+6ec916c 2026-10-28 Win-chance log: one prediction per matchup per stage, same model for every pair (review 2, finding 6)
+9eea854 2026-10-28 Return rates: censor before end-of-season shutdowns, drop protocol stays, pool 13+ (review 2, finding 5)
+0d5fd4c 2026-10-28 Usage model: fit without hindsight, production position rule, healthy-league normalization, horizon grading (review 2, finding 4)
+493c0f6 2026-10-28 Other-leagues study: lineup-checked weeks, DNPs as 0, production bar, player-week CI (review 2, finding 3)
+519e35f 2026-10-28 Timelines: one vote per outlet, 'about N' as a range, available wins; day-to-day defers to the designation (review 2, finding 2)
+3b3bcbd 2026-10-28 Rotation: each idle bench player's games go to one slot only (review 2, finding 1)
+2b4c459 2026-10-28 Tests: read PNG sizes from the header (the CI runner has no image library)
+7a2ed23 2026-10-28 Backend button: a connected device can copy its setup link for the home-screen app
+811a72d 2026-10-28 README: current architecture, workflows, home-screen install
+42b6e82 2026-10-28 Win-chance calibration log: every matchup in the league, once a day, graded at week's end
+8d88420 2026-10-28 Job: failed moves/learn/alerts steps are recorded and shown on the site instead of hidden by '|| echo'
+877b907 2026-10-28 News: read the full article for cut-off injury teasers that promise a timeline
+e8bd15b 2026-10-28 Home-screen app: manifest, icons, iOS tags, safe areas, network-first service worker, in-app backend setup
+2057589 2026-10-28 Add LICENSE (all rights reserved, view-only) and a License section in the README
+77f2972 2026-10-28 Other leagues: results in % of projection; opponent lock model from lineup-checked decisions only
+ee79feb 2026-10-28 Other leagues: re-verify leagues checked with the x10 bug
+844d043 2026-10-28 Other leagues: starters_points are stored x10 (as everywhere in Sleeper NBA); reset verification
+1a56f7b 2026-10-28 Other Lock-In leagues: discovery, daily snapshots, Lock-In verification, lock-decision study
+ed102aa 2026-10-28 Usage model: caps from the fit's calibration (starters +30%, bench +60%)
+283b99d 2026-10-28 Usage model: teammates out (and lost opponent rim protection) -> projected output
+cf2bd9e 2026-10-28 News reading on DeepSeek V4.1 Flash; articles and explanations stay on Haiku
+82d9674 2026-10-28 Fix review finding 13: model eval scores injury timelines against labels; no same-family voting; advice back on Haiku
+a61335e 2026-10-28 Fix review finding 15: smaller defects
+71bdee6 2026-10-28 Fix review finding 14: robots.txt server errors and network failures mean 'don't crawl'
+cb5671a 2026-10-28 Fix review finding 11 (partly): opponent's bench games are no longer treated as lockable
+ad02d65 2026-10-28 Fix review finding 12: news names match short forms and the reported team; ambiguous names match nothing
+bd363ac 2026-10-28 Fix review finding 10: season value stops at the championship week, playoffs count fully, no trades after the deadline
+b96e156 2026-10-28 Fix review finding 9: browser keeps the job's missed-game count when a status changes between runs
+8eeb9b0 2026-10-28 Fix review finding 7: matchup context no longer double-counts pace; factors rescaled to a league mean of 1
+ecc33b6 2026-10-28 Fix review finding 6: learning scorecard records real calls and grades them inside the same week
+6b97946 2026-10-28 Fix review finding 8: a failed state fetch can no longer wipe the state branch
+badfe37 2026-10-28 Fix review finding 5: return rates refit with never-ended absences; long-term injuries flagged
+9cb17f7 2026-10-28 Fix review finding 4: validate AI-extracted injury timelines before they change play chances
+d540689 2026-10-28 Fix review finding 3: blend weights fitted to the blend's own error, kept only if they beat RotoWire
+b71948d 2026-10-28 Fix review finding 2: healthy play rates and back-to-back factor from data
+5f44a46 2026-10-28 Fix review finding 1: lock bar includes rotating idle bench players across days
