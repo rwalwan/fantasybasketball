@@ -46,3 +46,14 @@ assert.ok(forcedPass.slots[0].later || forcedPass.slots[0].today, "passing shows
 for (const pl of [mk().build({ force: {} })]) for (const sl of pl.slots) if (sl.pWaitBeats != null)
   assert.ok(sl.action === "lock" ? sl.pWaitBeats < 0.6 : sl.pWaitBeats > 0.4 || sl.score < sl.bar * 0.8, JSON.stringify(sl));
 console.log("ok: lock options");
+
+// bar calibration from the other-leagues study: used only when the gain's 95% interval excludes 0
+{
+  const { studyBarScale } = await import("../site/engine.js");
+  assert.equal(studyBarScale({ best_scale: { scale: 0.9, ci95_vs_current: [0.37, 4.09] } }), 0.9);
+  assert.equal(studyBarScale({ best_scale: { scale: 0.9, ci95_vs_current: [-0.5, 3] } }), 1);
+  assert.equal(studyBarScale(null), 1);
+  const raw = mk().build().slots[0].bar, cal = mk().build({ barScale: 0.9 }).slots[0].bar;
+  assert.ok(Math.abs(cal - 0.9 * raw) < 0.15, `${cal} vs ${raw}`);
+  console.log("ok: study bar scale");
+}

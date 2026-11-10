@@ -1,4 +1,4 @@
-import { Book, WeekPlan, Valuer, eligFromSnaps, mergeMatchups, irMoves, usesFaab, waiverMoves, weekDays, teamGames, fits, range80 } from "./engine.js";
+import { Book, WeekPlan, Valuer, eligFromSnaps, mergeMatchups, irMoves, studyBarScale, usesFaab, waiverMoves, weekDays, teamGames, fits, range80 } from "./engine.js";
 
 // ---- config -----------------------------------------------------------------------------------
 const LEAGUE = "1400915575915491328", USER = "1388708038000533504";
@@ -132,14 +132,15 @@ function compute() {
   if (oppRoster) {
     oppPlan = new WeekPlan({ Q: base.QS, book, schedule: base.schedule, week: base.week, today: etToday(), now: new Date(),
       rosterPositions: base.league.roster_positions, roster: oppRoster, matchup: opp, rosters: live.rosters, tips: live.tips,
-      elig: eligFromSnaps(live.oppSnaps), locks: {} }).build({ humanLocks: live.others?.opponent_model_ready ? live.others.lock_rate_eligible : null });
+      elig: eligFromSnaps(live.oppSnaps), locks: {} }).build({ humanLocks: live.others?.opponent_model_ready ? live.others.lock_rate_eligible : null, barScale: studyBarScale(live.others) });
     oppOut = { mean: oppPlan.outlook.mean, var: oppPlan.outlook.var };
   }
   const waivers = wp.waivers(live.trending);
   const valuer = new Valuer({ book, schedule: base.schedule, Q: base.QS, rosterPositions: base.league.roster_positions, week: base.week, today: etToday(), settings: base.league.settings,
                               freeAgents: waivers.list.map(x => x.pid) });
-  const basePlan = wp.build({ opp: oppOut, lockBias });
-  const plan = Object.keys(whatIf).length ? wp.build({ opp: oppOut, lockBias, force: whatIf }) : basePlan;
+  const barScale = studyBarScale(live.others);
+  const basePlan = wp.build({ opp: oppOut, lockBias, barScale });
+  const plan = Object.keys(whatIf).length ? wp.build({ opp: oppOut, lockBias, barScale, force: whatIf }) : basePlan;
   // every free agent scored the same way Moves does: best drop, this week's locked-points change + rest of season
   const protect = new Set([...(mine.reserve || []),
     ...plan.slots.filter(s => ["locked", "lock", "keep", "live", "confirm"].includes(s.action)).map(s => s.pid),
@@ -197,6 +198,7 @@ function render() {
       (ch.length ? `<div class="row"><span class="pos">Lineup changes: ${ch.join(" · ")}</span></div>` : `<div class="row"><span class="pos">No other lineup changes.</span></div>`) + `</div>`;
   }
   $("lockstyle").innerHTML = `<div class="box"><div class="row"><span><b>Lock style</b>: ${esc(STYLE(lockBias))}${lockBias ? ` <span class="pos">· bars × ${(1 + lockBias).toFixed(2)}</span>` : ""}</span></div>` +
+    (plan.barScale !== 1 ? `<div class="row"><span class="pos">Bars include a ×${plan.barScale.toFixed(2)} calibration from ${(live.others?.starter_weeks || 0).toLocaleString()} real starter-weeks in other Lock-In leagues (that rule scored ${live.others?.best_scale?.vs_current}% of projection more).</span></div>` : "") +
     `<div class="row"><span class="pos">safer</span><input type="range" id="biasr" min="-0.2" max="0.2" step="0.05" value="${lockBias}" style="flex:1;margin:0 8px"><span class="pos">gamble</span></div></div>` + wi;
   $("slots").innerHTML = plan.slots.map(s => {
     const nums = s.score != null && s.action !== "locked" && s.action !== "live" ? `<div class="nums">game <b>${r1(s.score)}</b>${s.bar != null ? ` · bar ${r1(s.bar)}${s.yourBar != null && s.yourBar !== s.bar ? ` (yours ${r1(s.yourBar)})` : ""}` : ""}${s.deadline ? ` · decide by ${esc(tipTime(s.deadline.tip) || day(s.deadline.date))}` : ""}</div>` +

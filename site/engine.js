@@ -237,6 +237,11 @@ export function mergeMatchups(primary, alts = []) {
     return { ...m, alt, disagree: alt.some(x => x.points !== m.points) };
   });
 }
+// the bar calibration to use from the other-leagues study: its best scale, only if the gain's 95% interval excludes 0
+export function studyBarScale(study) {
+  const b = study?.best_scale;
+  return b && b.scale !== 1 && Array.isArray(b.ci95_vs_current) && b.ci95_vs_current[0] > 0 ? b.scale : 1;
+}
 export function eligFromSnaps(snaps, overrides = {}) {
   return (pid, date) => {
     const k = `${date}|${pid}`;
@@ -453,6 +458,10 @@ export class WeekPlan {
     const assignedTo = {}; open.forEach((x, r) => { assignedTo[x.i] = main.pick[r]; });
     // opts.lockBias: your lock style, moving the bar by a share (-0.2 = lock at 80% of it, safer; +0.2 = wait for
     // 120%, gamble). opts.force: {pid: "lock" | "pass"} - a what-if that overrides the call for that slot.
+    // opts.barScale: calibration of every bar from real Lock-In leagues (app/league_study.py replays the lock rule
+    // with the bar scaled; used only when the gain's 95% interval excludes 0 - Nov 10: x0.90, +2.2% of projection,
+    // CI 0.4-4.1%, 6,788 lineup-checked starter-weeks). Applied before your lock style.
+    const barScale = opts.barScale > 0.5 && opts.barScale < 1.5 ? opts.barScale : 1;
     const bias = Math.max(-0.3, Math.min(0.3, opts.lockBias || 0)), force = opts.force || {};
     const willLock = new Set(), bars = {}, altFor = {}, surety = {};
     for (const x of open) {
@@ -462,7 +471,7 @@ export class WeekPlan {
       const rest = solve(restRows, restPool), passStreams = streams(open, noLock, pool, x.i);
       // opportunity cost with rotation on both sides: everything (this slot passing) - everything else
       const restStreams = streams(restRows, rest, restPool);
-      bars[x.i] = Math.max(0, noLock.total + passStreams.total - rest.total - restStreams.total);
+      bars[x.i] = barScale * Math.max(0, noLock.total + passStreams.total - rest.total - restStreams.total);
       (this.barDebug ||= {})[x.p] = { noLock: +noLock.total.toFixed(1), noLockStreams: +passStreams.total.toFixed(1), rest: +rest.total.toFixed(1),
         restStreams: +restStreams.total.toFixed(1), slotGets: noLock.pick[open.indexOf(x)] && this.b.name(noLock.pick[open.indexOf(x)]),
         ownW: +(cont[x.p]?.W || 0).toFixed(1), ownGames: (cont[x.p]?.u || []).map(g => [g.date, +g.mu.toFixed(1), g.q]),
@@ -474,7 +483,7 @@ export class WeekPlan {
       // (if you pass, this slot also uses games other slots would have had: that expected cost is added to the score,
       // so the simulated pass averages the bar - Nov 9: Jerome showed 'lock' at 29% certainty without it)
       const pg = passStreams.games[x.i] || [], wPass = pg.length ? contStats(Q, pg).W[0] || 0 : 0;
-      surety[x.i] = passOdds(Q, pg, g.fp + Math.max(0, wPass - bars[x.i]), x.i + 1);
+      surety[x.i] = passOdds(Q, pg, g.fp + Math.max(0, wPass - bars[x.i] / barScale), x.i + 1);   // simulation: the model's own (uncalibrated) world
       if (g.fp >= bars[x.i] * (1 + bias) && (ls[x.p].st === "open" || ls[x.p].st === "confirm")) willLock.add(x.p);
     }
     const forceCall = x => (force[x.p] === "lock" || force[x.p] === "pass") && lockable[x.i] && (ls[x.p].st === "open" || ls[x.p].st === "confirm") ? force[x.p] : null;
@@ -781,7 +790,7 @@ export class WeekPlan {
     const idle = pool.filter(p => !used.has(p) && todayGame(p)).map(p => ({ pid: p, name: this.b.name(p) }));
     for (const x of slots) { const i = this.slots.indexOf(x.slot) >= 0 ? slots.indexOf(x) : -1; x.ev = r1(evOf[i] || 0); x.sd = r1(sdOf[i] || 0); }
     return { slots, actions, lineup, idle, grid, days: this.days, unlocked: open.length - willLock.size, expectedTotal: r1(main.total + mainStreams.total), outlook,
-             lockBias: bias, forced: Object.keys(force).length ? force : null };
+             lockBias: bias, barScale, forced: Object.keys(force).length ? force : null };
   }
 
   // expected locked points from the open slots for the rest of THIS week if the roster were `players`
