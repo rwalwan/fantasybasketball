@@ -178,6 +178,28 @@ def next_game_healthy(today):
     return rate, f"historical rate for this stage of the season (own log: {len(own)} of {OWN_MIN} graded games)"
 
 
+DESIG_K = 50     # the published rate counts as 50 games against this season's own graded ones
+
+
+def calibrate_designations():
+    """Play rates by Sleeper designation, from this season's graded predictions blended with the published table
+    (worth DESIG_K games). The published 48% is the NBA's official 'Questionable' at the first report; Sleeper's
+    GTD/DTD labels are not the same thing: graded this season (Nov 10), GTD players played 78.5% (n=158), DTD 91%
+    (n=35). Returns {designation: (rate, n)} and updates M for this run."""
+    log = _load("availability_log.json", {"open": {}, "graded": []})
+    groups = {"Questionable": ("GTD", "DTD", "Questionable", "Day-To-Day"), "Probable": ("Probable",), "Doubtful": ("Doubtful",)}
+    M.setdefault("_designation_src", dict(M["designation"]))
+    out = {}
+    for key, labels in groups.items():
+        rs = [r for r in log.get("graded", []) if r.get("status") in labels]
+        src = M["_designation_src"][key]
+        rate = (src * DESIG_K + sum(bool(r["played"]) for r in rs)) / (DESIG_K + len(rs))
+        M["designation"][key] = round(rate, 3)
+        out[key] = (round(rate, 3), len(rs))
+    M["designation_basis"] = {k: f"{v[0]} from {v[1]} graded games this season + the published rate as {DESIG_K}" for k, v in out.items()}
+    return out
+
+
 def set_next_game(rate, basis):
     """Replace the curve's first point (next game) for this run; the rest of the curve is unchanged."""
     M.setdefault("_q0_hist", M["healthy_curve"]["q"][0])
