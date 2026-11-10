@@ -48,6 +48,27 @@ export function contStats(Q, games) {
   }
   return { W, sd: W.map((w, j) => Math.sqrt(Math.max(0, M2[j] - w * w))) };
 }
+// If you pass on `score`: simulate the slot's remaining games (`games`, each {mu, q, Q}, played by the stopping rule:
+// lock a game that beats what's left after it) and return how often the slot ends higher. Seeded, so the number
+// doesn't flicker between refreshes.
+export function passOdds(Q, games, score, seed = 1, n = 3000) {
+  if (!games.length) return { pBeat: 0, n: 0 };
+  const W = contStats(Q, games).W;
+  let s = seed * 2654435761 >>> 0, beat = 0;
+  const rnd = () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  for (let i = 0; i < n; i++) {
+    let fin = 0;
+    for (let k = 0; k < games.length; k++) {
+      const g = games[k], qs = g.Q || Q;
+      if (rnd() >= g.q) continue;
+      const x = g.mu * qs[Math.floor(rnd() * qs.length)];
+      fin = x;
+      if (k === games.length - 1 || x >= W[k + 1]) break;
+    }
+    if (fin > score) beat++;
+  }
+  return { pBeat: Math.round(1000 * beat / n) / 1000, n };
+}
 // volatility tier for a player whose typical game is `base` FP: bench guys swing far more than stars
 // a player's own spread (app/volatility.py): R_p = 1 + r (R - 1), floored at 0, mean kept at 1
 export function volQ(Q, r) {
@@ -423,16 +444,24 @@ export class WeekPlan {
     };
     const main = solve(open, pool), mainStreams = streams(open, main);
     const assignedTo = {}; open.forEach((x, r) => { assignedTo[x.i] = main.pick[r]; });
-    const willLock = new Set(), bars = {}, altFor = {};
+    // opts.lockBias: your lock style, moving the bar by a share (-0.2 = lock at 80% of it, safer; +0.2 = wait for
+    // 120%, gamble). opts.force: {pid: "lock" | "pass"} - a what-if that overrides the call for that slot.
+    const bias = Math.max(-0.3, Math.min(0.3, opts.lockBias || 0)), force = opts.force || {};
+    const willLock = new Set(), bars = {}, altFor = {}, surety = {};
     for (const x of open) {
       const g = lockable[x.i]; if (!g) continue;
       const noLock = solve(open, pool, x.i), restRows = open.filter(y => y.i !== x.i);
-      const rest = solve(restRows, pool.filter(p => p !== x.p));
+      const rest = solve(restRows, pool.filter(p => p !== x.p)), passStreams = streams(open, noLock);
       // opportunity cost with rotation on both sides: everything (this slot passing) - everything else
-      bars[x.i] = Math.max(0, noLock.total + streams(open, noLock).total - rest.total - streams(restRows, rest).total);
+      bars[x.i] = Math.max(0, noLock.total + passStreams.total - rest.total - streams(restRows, rest).total);
       altFor[x.i] = noLock.pick[open.indexOf(x)];
-      if (g.fp >= bars[x.i] && (ls[x.p].st === "open" || ls[x.p].st === "confirm")) willLock.add(x.p);
+      // lock certainty: simulate what this slot ends with if you pass (its games for the rest of the week, played
+      // by the stopping rule) and count how often that beats the score in hand
+      surety[x.i] = passOdds(Q, passStreams.games[x.i] || [], g.fp, x.i + 1);
+      if (g.fp >= bars[x.i] * (1 + bias) && (ls[x.p].st === "open" || ls[x.p].st === "confirm")) willLock.add(x.p);
     }
+    const forceCall = x => (force[x.p] === "lock" || force[x.p] === "pass") && lockable[x.i] && (ls[x.p].st === "open" || ls[x.p].st === "confirm") ? force[x.p] : null;
+    for (const x of open) { const f = forceCall(x); if (f === "lock") willLock.add(x.p); else if (f === "pass") willLock.delete(x.p); }
 
     // ---- 1b) matchup outlook + matchup-aware lock calls ------------------------------------------
     // Each slot: expected points (ev) and spread (sd). Locked = known. Waiting/open = the spread of the score the
@@ -470,7 +499,7 @@ export class WeekPlan {
     const pWin = (m, v) => opts.opp ? Phi((m - opts.opp.mean) / Math.sqrt(v + opts.opp.var + 1)) : null;
     const mx = {};
     if (opts.opp) for (const x of open) {
-      const g = lockable[x.i]; if (!g || !cont[x.p]?.u.length) continue;
+      const g = lockable[x.i]; if (!g || !cont[x.p]?.u.length || forceCall(x)) continue;   // a what-if stays as you set it
       const base = M - evOf[x.i], baseV = V - sdOf[x.i] ** 2, bar = bars[x.i];
       const alt = altFor[x.i], passSd = alt && cont[alt] ? cont[alt].sd : cont[x.p].sd;
       const pL = pWin(base + g.fp, baseV), pP = pWin(base + bar, baseV + passSd ** 2);
@@ -665,17 +694,22 @@ export class WeekPlan {
         const range = cont[p]?.u[0] ? ` Waiting: ~${bar.toFixed(1)} expected (his next game ${range80(cont[p].u[0].Q || Q, cont[p].u[0].mu).join("–")}).` : "";
         const decided = m && Math.max(m.pLock, m.pPass) < 0.02 || m && Math.min(m.pLock, m.pPass) > 0.98;
         const wp = !m ? "" : decided ? " (Matchup looks decided, so this call maximizes points.)" : ` Win chance: lock ${Math.round(m.pLock * 100)}% · wait ${Math.round(m.pPass * 100)}%.`;
-        const base = { ...out, score: sc, bar: r1(bar), gameDate: lockable[i].date, deadline, matchup: m || null };
+        const sur = surety[i] || { pBeat: 0 }, fx = force[p] === "lock" || force[p] === "pass" ? force[p] : null;
+        const base = { ...out, score: sc, bar: r1(bar), yourBar: r1(bar * (1 + bias)), gameDate: lockable[i].date, deadline, matchup: m || null,
+                       pWaitBeats: sur.pBeat, whatIf: fx };
         const lockIt = willLock.has(p);
+        if (fx) return { ...base, action: fx === "lock" ? "lock" : "pass", detail: fx === "lock"
+          ? `What-if: you lock ${sc.toFixed(1)}. The rest of the plan below assumes this slot is done.`
+          : `What-if: you pass on ${sc.toFixed(1)}. Waiting ends higher in ${Math.round(sur.pBeat * 100)}% of simulations; the plan below shows who fills this slot instead.${planTxt}` };
         if (s.st === "confirm" && lockIt)
           return { ...base, action: "confirm", detail: `Was he in your starting lineup when his ${lockable[i].date} game (${sc.toFixed(1)}) tipped? If yes, lock it.${wp}` };
         if (lockIt) {
           if (!deadline) return { ...base, action: "keep", detail: `${sc.toFixed(1)} counts automatically: he has no games left and nothing else beats it.` };
           if (m?.flipped) return { ...base, action: "lock", detail: `Matchup call — lock the safe ${sc.toFixed(1)}: you're projected ahead, so protecting the floor raises your win chance (${Math.round(m.pPass * 100)}% → ${Math.round(m.pLock * 100)}%), even though waiting averages ${bar.toFixed(1)}.` };
-          return { ...base, action: "lock", detail: `${sc.toFixed(1)} beats the best alternative for this slot (${bar.toFixed(1)} expected). Lock before ${day3(deadline.date)}'s tip.${wp}` };
+          return { ...base, action: "lock", detail: `${sc.toFixed(1)} beats the best alternative for this slot (${bar.toFixed(1)} expected${bias ? `, ${(bar * (1 + bias)).toFixed(1)} with your lock style` : ""}). Lock before ${day3(deadline.date)}'s tip.${wp}` };
         }
         if (m?.flipped) return { ...base, action: "pass", detail: `Matchup call — wait for upside: you're projected behind, so passing on ${sc.toFixed(1)} raises your win chance (${Math.round(m.pLock * 100)}% → ${Math.round(m.pPass * 100)}%).${planTxt}` };
-        return { ...base, action: "pass", detail: `Don't lock: ${sc.toFixed(1)} is under ${bar.toFixed(1)}, what this slot is expected to get by waiting.${planTxt}${wp}` };
+        return { ...base, action: "pass", detail: `Don't lock: ${sc.toFixed(1)} is under ${bias ? `${(bar * (1 + bias)).toFixed(1)} (your lock style; ${bar.toFixed(1)} expected by waiting)` : `${bar.toFixed(1)}, what this slot is expected to get by waiting`}.${planTxt}${wp}` };
       }
       if (!out.today && !out.later) return { ...out, action: "fallback-risk", detail: "Nobody eligible has a game left and nothing is locked: this slot scores its player's last game of the week." };
       const g = out.today || out.later;
@@ -729,7 +763,8 @@ export class WeekPlan {
 
     const idle = pool.filter(p => !used.has(p) && todayGame(p)).map(p => ({ pid: p, name: this.b.name(p) }));
     for (const x of slots) { const i = this.slots.indexOf(x.slot) >= 0 ? slots.indexOf(x) : -1; x.ev = r1(evOf[i] || 0); x.sd = r1(sdOf[i] || 0); }
-    return { slots, actions, lineup, idle, grid, days: this.days, unlocked: open.length - willLock.size, expectedTotal: r1(main.total + mainStreams.total), outlook };
+    return { slots, actions, lineup, idle, grid, days: this.days, unlocked: open.length - willLock.size, expectedTotal: r1(main.total + mainStreams.total), outlook,
+             lockBias: bias, forced: Object.keys(force).length ? force : null };
   }
 
   // expected locked points from the open slots for the rest of THIS week if the roster were `players`

@@ -109,6 +109,11 @@ let bookRef = null;
 const isTipped = (pid, date) => { const t = live.tips[`${date}|${bookRef?.team(pid)}`]; return t ? new Date(t) <= new Date() : date < etToday(); };
 
 // ---- compute + render ---------------------------------------------------------------------------
+// Lock style (your preference, kept on this device) and a what-if (this session only): see engine.js build opts
+const prefGet = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } };
+const prefSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+let lockBias = prefGet("lockBias", 0), whatIf = {};
+const STYLE = v => v <= -0.15 ? "Safest: lock early" : v < 0 ? "Safer: lock more" : v === 0 ? "Balanced (the engine's call)" : v < 0.15 ? "Gamble: wait for more" : "Big gamble: wait for a big game";
 function compute() {
   const book = new Book({ scoring: base.league.scoring_settings, players: base.players, priors: base.priors,
                           gamelog: base.gamelog.games, weights: base.experts.weights, ctx: live.context || {}, avail: live.avail, usage: live.usage, vol: base.vol, priorMin: base.priorMin, part: base.part });
@@ -133,7 +138,8 @@ function compute() {
   const waivers = wp.waivers(live.trending);
   const valuer = new Valuer({ book, schedule: base.schedule, Q: base.QS, rosterPositions: base.league.roster_positions, week: base.week, today: etToday(), settings: base.league.settings,
                               freeAgents: waivers.list.map(x => x.pid) });
-  const plan = wp.build({ opp: oppOut });
+  const basePlan = wp.build({ opp: oppOut, lockBias });
+  const plan = Object.keys(whatIf).length ? wp.build({ opp: oppOut, lockBias, force: whatIf }) : basePlan;
   // every free agent scored the same way Moves does: best drop, this week's locked-points change + rest of season
   const protect = new Set([...(mine.reserve || []),
     ...plan.slots.filter(s => ["locked", "lock", "keep", "live", "confirm"].includes(s.action)).map(s => s.pid),
@@ -145,7 +151,7 @@ function compute() {
   // IR: healthy players still on IR (who to drop to bring them back, or release them), Out players with an open IR spot
   const banked = new Set(plan.slots.filter(s => ["locked", "keep", "live"].includes(s.action)).map(s => s.pid));
   const ir = irMoves(wp, valuer, mine, base.league.roster_positions, banked);
-  return { book, wp, valuer, plan, oppPlan, waivers, mine, my, opp, ir };
+  return { book, wp, valuer, plan, basePlan, oppPlan, waivers, mine, my, opp, ir };
 }
 
 const LABEL = { lock: "Lock", keep: "Counts", pass: "Pass", start: "Start", locked: "Locked", confirm: "Confirm", live: "Live", "fallback-risk": "Fallback" };
@@ -177,13 +183,31 @@ function render() {
     (passes.length ? `<li><b>Pass</b> ${passes.map(a => esc(a.text.replace(/^Don't lock /, ""))).join(", ")} <span class="pos">· waiting is worth more</span></li>` : "") +
     (topAdd ? `<li><b>Waiver</b> add ${esc(topAdd.name)}, drop ${esc(topAdd.dropName)}${usesFaab(base.league.settings, live.rosters) ? ` — bid $${topAdd.bid}` : ""} <span class="pos">· Moves tab</span></li>` : "") + `</ul>`;
 
+  // lock style + what-if summary (what changes vs the plan)
+  let wi = "";
+  if (Object.keys(whatIf).length) {
+    const bp = c.basePlan, ch = [];
+    plan.slots.forEach((s, i) => {
+      const b = bp.slots[i], tn = x => x?.today ? `${x.today.name}${x.today.relief ? ` → ${x.today.relief.name}` : ""}` : x?.later ? `${x.later.name} (${day(x.later.date)})` : "—";
+      if (s.action !== b.action || tn(s) !== tn(b)) ch.push(`${esc(s.slot)}: ${esc(b.action === s.action ? "" : `${LABEL[b.action] || b.action} → ${LABEL[s.action] || s.action}, `)}${esc(tn(b))} → <b>${esc(tn(s))}</b>`);
+    });
+    const d = plan.outlook.mean - bp.outlook.mean;
+    wi = `<div class="box" style="border-color:var(--risk)"><div class="row"><span><b>What-if</b>: ${Object.entries(whatIf).map(([p, v]) => `${v === "lock" ? "lock" : "don't lock"} ${esc(bookRef.name(p))}`).join(", ")}</span><button data-whatif="*" data-v="">Back to the plan</button></div>` +
+      `<div class="row"><span class="pos">Projected final ${r1(bp.outlook.mean)} → <b>${r1(plan.outlook.mean)}</b> (${d >= 0 ? "+" : ""}${r1(d)})${bp.outlook.winProb != null ? ` · win chance ${pct(bp.outlook.winProb)} → <b>${pct(plan.outlook.winProb)}</b>` : ""}</span></div>` +
+      (ch.length ? `<div class="row"><span class="pos">Lineup changes: ${ch.join(" · ")}</span></div>` : `<div class="row"><span class="pos">No other lineup changes.</span></div>`) + `</div>`;
+  }
+  $("lockstyle").innerHTML = `<div class="box"><div class="row"><span><b>Lock style</b>: ${esc(STYLE(lockBias))}${lockBias ? ` <span class="pos">· bars × ${(1 + lockBias).toFixed(2)}</span>` : ""}</span></div>` +
+    `<div class="row"><span class="pos">safer</span><input type="range" id="biasr" min="-0.2" max="0.2" step="0.05" value="${lockBias}" style="flex:1;margin:0 8px"><span class="pos">gamble</span></div></div>` + wi;
   $("slots").innerHTML = plan.slots.map(s => {
-    const nums = s.score != null && s.action !== "locked" && s.action !== "live" ? `<div class="nums">game <b>${r1(s.score)}</b>${s.bar != null ? ` · bar ${r1(s.bar)}` : ""}${s.deadline ? ` · decide by ${esc(tipTime(s.deadline.tip) || day(s.deadline.date))}` : ""}</div>` : "";
+    const nums = s.score != null && s.action !== "locked" && s.action !== "live" ? `<div class="nums">game <b>${r1(s.score)}</b>${s.bar != null ? ` · bar ${r1(s.bar)}${s.yourBar != null && s.yourBar !== s.bar ? ` (yours ${r1(s.yourBar)})` : ""}` : ""}${s.deadline ? ` · decide by ${esc(tipTime(s.deadline.tip) || day(s.deadline.date))}` : ""}</div>` +
+      (s.pWaitBeats != null && s.deadline ? `<div class="nums">lock certainty <b>${Math.round((1 - s.pWaitBeats) * 100)}%</b> <span class="pos">· waiting ends higher in ${Math.round(s.pWaitBeats * 100)}% of 3,000 simulated weeks</span></div>` : "") : "";
     const td = s.today ? `<div class="nums">today: <b>${esc(s.today.name)}</b> ${esc(tipTime(s.today.tip))}${s.today.keepBar > 0.05 ? ` · keep if ≥ ${r1(s.today.keepBar)}` : ""}${s.today.relief ? ` · else ${esc(s.today.relief.name)}` : ""}</div>` : "";
     let acts2 = "";
     if (s.action === "confirm") acts2 = `<button data-elig="${s.gameDate}|${s.pid}" data-v="1">He was starting</button><button data-elig="${s.gameDate}|${s.pid}" data-v="0">He was on my bench</button>`;
     if (["lock", "pass", "confirm", "keep"].includes(s.action)) acts2 += `<button data-lock="${s.pid}" data-date="${esc(s.gameDate || "")}">I locked this</button>`;
     if (s.action === "locked") acts2 = `<button data-unlock="${s.pid}">Not locked</button>`;
+    if (["lock", "pass"].includes(s.action) && s.deadline) acts2 += s.whatIf ? `<button data-whatif="${s.pid}" data-v="">Back to the plan</button>`
+      : `<button data-whatif="${s.pid}" data-v="${s.action === "lock" ? "pass" : "lock"}">What if I ${s.action === "lock" ? "don't lock" : "lock"}?</button>`;
     return `<div class="slot ${s.action}"><div class="top"><span><span class="pos">${esc(s.slot)}</span> <span class="nm">${esc(s.name)}</span>${s.status ? `<span class="st">${esc(s.status)}</span>` : ""}</span><span class="tag">${LABEL[s.action] || s.action}</span></div><p>${esc(s.detail)}</p>${nums}${td}${acts2 ? `<div class="acts">${acts2}</div>` : ""}</div>`;
   }).join("");
 
@@ -388,6 +412,9 @@ function renderExperts() {
 }
 
 // ---- events + loop --------------------------------------------------------------------------------
+document.addEventListener("change", e => {
+  if (e.target.id === "biasr") { lockBias = Math.round(+e.target.value * 100) / 100; prefSet("lockBias", lockBias); render(); }
+});
 document.addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
   if (b.dataset.t) { tab = b.dataset.t; document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x === b)); document.querySelectorAll("section[data-p]").forEach(s => s.classList.toggle("hide", s.dataset.p !== tab)); return; }
@@ -396,6 +423,12 @@ document.addEventListener("click", e => {
     tradeSel = { give: new Set(x.give), get: new Set(x.get), partner: x.roster_id };
     $("partner").value = String(x.roster_id);
     document.querySelector('#tabs button[data-t="trades"]').click(); render(); return;
+  }
+  if (b.dataset.whatif != null) {
+    if (b.dataset.whatif === "*") whatIf = {};
+    else if (!b.dataset.v) delete whatIf[b.dataset.whatif];
+    else whatIf[b.dataset.whatif] = b.dataset.v;
+    render(); return;
   }
   if (b.dataset.elig) { saveAnswer("elig", b.dataset.elig, b.dataset.v === "1"); render(); }
   if (b.dataset.lock) {           // which game too, so a lock holds even when Sleeper's servers disagree (Nov 1)
