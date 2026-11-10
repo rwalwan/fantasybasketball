@@ -117,7 +117,9 @@ def build(book, meta, team_dates, today, is_final, pids):
             S, k = 1.0, missed
             for j, d in enumerate(upcoming):
                 if j == 0 and st in DESIG:
-                    p = M["designation"][DESIG[st]]
+                    # still carrying the label on game day is a different (higher) rate than the label a day or more
+                    # ahead: review 3, finding 2
+                    p = (M.get("designation_gameday") or M["designation"])[DESIG[st]] if d == today else M["designation"][DESIG[st]]
                     q[d] = round(p, 3)
                     S = 1 - p
                     k = max(k, 0) + 1
@@ -170,12 +172,22 @@ OWN_MIN = 300
 def next_game_healthy(today):
     """(rate, basis) for the first point of the healthy curve."""
     log = _load("availability_log.json", {"open": {}, "graded": []})
-    own = [r for r in log.get("graded", []) if r.get("status") is None and r.get("b2b") is False]
+    # only predictions graded on the status at FIRST sight (review 3, finding 2): older records carry the last status
+    # before the game, so their 'healthy' group is 'still undesignated at tip' (99.9%), not a next-game rate
+    own = [r for r in log.get("graded", []) if r.get("first") and r.get("status") is None and r.get("b2b") is False]
     if len(own) >= OWN_MIN:
         return round(sum(bool(r["played"]) for r in own) / len(own), 3), f"this season's own rate, {len(own)} graded games"
     md = today[5:]
     rate = next((r for lo, hi, r in STAGE_RATE if lo <= md <= hi), M.get("_q0_hist", M["healthy_curve"]["q"][0]))
     return rate, f"historical rate for this stage of the season (own log: {len(own)} of {OWN_MIN} graded games)"
+
+
+def gameday_healthy():
+    """(rate, n) for a player with no designation at the last run before his game (any game, b2b included), or None
+    until 300 are graded. Used only for games that tip today (site/engine.js playProb, daysAhead 0)."""
+    log = _load("availability_log.json", {"open": {}, "graded": []})
+    late = [r for r in log.get("graded", []) if (r.get("last_status") if r.get("first") else r.get("status")) is None]
+    return (round(sum(bool(r["played"]) for r in late) / len(late), 3), len(late)) if len(late) >= OWN_MIN else None
 
 
 DESIG_K = 50     # the published rate counts as 50 games against this season's own graded ones
@@ -190,10 +202,21 @@ def calibrate_designations():
     groups = {"Questionable": ("GTD", "DTD", "Questionable", "Day-To-Day"), "Probable": ("Probable",), "Doubtful": ("Doubtful",)}
     M.setdefault("_designation_src", dict(M["designation"]))
     out = {}
+    graded = log.get("graded", [])
+    late_status = lambda r: r.get("last_status") if r.get("first") else r.get("status")   # older records: last status
+    M["designation_gameday"] = {"Out": 0.0}
     for key, labels in groups.items():
-        rs = [r for r in log.get("graded", []) if r.get("status") in labels]
         src = M["_designation_src"][key]
-        rate = (src * DESIG_K + sum(bool(r["played"]) for r in rs)) / (DESIG_K + len(rs))
+        # (a) still carrying the label at the last run before the game: for games that tip today
+        late = [r for r in graded if late_status(r) in labels]
+        gameday = (src * DESIG_K + sum(bool(r["played"]) for r in late)) / (DESIG_K + len(late))
+        M["designation_gameday"][key] = round(gameday, 3)
+        # (b) the label when the game became his next game: what a call made a day or more ahead needs. Until first-sight
+        # games are graded, the prior is halfway between the published first-report rate and the game-day rate: the
+        # Nov 10 log bounds Sleeper's GTD at first sight between 49% (every fresh 'Out' began as GTD) and 78%.
+        rs = [r for r in graded if r.get("first") and r.get("status") in labels]
+        prior = (src + gameday) / 2
+        rate = (prior * DESIG_K + sum(bool(r["played"]) for r in rs)) / (DESIG_K + len(rs))
         M["designation"][key] = round(rate, 3)
         out[key] = (round(rate, 3), len(rs))
     M["designation_basis"] = {k: f"{v[0]} from {v[1]} graded games this season + the published rate as {DESIG_K}" for k, v in out.items()}
@@ -210,15 +233,28 @@ def set_next_game(rate, basis):
 def log_and_grade(avail, book, is_final, today, healthy=None):
     """Log each player's next-game probability; grade logged games once final. Returns calibration by bucket."""
     log = _load("availability_log.json", {"open": {}, "graded": []})
+    # The record made when a game becomes the player's next game is the prediction that gets graded (first: True).
+    # Later runs only add last_status / last_q beside it (review 3, finding 2: rewriting the record on every run graded
+    # everyone on their status at tip, so 'healthy' and 'GTD' kept only the players still carrying that label).
     for pid, h in (healthy or {}).items():
         d, qv = h[0], h[1]
-        log["open"].setdefault(f"{d}|{pid}", {"q": qv, "status": None, "missed": 0, "timeline": False,
-                                               "b2b": h[2] if len(h) > 2 else None})
+        old = log["open"].get(f"{d}|{pid}")
+        if old is None:
+            log["open"][f"{d}|{pid}"] = {"q": qv, "status": None, "missed": 0, "timeline": False,
+                                         "b2b": h[2] if len(h) > 2 else None, "first": True, "last_status": None, "last_q": qv}
+        elif old.get("first"):
+            old["last_status"], old["last_q"] = None, qv            # cleared since the first sight
     for pid, a in avail.items():
         nxt = min(a["q"]) if a["q"] else None
         if nxt:
-            log["open"][f"{nxt}|{pid}"] = {"q": a["q"][nxt], "status": a["status"], "missed": a["missed"],
-                                           "timeline": bool(a["timeline"])}
+            rec = {"q": a["q"][nxt], "status": a["status"], "missed": a["missed"], "timeline": bool(a["timeline"])}
+            old = log["open"].get(f"{nxt}|{pid}")
+            if old is None:
+                log["open"][f"{nxt}|{pid}"] = dict(rec, first=True, last_status=a["status"], last_q=a["q"][nxt])
+            elif old.get("first"):
+                old["last_status"], old["last_q"] = a["status"], a["q"][nxt]
+            else:
+                log["open"][f"{nxt}|{pid}"] = rec                   # opened before this change: graded the old way
     for key in list(log["open"]):
         date, pid = key.split("|")
         team = book.team(pid)

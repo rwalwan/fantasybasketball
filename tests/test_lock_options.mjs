@@ -50,8 +50,8 @@ console.log("ok: lock options");
 // bar calibration from the other-leagues study: used only when the gain's 95% interval excludes 0
 {
   const { studyBarScale } = await import("../site/engine.js");
-  assert.equal(studyBarScale({ best_scale: { scale: 0.9, ci95_vs_current: [0.37, 4.09] } }), 0.9);
-  assert.equal(studyBarScale({ best_scale: { scale: 0.9, ci95_vs_current: [-0.5, 3] } }), 1);
+  assert.equal(studyBarScale({ tier_units: "we back FP/G", best_scale: { scale: 0.9, ci95_vs_current: [0.37, 4.09] } }), 0.9);
+  assert.equal(studyBarScale({ tier_units: "we back FP/G", best_scale: { scale: 0.9, ci95_vs_current: [-0.5, 3] } }), 1);
   assert.equal(studyBarScale(null), 1);
   const raw = mk().build().slots[0].bar, cal = mk().build({ barScale: 0.9 }).slots[0].bar;
   assert.ok(Math.abs(cal - 0.9 * raw) < 0.15, `${cal} vs ${raw}`);
