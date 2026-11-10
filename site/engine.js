@@ -426,15 +426,22 @@ export class WeekPlan {
     // value over the merged games, one per day (the better one when two play the same day). Each idle player's
     // games go to ONE slot only (review 2, finding 1): greedily, the (player, slot) pair with the largest gain.
     const merged = (ds, extra) => { const byDay = {}; for (const g of [...ds, ...extra]) if (!byDay[g.date] || g.mu * g.q > byDay[g.date].mu * byDay[g.date].q) byDay[g.date] = g; return Object.keys(byDay).sort().map(d => byDay[d]); };
-    const streams = (rows, sol) => {
-      const games = {}, Wr = {}, gain = {}, owner = {};
-      rows.forEach((x, r) => { const a = sol.pick[r]; games[x.i] = a ? cont[a].u : []; Wr[x.i] = a ? cont[a].W : 0; gain[x.i] = 0; });
-      const used = new Set(sol.pick.filter(Boolean)), idle = pool.filter(p => !used.has(p) && cont[p].u.length);
+    // `from`: the players available (Nov 10: the 'lock' side of every bar let the locked player's own later games
+    // fill other slots, understating Luka's bar by ~28). A slot holding a lockable score is worth at least that
+    // score, so bench games only add value above it (else stream gains were overstated on both sides).
+    const streams = (rows, sol, from = pool, noLock = null) => {
+      const games = {}, Wr = {}, gain = {}, owner = {}, floor = {};
+      rows.forEach((x, r) => {
+        const a = sol.pick[r];
+        floor[x.i] = a && a === x.p && lockable[x.i] && x.i !== noLock ? lockable[x.i].fp : 0;
+        games[x.i] = a ? cont[a].u : []; Wr[x.i] = a ? Math.max(floor[x.i], cont[a].W) : 0; gain[x.i] = 0;
+      });
+      const used = new Set(sol.pick.filter(Boolean)), idle = from.filter(p => !used.has(p) && cont[p].u.length);
       for (;;) {
         let best = null;
         for (const p of idle) for (const x of rows) {
           if (!sol.pick[rows.indexOf(x)] || !fits(x.s, this.b.pos(p))) continue;
-          const ds = merged(games[x.i], cont[p].u), w = contStats(Q, ds).W[0] || 0, d = w - Wr[x.i];
+          const ds = merged(games[x.i], cont[p].u), w = Math.max(floor[x.i], contStats(Q, ds).W[0] || 0), d = w - Wr[x.i];
           if (d > 1e-9 && (!best || d > best.d)) best = { p, x, ds, w, d };
         }
         if (!best) break;
@@ -451,9 +458,10 @@ export class WeekPlan {
     for (const x of open) {
       const g = lockable[x.i]; if (!g) continue;
       const noLock = solve(open, pool, x.i), restRows = open.filter(y => y.i !== x.i);
-      const rest = solve(restRows, pool.filter(p => p !== x.p)), passStreams = streams(open, noLock);
+      const restPool = pool.filter(p => p !== x.p);
+      const rest = solve(restRows, restPool), passStreams = streams(open, noLock, pool, x.i);
       // opportunity cost with rotation on both sides: everything (this slot passing) - everything else
-      const restStreams = streams(restRows, rest);
+      const restStreams = streams(restRows, rest, restPool);
       bars[x.i] = Math.max(0, noLock.total + passStreams.total - rest.total - restStreams.total);
       (this.barDebug ||= {})[x.p] = { noLock: +noLock.total.toFixed(1), noLockStreams: +passStreams.total.toFixed(1), rest: +rest.total.toFixed(1),
         restStreams: +restStreams.total.toFixed(1), slotGets: noLock.pick[open.indexOf(x)] && this.b.name(noLock.pick[open.indexOf(x)]),
