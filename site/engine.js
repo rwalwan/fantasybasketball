@@ -457,7 +457,10 @@ export class WeekPlan {
       altFor[x.i] = noLock.pick[open.indexOf(x)];
       // lock certainty: simulate what this slot ends with if you pass (its games for the rest of the week, played
       // by the stopping rule) and count how often that beats the score in hand
-      surety[x.i] = passOdds(Q, passStreams.games[x.i] || [], g.fp, x.i + 1);
+      // (if you pass, this slot also uses games other slots would have had: that expected cost is added to the score,
+      // so the simulated pass averages the bar - Nov 9: Jerome showed 'lock' at 29% certainty without it)
+      const pg = passStreams.games[x.i] || [], wPass = pg.length ? contStats(Q, pg).W[0] || 0 : 0;
+      surety[x.i] = passOdds(Q, pg, g.fp + Math.max(0, wPass - bars[x.i]), x.i + 1);
       if (g.fp >= bars[x.i] * (1 + bias) && (ls[x.p].st === "open" || ls[x.p].st === "confirm")) willLock.add(x.p);
     }
     const forceCall = x => (force[x.p] === "lock" || force[x.p] === "pass") && lockable[x.i] && (ls[x.p].st === "open" || ls[x.p].st === "confirm") ? force[x.p] : null;

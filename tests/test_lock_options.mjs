@@ -42,4 +42,7 @@ assert.equal(forcedLock.slots[0].action, "lock"); assert.equal(forcedLock.slots[
 assert.equal(forcedPass.slots[0].action, "pass");
 assert.ok(forcedPass.outlook.mean > forcedLock.outlook.mean - 40 && forcedLock.outlook.mean === 38, "locking makes the slot 38");
 assert.ok(forcedPass.slots[0].later || forcedPass.slots[0].today, "passing shows who fills the slot next");
+// consistency: a lock call (score above the bar) has certainty above 50%-ish, a pass call below
+for (const pl of [mk().build({ force: {} })]) for (const sl of pl.slots) if (sl.pWaitBeats != null)
+  assert.ok(sl.action === "lock" ? sl.pWaitBeats < 0.6 : sl.pWaitBeats > 0.4 || sl.score < sl.bar * 0.8, JSON.stringify(sl));
 console.log("ok: lock options");
