@@ -148,3 +148,25 @@ Three existing tests encoded the old behaviour and are updated in the patch: `te
 After deploying: bars are unscaled at once (the published study has no `tier_units`); the next daily league run recomputes the study with correct tiers and the scale returns only if its interval excludes zero. The lock-rate bins for the opponent model are corrected by the same run. Old availability records keep feeding the game-day rates; day-ahead rates start from the priors above.
 
 One judgment call in the patch: the day-ahead GTD prior of 0.612. The published first-report rate (0.483) and the game-day rate (0.741) bracket the plausible range, and I took the midpoint. Change `prior` in `calibrate_designations` if you would rather start from one end.
+
+## 6. Week simulator: what the slot plan leaves on the table
+
+Added after the review. `tools/week_sim.mjs` plays whole weeks with the real engine (`WeekPlan.build` every morning and after every night's games, its lineup and lock calls followed to the letter) and plays the same weeks with looser policies. Roster and slots are the published plan's (15 players, 10 slots). Every player plays every game, there are no back-to-backs and one tip time a day; those simplifications apply to every policy alike. Harness check: with one player and one slot the engine followed to the letter averages his `contStats` value (48.59 against 48.62 over 3,000 weeks).
+
+400 weeks, points per week:
+
+| Policy | Mean | Against the engine |
+|---|---|---|
+| Engine, followed to the letter | 608.0 | its own Monday forecast is 605.6; realized minus forecast +2.4 [-1.5, +6.3] |
+| Defer: any player in any open slot each day, lock decided at the player's next tip | 608.6 | +0.6 [-1.4, +2.7]; +3.1 [0.1, 6.0] with its threshold tuned |
+| Hold: nobody locked until the week ends, each player stops on his own, best ten that fit count | 622.8 | +14.8 [12.9, 16.7] |
+| Perfect hindsight (not reachable) | 653.6 | +45.6 [43.1, 48.1] |
+
+What this says:
+
+- **The engine's plan value is honest.** What it forecasts on Monday is what it scores.
+- **Under the rule the engine assumes (a score in hand is gone at the player's next team game), the slot system leaves 0 to 3 points a week.** Free daily assignment and deferring the lock to the deadline add almost nothing over the current plan.
+- **If a score survives while the player sits on the bench through his own later games, holding instead of locking is worth about 15 points a week.** Then nobody needs a slot until Sunday, all 15 players get a full stopping problem, and the best ten count. The engine's `lockState` already reads Sleeper that way ("latest countable game"), but the league snapshots cannot confirm it: of 315 players benched with a score in hand who played while out of the morning lineup, 285 came back showing a different score and 26 the old one, and a morning snapshot cannot tell a bench game from a late lineup change. One deliberate test in your own league settles it: bench a player holding an unlocked score through his next game, put him back, and see which score the slot shows.
+- **In this simulated world, bars at x0.90 cost 7.3 points a week [4.3, 10.3]** (250 weeks). The world is the engine's own model, so this is the cost if the model is right; the league replay in finding 1 put it at about 4.4.
+
+Usage: `node tools/week_sim.mjs [weeks] [seed]`. Test: `tests/test_r3_5_week_sim.mjs`.
