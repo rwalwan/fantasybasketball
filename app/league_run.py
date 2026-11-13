@@ -49,7 +49,8 @@ def main():
         scale = experts.stack_weights(experts.graded_rows(memory.connect(), season)).get("scale", 1.0)
     except Exception:
         scale = 1.0
-    out = league_study.study(con, finals, stats, prior, team_dates=team_dates, proj_by_week=proj, proj_scale=scale)
+    out = league_study.study(con, finals, stats, prior, team_dates=team_dates, proj_by_week=proj, proj_scale=scale,
+                             tier_scoring=lg["scoring_settings"])
     ver = con.execute("SELECT COUNT(*), SUM(verified=1), SUM(verified=0) FROM league").fetchone()
     out.update(at=today, candidates=len(found), snapshot_rows=n,
                verified={"checked": ver[0], "lock_in": ver[1] or 0, "not_lock_in": ver[2] or 0})

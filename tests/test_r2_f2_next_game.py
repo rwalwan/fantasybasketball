@@ -11,7 +11,8 @@ assert A.next_game_healthy("2026-10-29")[0] == 0.955
 assert A.next_game_healthy("2027-01-15")[0] == 0.944
 assert A.next_game_healthy("2027-03-20")[0] == 0.930
 # 300 graded healthy non-b2b games this season, 290 played -> 0.967
-graded = [{"status": None, "b2b": False, "played": i < 290, "q": 0.955} for i in range(300)] + [{"status": None, "b2b": True, "played": False, "q": 0.89}] * 50
+# (review 3, finding 2: only records graded on the status at first sight count - "first": True)
+graded = [{"status": None, "b2b": False, "played": i < 290, "q": 0.955, "first": True} for i in range(300)] + [{"status": None, "b2b": True, "played": False, "q": 0.89, "first": True}] * 50
 json.dump({"open": {}, "graded": graded}, open(os.path.join(A.STATE, "availability_log.json"), "w"))
 rate, basis = A.next_game_healthy("2026-11-20")
 print(rate, "-", basis)

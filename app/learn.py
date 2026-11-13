@@ -10,6 +10,7 @@ import datetime as dt
 import json
 import os
 import sys
+from zoneinfo import ZoneInfo
 
 from . import memory, sleeper
 from .availability import healthy_at
@@ -23,6 +24,26 @@ USER_ID = os.environ.get("FBB_USER_ID", "1388708038000533504")
 
 def _future(t, now):
     return t and dt.datetime.fromisoformat(t.replace("Z", "+00:00")) > now
+
+
+ET = ZoneInfo("America/New_York")
+
+
+def game_date(tip):
+    """The NBA game date (US Eastern) of a tip time: an 8 pm ET tip is already the next day in UTC."""
+    return dt.datetime.fromisoformat(tip.replace("Z", "+00:00")).astimezone(ET).date().isoformat()
+
+
+def fix_move_dates(con):
+    """Move rows stored before review 3 carry the UTC date of the tip; put each under its game date (once: a row
+    already on its game date is left alone; a duplicate of a corrected row is dropped). Re-dated rows are ungraded so
+    the next grade() run grades them against the right box score."""
+    for rid, d, tip in con.execute("SELECT rowid, date, deadline FROM decisions WHERE kind='move' AND deadline IS NOT NULL").fetchall():
+        gd = game_date(tip)
+        if gd != d:
+            if con.execute("UPDATE OR IGNORE decisions SET date=?, final=NULL, cf=NULL, regret=NULL, followed=NULL WHERE rowid=?", (gd, rid)).rowcount == 0:
+                con.execute("DELETE FROM decisions WHERE rowid=?", (rid,))
+    con.commit()
 
 
 def record(con, plan, now):
@@ -46,7 +67,7 @@ def record(con, plan, now):
         if td and td.get("move") and _future(td.get("tip"), now):
             con.execute("""INSERT INTO decisions(week,date,slot,idx,pid,kind,score,deadline,made_at,extra) VALUES(?,?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(week,idx,pid,kind,date) DO UPDATE SET score=excluded.score, made_at=excluded.made_at, extra=excluded.extra""",
-                (week, td["tip"][:10], s["slot"], idx, td["pid"], "move", td.get("mu"), td["tip"], now.isoformat(timespec="minutes"),
+                (week, game_date(td["tip"]), s["slot"], idx, td["pid"], "move", td.get("mu"), td["tip"], now.isoformat(timespec="minutes"),
                  json.dumps({"name": td["name"], "replaces": s.get("pid"), "replaces_name": s.get("name")})))
     con.commit()
 
@@ -79,6 +100,7 @@ def grade_lock_call(score, call, later):
 
 def grade(con, season, current_week, lineups_by_week):
     """Grade every ungraded decision from finished weeks."""
+    fix_move_dates(con)
     weeks = [w for (w,) in con.execute("SELECT DISTINCT week FROM decisions WHERE regret IS NULL AND week < ?", (current_week,))]
     if not weeks:
         return 0

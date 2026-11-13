@@ -138,6 +138,9 @@ def main():
         print("designation play rates (own season + published):", availability.calibrate_designations())
         rate, basis = availability.next_game_healthy(today)
         availability.set_next_game(rate, basis)
+        gd = availability.gameday_healthy()              # no designation at the last run before tip: today's games only
+        if gd:
+            availability.M["healthy_gameday"] = gd[0]
         print(f"healthy next-game rate {rate}: {basis}")
         av = availability.build(book, meta, team_game_dates(sched), today, book.is_final, watch_av)
         hn = availability.healthy_next(meta, team_game_dates(sched), today, book.is_final, watch_av, set(av))

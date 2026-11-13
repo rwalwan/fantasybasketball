@@ -188,10 +188,15 @@ export class Book {
   playProb(p, daysAhead, b2b, date, j = 0) {
     const st = this.status(p), a = this.avail?.players?.[p], M = this.avail?.model || DEFAULT_AVAIL;
     let q;
+    // No designation and the game tips today: the rate at the last check before tip (0.999 this season, back-to-backs
+    // included). Further out, the next-game rate from the curve: he can still pick up a designation by then
+    // (review 3, finding 2: 0.999 was used for a next game days away; this season's next-game rate is 0.958).
+    const gameday = !st && daysAhead === 0 && M.healthy_gameday != null;
     if (a && a.status === st && date && a.q[date] != null) q = a.q[date];
+    else if (gameday) q = M.healthy_gameday * (this.part[p] ?? 1);
     else if (!st) q = healthyAt(M, (j ?? 0) + 1) * (this.part[p] ?? 1);   // a healthy player who's been sitting plays less
     else q = statusChain(M, st, j, a?.missed || 0);   // status changed since the job ran: keep his missed count
-    if (b2b) q *= B2B_FACTOR;
+    if (b2b && !gameday) q *= B2B_FACTOR;
     return Math.round(q * 100) / 100;
   }
 }
@@ -238,9 +243,12 @@ export function mergeMatchups(primary, alts = []) {
   });
 }
 // the bar calibration to use from the other-leagues study: its best scale, only if the gain's 95% interval excludes 0
+// ...and only from a study whose bars used the right volatility tier for each player (tier_units is written by
+// app/league_study.py since review 3: before that every player got the bench tier, which inflated the study's bars and
+// produced the x0.90)
 export function studyBarScale(study) {
   const b = study?.best_scale;
-  return b && b.scale !== 1 && Array.isArray(b.ci95_vs_current) && b.ci95_vs_current[0] > 0 ? b.scale : 1;
+  return study?.tier_units && b && b.scale !== 1 && Array.isArray(b.ci95_vs_current) && b.ci95_vs_current[0] > 0 ? b.scale : 1;
 }
 export function eligFromSnaps(snaps, overrides = {}) {
   return (pid, date) => {
@@ -374,6 +382,13 @@ export class WeekPlan {
     if (fresh && !OUT.has(this.b.status(p)) && this.elig(p, fresh) !== false) return { st: "live", g: { date: fresh, fp: 0, min: 0, gid: null } };
     const raw = this.slotPoints(p);
     if (!pl.length || raw == null) return { st: "none", g: null };
+    // Sleeper shows 0 for his slot in every copy AND his team has finished a game since his last one that he sat while
+    // in the lineup: that game became the slot's game (0) and the earlier score is gone (review 3, finding 4; other
+    // Lock-In leagues: 423 of 1,200 such mid-week cases). A 0 with no such game is still read as a glitch.
+    const lastD = pl.at(-1).date;
+    if (this.slotCandidates(p).every(v => !v) &&
+        this.teamDays(t).some(dd => dd > lastD && !done.has(dd) && this.final(p, dd) && this.elig(p, dd) === true))
+      return { st: "none", g: null, wiped: pl.at(-1) };
     const pts = Math.round(raw) / 10;
     // Sleeper's points for a starter = his locked game, or else his latest COUNTABLE game. So an earlier game
     // matching means "locked" only if his latest game was countable (played from a starting slot).
@@ -693,10 +708,10 @@ export class WeekPlan {
         const lp = planByIdx[i];
         if (lp?.draws[1]) {
           const { V, keep } = fold(lp.draws, lp.tail), f = lp.draws[0], r = lp.draws[1];
-          out.today = { pid: p, name, tip: f.g.tip, opp: f.g.opp, mu: f.g.mu, keepBar: r1(keep[0]), move: false, live: true, gain: r1(V - lp.tail), bestTime: null,
-                        relief: { pid: r.p, name: nm(r.p), tip: r.g.tip, opp: r.g.opp, mu: r.g.mu, swapAfter: swapAfterOf(f.g), keepBar: r1(keep[1]) } };
+          out.today = { pid: p, name, tip: f.g.tip, opp: f.g.opp, mu: f.g.mu, keepBar: r1(barScale * keep[0]), move: false, live: true, gain: r1(V - lp.tail), bestTime: null,
+                        relief: { pid: r.p, name: nm(r.p), tip: r.g.tip, opp: r.g.opp, mu: r.g.mu, swapAfter: swapAfterOf(f.g), keepBar: r1(barScale * keep[1]) } };
           return { ...out, action: "live", score: s.g.fp,
-            detail: `Game in progress: ${s.g.fp.toFixed(1)} so far (~${f.g.mu.toFixed(1)} projected final). After the final buzzer: lock if he ends at ${keep[0].toFixed(1)} or more; otherwise put ${nm(r.p)} in this slot before his ${r.g.opp ? `game vs ${r.g.opp}` : "game"} tips.` };
+            detail: `Game in progress: ${s.g.fp.toFixed(1)} so far (~${f.g.mu.toFixed(1)} projected final). After the final buzzer: lock if he ends at ${(barScale * keep[0]).toFixed(1)} or more; otherwise put ${nm(r.p)} in this slot before his ${r.g.opp ? `game vs ${r.g.opp}` : "game"} tips.` };
         }
         return { ...out, action: "live", score: s.g.fp, detail: `Game in progress: ${s.g.fp.toFixed(1)} so far. The lock call comes after the final buzzer.` };
       }
@@ -705,9 +720,11 @@ export class WeekPlan {
       const pl = planByIdx[i];
       if (pl && pl.draws.length) {
         const { V, keep } = fold(pl.draws, pl.tail), f = pl.draws[0];
-        out.today = { pid: f.p, name: nm(f.p), tip: f.g.tip, opp: f.g.opp, mu: f.g.mu, keepBar: r1(keep[0]), move: f.p !== p,
+        // the keep-line is the bar this game will face once it's final, so it carries the same calibration as the bars
+        // (review 3, finding 3: with x0.90 the plan said "under 46.9, swap" before the game and "lock 43.5" after it)
+        out.today = { pid: f.p, name: nm(f.p), tip: f.g.tip, opp: f.g.opp, mu: f.g.mu, keepBar: r1(barScale * keep[0]), move: f.p !== p,
                       gain: r1(V - pl.tail), bestTime: f.p !== p ? new Date(Date.parse(f.g.tip) - 40 * 60000).toISOString() : null };
-        if (pl.draws[1]) { const r = pl.draws[1]; out.today.relief = { pid: r.p, name: nm(r.p), tip: r.g.tip, opp: r.g.opp, mu: r.g.mu, swapAfter: swapAfterOf(f.g), keepBar: r1(keep[1]) }; }
+        if (pl.draws[1]) { const r = pl.draws[1]; out.today.relief = { pid: r.p, name: nm(r.p), tip: r.g.tip, opp: r.g.opp, mu: r.g.mu, swapAfter: swapAfterOf(f.g), keepBar: r1(barScale * keep[1]) }; }
       } else if (pl?.a && (pl.next?.g || cont[pl.a]?.u[0])) {
         const g = pl.next?.g || cont[pl.a].u[0];
         out.later = { pid: pl.a, name: nm(pl.a), date: g.date, tip: g.tip, opp: g.opp, mu: g.mu, move: pl.a !== p };
@@ -739,9 +756,10 @@ export class WeekPlan {
         if (m?.flipped) return { ...base, action: "pass", detail: `Matchup call — wait for upside: you're projected behind, so passing on ${sc.toFixed(1)} raises your win chance (${Math.round(m.pLock * 100)}% → ${Math.round(m.pPass * 100)}%).${planTxt}` };
         return { ...base, action: "pass", detail: `Don't lock: ${sc.toFixed(1)} is under ${bias ? `${(bar * (1 + bias)).toFixed(1)} (your lock style; ${bar.toFixed(1)} expected by waiting)` : `${bar.toFixed(1)}, what this slot is expected to get by waiting`}.${planTxt}${wp}` };
       }
-      if (!out.today && !out.later) return { ...out, action: "fallback-risk", detail: "Nobody eligible has a game left and nothing is locked: this slot scores its player's last game of the week." };
+      const gone = s.wiped ? ` His ${s.wiped.fp.toFixed(1)} from ${day3(s.wiped.date)} is gone: he sat a later game in your lineup and Sleeper reset the slot to 0.` : "";
+      if (!out.today && !out.later) return { ...out, action: "fallback-risk", detail: "Nobody eligible has a game left and nothing is locked: this slot scores its player's last game of the week." + gone };
       const g = out.today || out.later;
-      const note = s.st === "bench" ? " His last game was played from your bench, so it can't count." : "";
+      const note = (s.st === "bench" ? " His last game was played from your bench, so it can't count." : "") + gone;
       return { ...out, action: "start", deadline,
         detail: out.today ? (out.today.move ? `Start ${out.today.name} here today (${out.today.opp}, ${out.today.mu.toFixed(1)} proj).${note}`
                                             : `Plays today vs ${g.opp}: ${g.mu.toFixed(1)} projected (${range80(g.Q || Q, g.mu).join("–")}).${note}`)

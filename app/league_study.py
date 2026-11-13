@@ -23,6 +23,7 @@ import numpy as np
 from .availability import healthy_at
 from .leagues import fantasy_points
 from .model import B2B_FACTOR
+from .scoring import fantasy_points as our_points
 
 BINS = [0, 0.7, 0.85, 1.0, 1.15, 1.3, 1.5, 99]
 QS = json.load(open(os.path.join(os.path.dirname(__file__), "data", "game_ratio_quantiles.json")))
@@ -36,11 +37,14 @@ def tier_q(mu):
 
 
 def cont(games):
-    """Production continuation value W over games [(mu, q)], same recursion as site/engine.js contStats."""
+    """Production continuation value W over games [(mu, q)] or [(mu, q, tier_mu)], same recursion as site/engine.js
+    contStats. tier_mu = the projection in 'we back' FP per game, the units the tier thresholds are in (review 3,
+    finding 1: mu itself is each league's own scoring / 10, so tier_q(mu) was the bench tier for every player)."""
     W = 0.0
     for k in range(len(games) - 1, -1, -1):
-        mu, q = games[k]
-        W = q * mu if k == len(games) - 1 else q * float(np.mean(np.maximum(mu * tier_q(mu), W))) + (1 - q) * W
+        mu, q = games[k][0], games[k][1]
+        t = games[k][2] if len(games[k]) > 2 else mu
+        W = q * mu if k == len(games) - 1 else q * float(np.mean(np.maximum(mu * tier_q(t), W))) + (1 - q) * W
     return W
 
 
@@ -64,8 +68,11 @@ def _b2b(d, dates):
     return (dt.date.fromisoformat(d) - dt.timedelta(days=1)).isoformat() in dates
 
 
-def study(con, weeks, stats_by_week, prior_rows, team_dates=None, proj_by_week=None, proj_scale=1.0, boot=400, seed=7):
-    """team_dates: {week: {team: [dates]}} from the schedule; proj_by_week: {week: Sleeper projection rows}."""
+def study(con, weeks, stats_by_week, prior_rows, team_dates=None, proj_by_week=None, proj_scale=1.0, boot=400, seed=7,
+          tier_scoring=None):
+    """team_dates: {week: {team: [dates]}} from the schedule; proj_by_week: {week: Sleeper projection rows}.
+    tier_scoring: OUR league's scoring_settings; each game's volatility tier is picked by the projection scored with it
+    (the tier thresholds are in our FP per game). Without it the old behaviour (tier by mu) is kept and flagged."""
     team_dates, proj_by_week = team_dates or {}, proj_by_week or {}
     prior = {}
     for r in prior_rows or []:
@@ -107,8 +114,14 @@ def study(con, weeks, stats_by_week, prior_rows, team_dates=None, proj_by_week=N
                     mus = [proj_scale * fantasy_points(proj[(w, p, d)], sc) if (w, p, d) in proj else base for d in lineup]
                     if min(mus) <= 0:
                         continue
+                    if tier_scoring:                      # the same projection in our scoring: picks the tier only
+                        tbase = our_points(prior[p], tier_scoring) if p in prior else 0
+                        tmus = [proj_scale * our_points(proj[(w, p, d)], tier_scoring) if (w, p, d) in proj else tbase for d in lineup]
+                    else:
+                        tmus = mus
                     allset = set(dates)
-                    games = [(m, healthy_at(k + 1) * (B2B_FACTOR if _b2b(d, allset) else 1)) for k, (m, d) in enumerate(zip(mus, lineup))]
+                    games = [(m, healthy_at(k + 1) * (B2B_FACTOR if _b2b(d, allset) else 1), t)
+                             for k, (m, d, t) in enumerate(zip(mus, lineup, tmus))]
                     mu = sum(mus) / len(mus)
                     key = (w, p)
                     outcomes.append(((replay(fp, games) - s) / mu, key))     # % of his projection: leagues score differently
@@ -126,7 +139,9 @@ def study(con, weeks, stats_by_week, prior_rows, team_dates=None, proj_by_week=N
 
     out = {"leagues": len(leagues), "weeks": list(weeks), "decision_points": len(points), "starter_weeks": len(outcomes),
            "unchecked_starter_weeks": unchecked, "player_weeks": len({k for _, k in outcomes}),
-           "method": "lineup-checked weeks only; DNPs count as 0; production bar (RotoWire x scale, tiers, b2b); CI by NBA player-week"}
+           "method": "lineup-checked weeks only; DNPs count as 0; production bar (RotoWire x scale, tiers, b2b); CI by NBA player-week",
+           # which units picked the volatility tiers; site/engine.js studyBarScale ignores a study without it
+           "tier_units": "we back FP/G" if tier_scoring else None}
     out["eligible_points"] = len(points)
     if not points and not outcomes:
         out["opponent_model_ready"] = False
