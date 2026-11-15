@@ -1120,11 +1120,12 @@ export function tradeIdeas(valuer, book, mine, others, limit = 15, ctx = null) {
   }
   // best for us, but deals that also help them rank higher (lopsided offers just get declined)
   ideas.sort((x, y) => (y.winsMe + 0.5 * y.winsThem) - (x.winsMe + 0.5 * x.winsThem));
-  const per = {}, team = {}, shape = {}, out = [];
+  const per = {}, team = {}, shape = {}, gave = {}, out = [];
   for (const x of ideas) {
-    const k = x.get.join(), sh = `${x.roster_id}|${x.give.length}x${x.get.length}`;
-    if ((per[k] || 0) >= 2 || (team[x.roster_id] || 0) >= 3 || (shape[sh] || 0) >= 1) continue;   // variety
-    per[k] = (per[k] || 0) + 1; team[x.roster_id] = (team[x.roster_id] || 0) + 1; shape[sh] = 1;
+    const k = x.get.join(), g = [...x.give].sort().join(), sh = `${x.roster_id}|${x.give.length}x${x.get.length}`;
+    // variety: the same target, partner, shape, or set of our players at most a couple of times
+    if ((per[k] || 0) >= 2 || (team[x.roster_id] || 0) >= 3 || (shape[sh] || 0) >= 1 || (gave[g] || 0) >= 2) continue;
+    per[k] = (per[k] || 0) + 1; team[x.roster_id] = (team[x.roster_id] || 0) + 1; shape[sh] = 1; gave[g] = (gave[g] || 0) + 1;
     x.theirFit = valuer.fit(x.tp, swapIn(x.tp, x.get, x.give)).map(f => ({ ...f, inName: book.name(f.in), outName: f.out ? book.name(f.out) : "a waiver pickup" }));
     x.myFit = valuer.fit(mine.players, swapIn(mine.players, x.give, x.get)).map(f => ({ ...f, inName: book.name(f.in), outName: f.out ? book.name(f.out) : "a waiver pickup" }));
     delete x.tp; out.push(x);
