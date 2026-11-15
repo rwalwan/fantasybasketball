@@ -860,7 +860,7 @@ export class WeekPlan {
     const fixed = new Set(starters.filter(p => p && p !== "0" && (ls(p).st === "locked" || ((have.has(p) || out.has(p)) && ls(p).st === "live"))));
     const open = this.slots.map((s, i) => ({ s, i, p: starters[i] })).filter(x => !fixed.has(x.p));
     const reserve = new Set(this.roster.reserve || []);
-    const pool = players.filter(p => !fixed.has(p) && !reserve.has(p)).concat([...out].filter(p => !fixed.has(p)));
+    const pool = players.filter(p => !fixed.has(p) && !reserve.has(p)).concat([...out].filter(p => !fixed.has(p) && !reserve.has(p)));
     const kind = p => (out.has(p) ? "out" : from && !mine.has(p) ? "in" : "all");
     const W = p => {
       const k = kind(p), key = `${p}|${k}|${from}`;
@@ -1101,8 +1101,9 @@ export function tradeIdeas(valuer, book, mine, others, limit = 15, ctx = null) {
       // this week: expected points the open slots gain or lose, as a change in win chance
       let wMe = 0, wThem = 0, myWeek = 0, theirWeek = 0;
       if (me && wk[partner]) {
-        myWeek = wt(mine.roster_id, myNew, give) - base[mine.roster_id];
-        theirWeek = wt(partner, thNew, get) - base[partner];
+        // players leaving (traded, or dropped to make room) are still there until the trade goes through
+        myWeek = wt(mine.roster_id, myNew, [...give, ...myDrop]) - base[mine.roster_id];
+        theirWeek = wt(partner, thNew, [...get, ...thDrop]) - base[partner];
         const p0 = pWin(mine.roster_id), q0 = pWin(partner);
         const vsMe = me.opp === partner;                     // trading with this week's opponent: one change moves both
         if (p0 != null) wMe = pWin(mine.roster_id, myWeek, vsMe ? theirWeek : 0) - p0;

@@ -34,6 +34,10 @@ assert.ok(naive <= before + 1e-9, "trading X for nothing changes nothing this we
 const sat = myWp.weekTotal(["Y", "M"], { from: "2026-11-14", outgoing: ["X"] });
 assert.ok(sat > before && sat < after, `${before.toFixed(1)} < ${sat.toFixed(1)} < ${after.toFixed(1)}`);
 assert.equal(myWp.weekTotal(["Y", "M"], { from: "2026-11-16", outgoing: ["X"] }), before);
+// a player on IR who is part of the deal doesn't start playing this week because he's leaving (Nov 15 live run:
+// their side showed +23.5 pts this week for a deal that only goes through next week)
+const irWp = plan({ ...me, players: ["X", "M", "Y"], reserve: ["Y"] }, ["X", "M"], { X: true, "X|2026-11-09": true });
+assert.equal(irWp.weekTotal(["X", "M"], { from: "2026-11-16", outgoing: ["Y"] }), irWp.weekTotal(["X", "M", "Y"]));
 
 // 3) the search: equal rest-of-season value, so only this week separates them
 const ctx = (theirMean, theirOpp) => ({ S: 500, from: null, weekOf: {
