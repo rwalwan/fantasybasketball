@@ -67,12 +67,13 @@ async function snapshot(env) {
     const slot = slotOf[pid] ?? null, i = idxOf[pid] ?? null;   // i: which slot (names repeat); a game locks only there
     if (!cur || cur.slot !== slot || (cur.i ?? null) !== i) { snaps[k] = { slot, i, seen: stamp, frozen: false }; changed = true; }
   }
-  // a game is lockable only in the slot he played it in, and moving him out loses it for good (even if moved back):
-  // mark every frozen record of this week whose player is no longer in that slot
+  // Sleeper: a game is ineligible once he "was moved to bench since the game began" (even if moved back); moving
+  // between starting slots is fine. Mark frozen starting-slot records of players who are on the bench now.
+  const roster = new Set(mine.players || my.players || []);
   for (const [k, rec] of Object.entries(snaps)) {
-    if (!rec.frozen || rec.slot == null || rec.left) continue;
+    if (!rec.frozen || rec.slot == null || rec.benched) continue;
     const pid = k.split("|")[1];
-    if (rec.i != null ? (idxOf[pid] ?? null) !== rec.i : (slotOf[pid] ?? null) !== rec.slot) { rec.left = true; changed = true; }
+    if (roster.has(pid) && slotOf[pid] == null) { rec.benched = true; changed = true; }
   }
   // KV free plan = 1,000 writes/day. Only write when a lineup actually changes (~10-40 writes on a game day).
   if (changed) await env.KV.put(key, JSON.stringify(snaps));

@@ -29,22 +29,19 @@ const sq = wq.build().slots.find(s => s.pid === "Q");
 assert.notEqual(sq.action, "lock"); assert.notEqual(sq.action, "pass");
 console.log("Queta:", sq.action, "-", sq.detail);
 
-// Okongwu: played Wednesday in UTIL (index 1), now in C (index 0) -> not lockable there
+// Okongwu: played in UTIL, then moved to C. Sleeper's rule (its own message): ineligible only if he wasn't starting at
+// game time "OR was moved to bench since the game began". Starting slot to starting slot keeps it lockable...
 const snapsO = { [`${wed}|O`]: { slot: "UTIL", i: 1, frozen: true }, [`${wed}|Q`]: { slot: "C", i: 0, frozen: true }, [`${wed}|X`]: { slot: null, frozen: true } };
-const wo = mk(["O", "Q", "X"], log, pts, snapsO);
+assert.equal(mk(["O", "Q", "X"], log, pts, snapsO).lockState("O").st, "open");
+// ...but a trip to the bench after the game loses it for good, even back in a starting slot (what happened Nov 15)
+const benched = { ...snapsO, [`${wed}|O`]: { ...snapsO[`${wed}|O`], benched: true } };
+const wo = mk(["O", "Q", "X"], log, pts, benched);
 assert.equal(wo.lockState("O").st, "moved");
 const so = wo.build().slots.find(s => s.pid === "O");
 assert.ok(!["lock", "pass"].includes(so.action), so.action);
-assert.match(so.detail, /played in UTIL/);
+assert.match(so.detail, /moved to the bench/);
 console.log("Okongwu:", so.action, "-", so.detail);
-// ...back in UTIL index 1, the same game is lockable
-assert.equal(mk(["Q", "O", "X"], log, pts, snapsO).lockState("O").st, "open");
-// the other UTIL (index 2) is a different slot even though the name matches
-assert.equal(mk(["Q", "X", "O"], log, pts, snapsO).lockState("O").st, "moved");
-// records from before slot indexes were saved fall back to the slot name
-const old = { [`${wed}|O`]: { slot: "UTIL", frozen: true } };
-assert.equal(mk(["Q", "X", "O"], log, pts, old).lockState("O").st, "open");
-assert.equal(mk(["O", "Q", "X"], log, pts, old).lockState("O").st, "moved");
+assert.equal(mk(["Q", "O", "X"], log, pts, benched).lockState("O").st, "moved");   // back in UTIL: still gone
 
 // a bench record stays a bench game even when Sleeper's slot shows its points (replaces the Oct 31 rule)
 assert.equal(mk(["O", "Q", "X"], log, pts, { [`${wed}|O`]: { slot: null, frozen: true } }).lockState("O").st, "bench");
@@ -54,11 +51,9 @@ assert.equal(mk(["O", "Q", "X"], log, pts, snapsQ, { [`${wed}|Q`]: true }).lockS
 assert.equal(eligFromSnaps({})("O", wed), null);
 console.log("ok: nov 15 slot locks");
 
-// Moving him out of the slot after the game loses it for good, even if he's moved back (Sleeper doesn't allow it)
+// the Worker's record (no "benched") doesn't erase the job's "benched"; Nov 15 "left" records read as benched
 import { mergeSnaps } from "../site/engine.js";
-const leftSnaps = { [`${wed}|O`]: { slot: "UTIL", i: 1, frozen: true, left: true }, [`${wed}|Q`]: { slot: "C", i: 0, frozen: true } };
-assert.equal(mk(["Q", "O", "X"], log, pts, leftSnaps).lockState("O").st, "moved");     // back in UTIL index 1: still gone
-// the Worker's record (no "left") doesn't erase the job's "left"
-const m = mergeSnaps(leftSnaps, { [`${wed}|O`]: { slot: "UTIL", i: 1, frozen: true } });
-assert.equal(m[`${wed}|O`].left, true);
-console.log("ok: nov 15 moved-and-back");
+const m = mergeSnaps(benched, { [`${wed}|O`]: { slot: "UTIL", i: 1, frozen: true } });
+assert.equal(m[`${wed}|O`].benched, true);
+assert.equal(mk(["O", "Q", "X"], log, pts, { [`${wed}|O`]: { slot: "UTIL", frozen: true, left: true } }).lockState("O").st, "moved");
+console.log("ok: nov 15 benched-and-back");

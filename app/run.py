@@ -116,9 +116,10 @@ def main():
         os.makedirs(os.path.join(ROOT, "data", "state"), exist_ok=True)
         with open(os.path.join(ROOT, "data", "state", "kick.json"), "w") as f:
             json.dump(backend["kick"], f)
-    for k, v in (backend.get("lineups") or {}).items():         # minute-level records win; "left" sticks from either
-        left = (tracker.snaps.get(k) or {}).get("left") or v.get("left")
-        tracker.snaps[k] = {**(tracker.snaps.get(k) or {}), **v, **({"left": True} if left else {})}
+    for k, v in (backend.get("lineups") or {}).items():         # minute-level records win; "benched" sticks from either
+        old = tracker.snaps.get(k) or {}
+        benched = old.get("benched") or v.get("benched") or old.get("left") or v.get("left")
+        tracker.snaps[k] = {**old, **v, **({"benched": True} if benched else {})}
     tracker.overrides.update(backend.get("elig") or {})
     tracker.record(slots, my_m.get("starters") or [], mine.get("players") or [], book.team,
                    lambda team: sorted(d for d in tg.get(team, {}) if d in days), tips)

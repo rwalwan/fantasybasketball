@@ -252,14 +252,18 @@ export function studyBarScale(study) {
 }
 // Lineup records -> was a game lockable? A record is final once frozen at tip (or once the game has tipped, when the
 // caller passes tipped(pid, date)). Lock-In only lets a game be locked in the slot he played it in, so the record's
-// slot (and, since Nov 15, its slot index) is returned too: eligFromSnaps(...).slot(pid, date) -> {slot, i, left} | null.
+// slot is returned too: eligFromSnaps(...).slot(pid, date) -> {slot, i, benched} | null. Sleeper's rule (its own
+// message, Nov 15): a game is ineligible if he "was not in the starting lineup at the scheduled game time OR was moved to
+// bench since the game began". Moving between starting slots keeps it lockable; any trip to the bench loses it.
 // No record for a date the tracker covered = he wasn't on the roster that day (Nov 15: Neemias Queta's 52 from before
 // he was picked up was offered as a lock): not lockable. No record on a date before tracking: unknown (null).
-// Merge two lineup-record sets (the job's and the Worker's minute-level one): the second wins, but "left" (he was moved
-// out of that slot after the game) sticks if either saw it.
+// Merge two lineup-record sets (the job's and the Worker's minute-level one): the second wins, but "benched" (he was
+// on the bench at some point after the game began) sticks if either saw it. ("left" = the Nov 15 records written
+// while the rule was "any slot change"; read as benched so nothing unlockable is offered for the rest of week 4.)
 export function mergeSnaps(a = {}, b = {}) {
   const out = { ...a };
-  for (const [k, v] of Object.entries(b || {})) out[k] = (a[k]?.left || v?.left) ? { ...a[k], ...v, left: true } : { ...a[k], ...v };
+  const bn = r => !!(r?.benched || r?.left);
+  for (const [k, v] of Object.entries(b || {})) out[k] = (bn(a[k]) || bn(v)) ? { ...a[k], ...v, benched: true } : { ...a[k], ...v };
   return out;
 }
 export function eligFromSnaps(snaps, overrides = {}, tipped = null) {
@@ -275,7 +279,7 @@ export function eligFromSnaps(snaps, overrides = {}, tipped = null) {
   f.slot = (pid, date) => {
     const k = `${date}|${pid}`, s = snaps?.[k];
     if (k in overrides || !final(s, pid, date) || s.slot == null) return null;
-    return { slot: s.slot, i: s.i ?? null, left: !!s.left };
+    return { slot: s.slot, i: s.i ?? null, benched: !!(s.benched || s.left) };
   };
   return f;
 }
@@ -418,18 +422,17 @@ export class WeekPlan {
     if (this.locks[p] !== false && countable.length && this.elig(p, pl.at(-1).date) !== false)
       for (const g of countable.slice(0, -1)) if (Math.abs(g.fp - pts) < 0.01 && Math.abs(latest.fp - pts) >= 0.01) return { st: "locked", g, inferred: true };
     const last = pl.at(-1);
-    // Lockable only if the lineup record says he played it from a starting slot, and from THIS slot. Sleeper's slot
+    // Lockable only if the lineup record says he played it from a starting slot and he hasn't been benched since. Sleeper's slot
     // score is no evidence: it shows a player's latest game in whatever slot he sits in now, including a game played
     // from the bench, in another slot, or before he was on the roster (Nov 15: Queta's pre-pickup 52 and Okongwu's
     // 39 from UTIL, moved to C, were both offered as locks). The Oct 31 rule that read matching points as "it counted"
     // is gone; the Worker's minute-level lineup record makes the record reliable.
     const e = this.elig(p, last.date);
     if (e === false) return { st: "bench", g: last };
-    const at = this.elig.slot?.(p, last.date), i = (this.matchup.starters || []).indexOf(p);
-    // Moving him out of that slot after the game loses it for good, even if he's moved back (Nov 15): "left" is set by
-    // the lineup trackers once his slot changes after the game.
-    if (e === true && at && i >= 0 && (at.left || (at.i != null ? at.i !== i : at.slot !== this.slots[i])))
-      return { st: "moved", g: last, from: at.slot };
+    // moved to the bench after the game began: gone for good, even if he's back in a starting slot now. Moving between
+    // starting slots is fine (Sleeper; Nov 15 Okongwu: played in UTIL, benched, then put in C -> "ineligible").
+    const at = this.elig.slot?.(p, last.date);
+    if (e === true && at?.benched) return { st: "moved", g: last, from: at.slot };
     return { st: e === true ? "open" : "confirm", g: last };
   }
   // opts.opp = the opponent's outlook ({mean, var}) -> matchup-aware lock calls
@@ -788,7 +791,7 @@ export class WeekPlan {
       if (!out.today && !out.later) return { ...out, action: "fallback-risk", detail: "Nobody eligible has a game left and nothing is locked: this slot scores its player's last game of the week." + gone };
       const g = out.today || out.later;
       const note = (s.st === "bench" ? ` His ${s.g.fp.toFixed(1)} from ${day3(s.g.date)} wasn't played from your lineup, so it can't be locked.`
-                  : s.st === "moved" ? ` His ${s.g.fp.toFixed(1)} from ${day3(s.g.date)} was played in ${s.from}; a game can only be locked in the slot he played it in.` : "") + gone;
+                  : s.st === "moved" ? ` His ${s.g.fp.toFixed(1)} from ${day3(s.g.date)} can't be locked: he was moved to the bench after it began.` : "") + gone;
       return { ...out, action: "start", deadline,
         detail: out.today ? (out.today.move ? `Start ${out.today.name} here today (${out.today.opp}, ${out.today.mu.toFixed(1)} proj).${note}`
                                             : `Plays today vs ${g.opp}: ${g.mu.toFixed(1)} projected (${range80(g.Q || Q, g.mu).join("–")}).${note}`)

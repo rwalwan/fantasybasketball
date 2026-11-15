@@ -7,7 +7,8 @@ before tip-off is frozen as that game's lineup.
 State lives in data/state/lineups_<season>_w<week>.json (kept on the `state` branch by the workflow):
   {"<date>|<pid>": {"slot": "G" | null, "i": <slot index> | null, "seen": "<utc iso>", "frozen": bool}}
 (i since Nov 15: a game can only be locked in the slot he played it in, and slot names repeat, e.g. two UTIL;
- "left": true once he's moved out of that slot after the game: it can't be locked again, even if he's moved back)
+ "benched": true once he's on the bench after the game began: Sleeper won't let that game be locked again, even if
+ he's moved back; moving between starting slots is fine)
 Manual answers for games played before tracking started go in data/state/eligibility_overrides.json:
   {"<date>|<pid>": true | false}
 """
@@ -48,11 +49,10 @@ class LineupTracker:
                 tip = tips.get((d, team))
                 cur = self.snaps.get(key)
                 if cur and cur.get("frozen"):
-                    # moved out of the slot he played the game in: that game can't be locked any more, even if he's
-                    # moved back (Sleeper, Nov 15). Old records without "i" compare by slot name.
-                    if cur.get("slot") is not None and not cur.get("left") and \
-                            (idx_of.get(pid) != cur["i"] if cur.get("i") is not None else slot_of.get(pid) != cur["slot"]):
-                        cur["left"] = True
+                    # on the bench (or IR) after the game began: that game can't be locked any more, even if he's
+                    # moved back into the lineup (Sleeper's rule). Moving between starting slots is fine.
+                    if cur.get("slot") is not None and not cur.get("benched") and slot_of.get(pid) is None:
+                        cur["benched"] = True
                     continue
                 if tip and dt.datetime.fromisoformat(tip.replace("Z", "+00:00")) <= self.now:
                     if cur:                       # tipped: freeze the last pre-tip snapshot
