@@ -38,16 +38,15 @@ const moves = [{ pid: "a", weekGain: 0, rosGain: 1, noise: 1.8 }, { pid: "b", we
 assert.deepEqual(selectAdds(moves).map(m => m.pid), ["b", "c"]);
 console.log("ok: oct 29 bugs");
 
-// Oct 31: Sleeper's score included Wendell Carter Jr.'s 40 (latest game), but our lineup record said he played it
-// from the bench, so his slot was valued without it. Sleeper only credits lineup games: matching points = it counted.
+// Oct 31 rule reversed Nov 15: Sleeper's slot shows a player's latest game wherever he sits now (Queta's pre-pickup 52
+// in UTIL), so matching points are no evidence the game was played from the lineup. The lineup record decides.
 {
   const wpB = mk([g(mon, "complete"), g(wed, "complete"), g(fri, "pre_game")], { G: [[mon, 30.5, 30, "a"], [wed, 40, 30, "b"]] }, 400, {}, "2026-11-05T05:00:00Z");
   wpB.elig = (p, d) => (d === wed ? false : true);
   const st = wpB.lockState("G");
-  console.log("bench record vs Sleeper's 40:", st.st, st.g.fp);
-  assert.equal(st.st, "open"); assert.equal(st.g.fp, 40);
+  assert.equal(st.st, "bench"); assert.equal(st.g.fp, 40);
 }
-console.log("ok: oct 31 bench record");
+console.log("ok: bench record wins over Sleeper's slot points");
 
 // Oct 31: starters_points (the slot score, sums to the matchup score) beats players_points when they disagree
 {

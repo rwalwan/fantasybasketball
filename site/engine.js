@@ -250,13 +250,27 @@ export function studyBarScale(study) {
   const b = study?.best_scale;
   return study?.tier_units && b && b.scale !== 1 && Array.isArray(b.ci95_vs_current) && b.ci95_vs_current[0] > 0 ? b.scale : 1;
 }
-export function eligFromSnaps(snaps, overrides = {}) {
-  return (pid, date) => {
+// Lineup records -> was a game lockable? A record is final once frozen at tip (or once the game has tipped, when the
+// caller passes tipped(pid, date)). Lock-In only lets a game be locked in the slot he played it in, so the record's
+// slot (and, since Nov 15, its slot index) is returned too: eligFromSnaps(...).slot(pid, date) -> {slot, i} | null.
+// No record for a date the tracker covered = he wasn't on the roster that day (Nov 15: Neemias Queta's 52 from before
+// he was picked up was offered as a lock): not lockable. No record on a date before tracking: unknown (null).
+export function eligFromSnaps(snaps, overrides = {}, tipped = null) {
+  const days = new Set(Object.keys(snaps || {}).map(k => k.split("|")[0]));
+  const final = (s, pid, date) => s && (s.frozen || (tipped ? tipped(pid, date) : false));
+  const f = (pid, date) => {
     const k = `${date}|${pid}`;
     if (k in overrides) return !!overrides[k];
     const s = snaps?.[k];
-    return s && s.frozen ? s.slot != null : null;
+    if (s) return final(s, pid, date) ? s.slot != null : null;
+    return days.has(date) ? false : null;
   };
+  f.slot = (pid, date) => {
+    const k = `${date}|${pid}`, s = snaps?.[k];
+    if (k in overrides || !final(s, pid, date) || s.slot == null) return null;
+    return { slot: s.slot, i: s.i ?? null };
+  };
+  return f;
 }
 
 // ---------- schedule ----------
@@ -397,11 +411,16 @@ export class WeekPlan {
     if (this.locks[p] !== false && countable.length && this.elig(p, pl.at(-1).date) !== false)
       for (const g of countable.slice(0, -1)) if (Math.abs(g.fp - pts) < 0.01 && Math.abs(latest.fp - pts) >= 0.01) return { st: "locked", g, inferred: true };
     const last = pl.at(-1);
-    // Sleeper credits a starter only with a game he played from the lineup: if his slot shows his latest game's
-    // points, that game counted, whatever our lineup record says (Oct 31: Wendell Carter Jr.'s 40 in Sleeper's score
-    // was treated as a bench game, so the plan valued his slot without it)
-    const e = pts > 0 && Math.abs(last.fp - pts) < 0.01 ? true : this.elig(p, last.date);
+    // Lockable only if the lineup record says he played it from a starting slot, and from THIS slot. Sleeper's slot
+    // score is no evidence: it shows a player's latest game in whatever slot he sits in now, including a game played
+    // from the bench, in another slot, or before he was on the roster (Nov 15: Queta's pre-pickup 52 and Okongwu's
+    // 39 from UTIL, moved to C, were both offered as locks). The Oct 31 rule that read matching points as "it counted"
+    // is gone; the Worker's minute-level lineup record makes the record reliable.
+    const e = this.elig(p, last.date);
     if (e === false) return { st: "bench", g: last };
+    const at = this.elig.slot?.(p, last.date), i = (this.matchup.starters || []).indexOf(p);
+    if (e === true && at && i >= 0 && (at.i != null ? at.i !== i : at.slot !== this.slots[i]))
+      return { st: "moved", g: last, from: at.slot };
     return { st: e === true ? "open" : "confirm", g: last };
   }
   // opts.opp = the opponent's outlook ({mean, var}) -> matchup-aware lock calls
@@ -759,7 +778,8 @@ export class WeekPlan {
       const gone = s.wiped ? ` His ${s.wiped.fp.toFixed(1)} from ${day3(s.wiped.date)} is gone: he sat a later game in your lineup and Sleeper reset the slot to 0.` : "";
       if (!out.today && !out.later) return { ...out, action: "fallback-risk", detail: "Nobody eligible has a game left and nothing is locked: this slot scores its player's last game of the week." + gone };
       const g = out.today || out.later;
-      const note = (s.st === "bench" ? " His last game was played from your bench, so it can't count." : "") + gone;
+      const note = (s.st === "bench" ? ` His ${s.g.fp.toFixed(1)} from ${day3(s.g.date)} wasn't played from your lineup, so it can't be locked.`
+                  : s.st === "moved" ? ` His ${s.g.fp.toFixed(1)} from ${day3(s.g.date)} was played in ${s.from}; a game can only be locked in the slot he played it in.` : "") + gone;
       return { ...out, action: "start", deadline,
         detail: out.today ? (out.today.move ? `Start ${out.today.name} here today (${out.today.opp}, ${out.today.mu.toFixed(1)} proj).${note}`
                                             : `Plays today vs ${g.opp}: ${g.mu.toFixed(1)} projected (${range80(g.Q || Q, g.mu).join("–")}).${note}`)

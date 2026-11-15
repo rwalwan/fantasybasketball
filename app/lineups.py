@@ -5,7 +5,8 @@ returns the current lineup, so every run records who is starting; when a game ti
 before tip-off is frozen as that game's lineup.
 
 State lives in data/state/lineups_<season>_w<week>.json (kept on the `state` branch by the workflow):
-  {"<date>|<pid>": {"slot": "G" | null, "seen": "<utc iso>", "frozen": bool}}
+  {"<date>|<pid>": {"slot": "G" | null, "i": <slot index> | null, "seen": "<utc iso>", "frozen": bool}}
+(i since Nov 15: a game can only be locked in the slot he played it in, and slot names repeat, e.g. two UTIL)
 Manual answers for games played before tracking started go in data/state/eligibility_overrides.json:
   {"<date>|<pid>": true | false}
 """
@@ -37,6 +38,7 @@ class LineupTracker:
     def record(self, slots, starters, roster_players, team_of, game_dates_of, tips):
         """Snapshot today's/future games for every rostered player. Frozen once the game has tipped."""
         slot_of = {pid: s for s, pid in zip(slots, starters) if pid and pid != "0"}
+        idx_of = {pid: i for i, pid in enumerate(starters[:len(slots)]) if pid and pid != "0"}
         stamp = self.now.isoformat(timespec="minutes")
         for pid in roster_players:
             team = team_of(pid)
@@ -52,7 +54,7 @@ class LineupTracker:
                     continue
                 if tip is None and d < self.now.date().isoformat():
                     continue
-                self.snaps[key] = {"slot": slot_of.get(pid), "seen": stamp, "frozen": False}
+                self.snaps[key] = {"slot": slot_of.get(pid), "i": idx_of.get(pid), "seen": stamp, "frozen": False}
         _save(self.name, self.snaps)
 
     def eligible(self, pid, date):

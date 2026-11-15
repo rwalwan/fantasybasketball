@@ -96,14 +96,8 @@ async function loadLive() {
 
 // ---- eligibility: was the player in a starting slot when that game tipped? ----------------------
 function eligFn(starters) {
-  const ov = { ...live.overrides, ...local.get("elig") };
-  return (pid, date) => {
-    const k = `${date}|${pid}`;
-    if (k in ov) return !!ov[k];
-    const s = live.snaps[k];
-    if (s && (s.frozen || isTipped(pid, date))) return s.slot != null;
-    return null;
-  };
+  // same rules as the job (engine.js eligFromSnaps): record's slot must be a starting slot, and the slot he's in now
+  return eligFromSnaps(live.snaps, { ...live.overrides, ...local.get("elig") }, isTipped);
 }
 let bookRef = null;
 const isTipped = (pid, date) => { const t = live.tips[`${date}|${bookRef?.team(pid)}`]; return t ? new Date(t) <= new Date() : date < etToday(); };

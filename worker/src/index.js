@@ -49,7 +49,7 @@ async function snapshot(env) {
     const lg = await getJSON(`${S1}/league/${LEAGUE}`);
     const v = { slots: lg.roster_positions.filter(s => s !== "BN" && s !== "IR") };
     await env.KV.put("league", JSON.stringify(v), { expirationTtl: 86400 }); return v; })();
-  const slotOf = {}; (my.starters || []).forEach((p, i) => { if (p && p !== "0") slotOf[p] = league.slots[i]; });
+  const slotOf = {}, idxOf = {}; (my.starters || []).forEach((p, i) => { if (p && p !== "0") { slotOf[p] = league.slots[i]; idxOf[p] = i; } });
 
   const key = `lineups_${info.season}_w${info.week}`;
   const snaps = await kvGet(env, key, {});
@@ -64,8 +64,8 @@ async function snapshot(env) {
       if (cur) { cur.frozen = true; changed = true; }
       continue;
     }
-    const slot = slotOf[pid] ?? null;
-    if (!cur || cur.slot !== slot) { snaps[k] = { slot, seen: stamp, frozen: false }; changed = true; }
+    const slot = slotOf[pid] ?? null, i = idxOf[pid] ?? null;   // i: which slot (names repeat); a game locks only there
+    if (!cur || cur.slot !== slot || (cur.i ?? null) !== i) { snaps[k] = { slot, i, seen: stamp, frozen: false }; changed = true; }
   }
   // KV free plan = 1,000 writes/day. Only write when a lineup actually changes (~10-40 writes on a game day).
   if (changed) await env.KV.put(key, JSON.stringify(snaps));
