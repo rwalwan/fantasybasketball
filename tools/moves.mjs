@@ -58,9 +58,36 @@ const claims = (() => { try { return st("claims"); } catch { return { consensus:
 const fa = wp.waivers(trending, 40).list;
 const valuer = new Valuer({ book, schedule, Q: st("quantiles"), rosterPositions: league.roster_positions, week, today, settings: league.settings, freeAgents: fa.map(x => x.pid) });
 const adds = selectAdds(waiverMoves(wp, valuer, mine, fa, protect, 12), claims.consensus || {});
-const trades = tradeIdeas(valuer, book, mine, rosters.filter(r => r.roster_id !== mine.roster_id), 10)
+// trades: every team's week too (this week's win chance is part of a trade's value: a player whose slot is locked or
+// who has no games left is worth nothing more this week; one with games left is). Each team's plan and outlook from
+// the same model as the win-chance log; ours and our opponent's are the real ones above.
+const tradeCtx = (() => {
+  try {
+    const weekOf = {}, byMid = {};
+    for (const m of matchups) if (m.matchup_id != null) (byMid[m.matchup_id] ||= []).push(m.roster_id);
+    const oppOf = rid => { const m = matchups.find(x => x.roster_id === rid); return (byMid[m?.matchup_id] || []).find(x => x !== rid) ?? null; };
+    for (const r of rosters) {
+      const m = matchups.find(x => x.roster_id === r.roster_id); if (!m) continue;
+      if (r.roster_id === mine.roster_id) { weekOf[r.roster_id] = { wp, mean: plan.outlook.mean, var: plan.outlook.var, opp: oppOf(r.roster_id) }; continue; }
+      const twp = new WeekPlan({ Q: st("quantiles"), book, schedule, week, today, rosterPositions: league.roster_positions,
+        roster: r, matchup: m, rosters, tips: tipsRaw, locks: {}, elig: r.roster_id === oppRoster?.roster_id ? eligFromSnaps(readState(`opp_lineups_${season}_w${week}.json`, {})) : () => true });
+      const o = r.roster_id === oppRoster?.roster_id ? oppPlan.outlook : twp.build().outlook;
+      weekOf[r.roster_id] = { wp: twp, mean: o.mean, var: o.var, opp: oppOf(r.roster_id) };
+    }
+    // the league's trade review period: a deal goes through that many days later; until then the players stay put
+    const rd = +(league.settings?.trade_review_days || 0);
+    const from = rd > 0 ? new Date(Date.parse(today + "T12:00:00Z") + rd * 864e5).toISOString().slice(0, 10) : null;
+    const vals = rosters.map(r => valuer.team(r.players || [])).sort((a, b) => a - b);
+    return { weekOf, from, reviewDays: rd, S: vals[Math.floor(vals.length / 2)] || 500 };
+  } catch (e) { console.log("trade week context failed:", e.message); return null; }
+})();
+const tradeT0 = Date.now();
+const trades = tradeIdeas(valuer, book, mine, rosters.filter(r => r.roster_id !== mine.roster_id), 10, tradeCtx)
   .map(t => ({ ...t, partner: userName[t.owner_id] || `Team ${t.roster_id}`,
                giveNames: t.give.map(p => book.name(p)), getNames: t.get.map(p => book.name(p)) }));
+
+const tradeMs = Date.now() - tradeT0;
+console.log(`trades: ${trades.length} in ${tradeMs} ms (review ${tradeCtx?.reviewDays ?? "?"} days)`);
 
 // ---- short reasons from the AI model (cached per suggestion) ----
 const cache = readState("reasons.json", {});
@@ -68,7 +95,7 @@ const fmtP = p => { const g = book.games[p] || [], avg = book.avg(p), pri = book
   return `${book.name(p)} (${book.team(p)}, ${book.pos(p).join("/")}, projection ${book.baseline(p).toFixed(1)} FP/G = ${g.length} games this season${avg != null ? ` at ${avg.toFixed(1)}` : ""} blended with ${pri != null ? `last season's ${pri.toFixed(1)}` : "preseason projections"}; last 3: ${g.slice(-3).map(x => x.fp).join("/") || "none"}${book.status(p) ? ", " + book.status(p) : ""})`; };
 const items = [
   ...adds.map(m => ({ key: `add|${m.pid}|${m.drop}|${today}`, text: `WAIVER: add ${fmtP(m.pid)}; drop ${fmtP(m.drop)}. Gain: +${m.weekGain} locked pts this week, +${m.rosGain} per week after (${m.gain} total over the season). ${m.experts ? `Experts: ${Math.round(m.experts.bull_share * 100)}% bullish over ${m.experts.n} calls.` : ""} Sleeper adds last 24h: ${m.trend}.` })),
-  ...trades.map(t => ({ key: `trade|${t.give.join("+")}|${t.get.join("+")}|${today}`, text: `TRADE with ${t.partner}: give ${t.give.map(fmtP).join(" + ")}; get ${t.get.map(fmtP).join(" + ")}. Our team +${t.dm.toFixed(1)}, theirs +${t.dt.toFixed(1)} locked pts per week for the rest of the season. Their lineup change: ${(t.theirFit || []).map(f => `${f.inName} takes their ${f.slot} spot from ${f.outName} (${f.gain >= 0 ? "+" : ""}${f.gain}/wk)`).join("; ") || "depth only"}. Ours: ${(t.myFit || []).map(f => `${f.inName} replaces ${f.outName} at ${f.slot} (${f.gain >= 0 ? "+" : ""}${f.gain}/wk)`).join("; ") || "depth only"}. Mention what it fixes for them.` })),
+  ...trades.map(t => ({ key: `trade|${t.give.join("+")}|${t.get.join("+")}|${today}`, text: `TRADE with ${t.partner}: give ${t.give.map(fmtP).join(" + ")}; get ${t.get.map(fmtP).join(" + ")}. Our team +${t.dm.toFixed(1)}, theirs +${t.dt.toFixed(1)} locked pts per week for the rest of the season. Their lineup change: ${(t.theirFit || []).map(f => `${f.inName} takes their ${f.slot} spot from ${f.outName} (${f.gain >= 0 ? "+" : ""}${f.gain}/wk)`).join("; ") || "depth only"}. Ours: ${(t.myFit || []).map(f => `${f.inName} replaces ${f.outName} at ${f.slot} (${f.gain >= 0 ? "+" : ""}${f.gain}/wk)`).join("; ") || "depth only"}. This week: ${t.myWeek >= 0 ? "+" : ""}${t.myWeek.toFixed(1)} expected pts for us, ${t.theirWeek >= 0 ? "+" : ""}${t.theirWeek.toFixed(1)} for them${t.theirP != null ? ` (their chance to win their matchup this week: ${Math.round(t.theirP * 100)}%)` : ""}. Mention what it fixes for them.` })),
 ].filter(x => !cache[x.key]);
 
 if (items.length && process.env.OPENROUTER_API_KEY) {
@@ -96,6 +123,12 @@ const out = {
     reason: cache[`add|${m.pid}|${m.drop}|${today}`] || null })),
   trades: trades.map(t => ({ partner: t.partner, roster_id: t.roster_id, give: t.give, get: t.get, giveNames: t.giveNames, getNames: t.getNames,
     dm: Math.round(t.dm * 10) / 10, dt: Math.round(t.dt * 10) / 10, theirFit: t.theirFit, myFit: t.myFit,
+    myWeek: Math.round(t.myWeek * 10) / 10, theirWeek: Math.round(t.theirWeek * 10) / 10,
+    winsMe: Math.round(t.winsMe * 1000) / 1000, winsThem: Math.round(t.winsThem * 1000) / 1000,
+    winsWeekMe: Math.round(t.winsWeekMe * 1000) / 1000, winsWeekThem: Math.round(t.winsWeekThem * 1000) / 1000,
+    winsRosMe: Math.round(t.winsRosMe * 1000) / 1000, winsRosThem: Math.round(t.winsRosThem * 1000) / 1000,
+    theirP: t.theirP != null ? Math.round(t.theirP * 100) / 100 : null,
+    myDrop: (t.myDrop || []).map(p => book.name(p)), thDrop: (t.thDrop || []).map(p => book.name(p)),
     marketGive: Math.round(t.marketGive), marketGet: Math.round(t.marketGet),
     uncertain: [...t.give, ...t.get].filter(p => book.avail?.players?.[p]?.uncertain).map(p => book.name(p)),
     reason: cache[`trade|${t.give.join("+")}|${t.get.join("+")}|${today}`] || null })),
@@ -130,6 +163,8 @@ void playerValue;
   const faRows = fa.map(x => row(x.pid)).sort((a, b) => b.perWeek - a.perWeek);
   const teams = rosters.map(r => ({ owner: userName[r.owner_id] || r.roster_id, n: (r.players || []).length, value: r1(valuer.team(r.players || [])) }));
   fs.writeFileSync(stateFile("value_debug.json"), JSON.stringify({ at: new Date().toISOString(), discSum: valuer.discSum, weeks: valuer.weeks.length,
+    trade: { reviewDays: tradeCtx?.reviewDays ?? null, from: tradeCtx?.from ?? null, S: tradeCtx?.S ?? null, ms: tradeMs, found: trades.length,
+      settings: Object.fromEntries(Object.entries(league.settings || {}).filter(([k]) => /trade|waiver|playoff|reserve|bench/.test(k))) },
     size: valuer.size, teams, rostered, fa: faRows.slice(0, 40) }, null, 1));
 }
 

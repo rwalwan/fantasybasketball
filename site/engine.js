@@ -847,14 +847,27 @@ export class WeekPlan {
 
   // expected locked points from the open slots for the rest of THIS week if the roster were `players`
   // (same joint assignment as build(), without the lock-bar detail). Locked/live slots stay as they are.
-  weekTotal(players) {
-    const starters = this.matchup.starters || [], have = new Set(players);
+  // Expected points the open slots still add this week with this roster (locked/live slots are constant and left out).
+  // For trades (Sleeper: "You can only earn points for games after the trade. Previous points stay with the original
+  // team"): a locked slot stays locked whoever holds the player now; opts.from = the date the trade goes through (null =
+  // now): players coming in count only games from then on, opts.outgoing = players leaving, who count only games
+  // before then. A starter leaving with a score in hand can be locked first and then traded, so his slot keeps it.
+  weekTotal(players, { from = null, outgoing = [] } = {}) {
+    const starters = this.matchup.starters || [], have = new Set(players), mine = new Set(this.roster.players || []);
+    const out = new Set(outgoing.filter(p => !have.has(p)));
     this._ls ||= {}; this._W ||= {};
     const ls = p => (this._ls[p] ||= this.lockState(p));
-    const fixed = new Set(starters.filter(p => have.has(p) && ["locked", "live"].includes(ls(p).st)));
+    const fixed = new Set(starters.filter(p => p && p !== "0" && (ls(p).st === "locked" || ((have.has(p) || out.has(p)) && ls(p).st === "live"))));
     const open = this.slots.map((s, i) => ({ s, i, p: starters[i] })).filter(x => !fixed.has(x.p));
-    const pool = players.filter(p => !fixed.has(p) && !(this.roster.reserve || []).includes(p));
-    const W = p => (this._W[p] ??= contValues(this.Q, this.upcoming(p))[0] || 0);
+    const reserve = new Set(this.roster.reserve || []);
+    const pool = players.filter(p => !fixed.has(p) && !reserve.has(p)).concat([...out].filter(p => !fixed.has(p)));
+    const kind = p => (out.has(p) ? "out" : from && !mine.has(p) ? "in" : "all");
+    const W = p => {
+      const k = kind(p), key = `${p}|${k}|${from}`;
+      if (this._W[key] != null) return this._W[key];
+      const u = this.upcoming(p).filter(g => k === "all" || (k === "in" ? g.date >= from : from != null && g.date < from));
+      return (this._W[key] = u.length ? contValues(this.Q, u)[0] || 0 : 0);
+    };
     const m = open.map(x => pool.map(p => {
       if (!fits(x.s, this.b.pos(p))) return null;
       const st = p === x.p ? ls(p).st : null;
@@ -1025,33 +1038,92 @@ export function irMoves(wp, valuer, mine, rosterPositions, protect = new Set()) 
 }
 export const teamValue = (valuer, players) => valuer.team(players);
 
-export function tradeIdeas(valuer, book, mine, others, limit = 15) {
+// ---- trades, valued in expected wins -----------------------------------------------------------------------------
+// One point of ONE week's score is worth WINS_PER_SCORE / S wins, S = a typical team's weekly score. Measured (Nov 15):
+// final margins of 1,155 Lock-In matchups in 72 other leagues (weeks 1-3) have density 2.2 at a tie per unit of a
+// team's weekly score, i.e. 0.022 wins per 1% of S (0.020-0.024 across band widths 2-6%). This puts this week's win
+// chance and points per week for the rest of the season in one unit.
+export const WINS_PER_SCORE = 2.2;
+const PhiN = z => 0.5 * (1 + Math.tanh(0.7978845608 * (z + 0.044715 * z ** 3)));
+
+// ctx (optional; without it, trades are judged on the rest of the season only):
+//   ctx.weekOf[roster_id] = { wp, mean, var, opp }   each team's WeekPlan, its outlook, and its opponent's roster_id
+//   ctx.from = date the trade would go through (league trade review period; null = right away)
+//   ctx.S = typical weekly team score (league units)
+// A deal is offered when it adds wins for us (this week + rest of season) and doesn't cost the partner wins by the
+// same model, and he gets back at least ~90% of the market value he gives (names/market drive acceptance).
+export function tradeIdeas(valuer, book, mine, others, limit = 15, ctx = null) {
   if (valuer.week > valuer.deadline) return [];             // past the league's trade deadline
   const T = ps => ps.reduce((a, p) => a + valuer.tradeValue(p), 0);
+  const S = ctx?.S || 500, wpp = WINS_PER_SCORE / S, ros = d => d * valuer.discSum * wpp;
   const myB = valuer.team(mine.players, true), ideas = [];
+  const wk = ctx?.weekOf || {}, me = wk[mine.roster_id];
+  const base = {};                                           // this week's expected total of the open slots, per team
+  const wt = (rid, players, outgoing) => {
+    const t = wk[rid]; if (!t) return 0;
+    return t.wp.weekTotal(players, { from: ctx.from, outgoing });
+  };
+  const pWin = (rid, dSelf = 0, dOpp = 0) => {               // win chance this week after a change in expected points
+    const t = wk[rid], o = t && wk[t.opp]; if (!t || !o) return null;
+    return PhiN((t.mean + dSelf - o.mean - dOpp) / Math.sqrt(t.var + o.var + 1));
+  };
+  for (const r of [mine, ...others]) if (wk[r.roster_id]) base[r.roster_id] = wt(r.roster_id, r.players, []);
+  // pools for 2- and 3-player sides: the 10 players on each side worth most to a trade (market value), plus anyone
+  // with games left this week whose value is mostly this week
+  const pool = (ps, n = 10) => [...ps].sort((a, b) => valuer.tradeValue(b) - valuer.tradeValue(a)).slice(0, n);
+  const combos = (ps, k) => k === 1 ? ps.map(p => [p]) : ps.flatMap((p, i) => combos(ps.slice(i + 1), k - 1).map(c => [p, ...c]));
+  const mp = mine.players;
+  const fitRoster = (roster, reserve = [], keep = []) => {
+    const ir = new Set(reserve || []), k = new Set(keep), dropped = [];
+    let out = roster;
+    while (out.filter(p => !ir.has(p)).length > valuer.size) {
+      const d = out.filter(p => !ir.has(p) && !k.has(p)).sort((a, b) => valuer.ros(a) - valuer.ros(b))[0];
+      if (!d) break;
+      out = out.filter(p => p !== d); dropped.push(d);
+    }
+    return { roster: out, dropped };
+  };
   for (const r of others) {
-    const tb = valuer.team(r.players, true), mp = mine.players, tp = r.players;
-    const tryDeal = (give, get) => {
-      // realism: by market value (above replacement, stars convex) they must get back at least ~90% of what they give
-      const tg = T(give), tt = T(get);
-      if (tg < 0.9 * tt || tt === 0) return;
-      const dm = valuer.team(swapIn(mp, give, get), true) - myB;
-      if (dm <= 0.5) return;
-      const dt = valuer.team(swapIn(tp, get, give), true) - tb;
-      if (dt >= 0) ideas.push({ give, get, dm, dt, marketGive: tg, marketGet: tt, roster_id: r.roster_id, owner_id: r.owner_id, tp });
-    };
-    for (const a of mp) for (const b of tp) tryDeal([a], [b]);
-    for (let i = 0; i < mp.length; i++) for (let j = i + 1; j < mp.length; j++) for (const b of tp) tryDeal([mp[i], mp[j]], [b]);
-    for (const a of mp) for (let i = 0; i < tp.length; i++) for (let j = i + 1; j < tp.length; j++) tryDeal([a], [tp[i], tp[j]]);
+    const tp = r.players, tb = valuer.team(tp, true), partner = r.roster_id;
+    const myP = pool(mp), thP = pool(tp);
+    const sides = (all, top) => [1, 2, 3].flatMap(k => combos(k === 1 ? all : top, k));
+    const G = sides(mp, myP), R = sides(tp, thP);
+    const TG = new Map(G.map(g => [g.join(), T(g)])), TR = new Map(R.map(g => [g.join(), T(g)]));
+    for (const give of G) for (const get of R) {
+      if (give.length + get.length > 5) continue;           // 3-for-3 is rarely accepted and slow to search
+      // market realism first (cheap): they must get back >= 90% of what they give
+      const tg = TG.get(give.join()), tt = TR.get(get.join());
+      if (tt === 0 || tg < 0.9 * tt) continue;
+      // a team that ends up over the roster limit drops its least valuable player (not one it just received)
+      const { roster: myNew, dropped: myDrop } = fitRoster(swapIn(mp, give, get), mine.reserve, get);
+      const { roster: thNew, dropped: thDrop } = fitRoster(swapIn(tp, get, give), r.reserve, give);
+      const dm = valuer.team(myNew, true) - myB;
+      // this week: expected points the open slots gain or lose, as a change in win chance
+      let wMe = 0, wThem = 0, myWeek = 0, theirWeek = 0;
+      if (me && wk[partner]) {
+        myWeek = wt(mine.roster_id, myNew, give) - base[mine.roster_id];
+        theirWeek = wt(partner, thNew, get) - base[partner];
+        const p0 = pWin(mine.roster_id), q0 = pWin(partner);
+        const vsMe = me.opp === partner;                     // trading with this week's opponent: one change moves both
+        if (p0 != null) wMe = pWin(mine.roster_id, myWeek, vsMe ? theirWeek : 0) - p0;
+        if (q0 != null) wThem = pWin(partner, theirWeek, vsMe ? myWeek : 0) - q0;
+      }
+      const winsMe = ros(dm) + wMe;
+      if (winsMe < 0.035) continue;                          // ~0.5 pts/week for the rest of the season: below that it's noise
+      const dt = valuer.team(thNew, true) - tb, winsThem = ros(dt) + wThem;
+      if (winsThem < 0) continue;
+      ideas.push({ give, get, myDrop, thDrop, dm, dt, myWeek, theirWeek, winsMe, winsThem, winsWeekMe: wMe, winsWeekThem: wThem,
+        winsRosMe: ros(dm), winsRosThem: ros(dt), marketGive: tg, marketGet: tt, roster_id: partner, owner_id: r.owner_id, tp,
+        theirP: pWin(partner) });
+    }
   }
-  // best for us, but only deals that are close to fair for them rank high (lopsided offers just get declined)
-  ideas.sort((x, y) => (y.dm + 0.5 * y.dt) - (x.dm + 0.5 * x.dt));
-  const per = {}, team = {}, out = [];
+  // best for us, but deals that also help them rank higher (lopsided offers just get declined)
+  ideas.sort((x, y) => (y.winsMe + 0.5 * y.winsThem) - (x.winsMe + 0.5 * x.winsThem));
+  const per = {}, team = {}, shape = {}, out = [];
   for (const x of ideas) {
-    const k = x.get.join();
-    if ((per[k] || 0) >= 2 || (team[x.roster_id] || 0) >= 3) continue;      // variety: targets and partners
-    per[k] = (per[k] || 0) + 1; team[x.roster_id] = (team[x.roster_id] || 0) + 1;
-    // fit: which of THEIR lineup spots the players they receive take over (who they replace, per-week gain)
+    const k = x.get.join(), sh = `${x.roster_id}|${x.give.length}x${x.get.length}`;
+    if ((per[k] || 0) >= 2 || (team[x.roster_id] || 0) >= 3 || (shape[sh] || 0) >= 1) continue;   // variety
+    per[k] = (per[k] || 0) + 1; team[x.roster_id] = (team[x.roster_id] || 0) + 1; shape[sh] = 1;
     x.theirFit = valuer.fit(x.tp, swapIn(x.tp, x.get, x.give)).map(f => ({ ...f, inName: book.name(f.in), outName: f.out ? book.name(f.out) : "a waiver pickup" }));
     x.myFit = valuer.fit(mine.players, swapIn(mine.players, x.give, x.get)).map(f => ({ ...f, inName: book.name(f.in), outName: f.out ? book.name(f.out) : "a waiver pickup" }));
     delete x.tp; out.push(x);

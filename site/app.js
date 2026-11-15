@@ -1,4 +1,4 @@
-import { Book, WeekPlan, Valuer, eligFromSnaps, mergeSnaps, mergeMatchups, irMoves, studyBarScale, usesFaab, waiverMoves, weekDays, teamGames, fits, range80 } from "./engine.js";
+import { Book, WeekPlan, Valuer, WINS_PER_SCORE, eligFromSnaps, mergeSnaps, mergeMatchups, irMoves, studyBarScale, usesFaab, waiverMoves, weekDays, teamGames, fits, range80 } from "./engine.js";
 
 // ---- config -----------------------------------------------------------------------------------
 const LEAGUE = "1400915575915491328", USER = "1388708038000533504";
@@ -247,6 +247,20 @@ function render() {
 }
 
 // ---- trade assistant ------------------------------------------------------------------------------
+// trades are judged in expected wins: this week's win chance + points per week for the rest of the season, converted
+// at WINS_PER_SCORE / (typical weekly score) wins per point per week (measured on 1,155 Lock-In matchups)
+const pct = v => `${v >= 0 ? "+" : ""}${Math.round(v * 1000) / 10}%`;
+const wins = v => `${v >= 0 ? "+" : ""}${(Math.round(v * 100) / 100).toFixed(2)}`;
+function tradeLines(x) {
+  const wk = x.winsWeekMe != null && (Math.abs(x.myWeek) >= 0.5 || Math.abs(x.winsWeekMe) >= 0.005)
+    ? `This week: ${x.myWeek >= 0 ? "+" : ""}${r1(x.myWeek)} expected pts for you (win chance ${pct(x.winsWeekMe)}). ` : "";
+  const ros = `Rest of season: ${x.dm >= 0 ? "+" : ""}${r1(x.dm)}/week (${wins(x.winsRosMe)} wins).`;
+  const them = x.theirP != null ? ` Them: ${x.dt >= 0 ? "+" : ""}${r1(x.dt)}/week after this week` +
+    (Math.abs(x.theirWeek) >= 0.5 ? `, ${x.theirWeek >= 0 ? "+" : ""}${r1(x.theirWeek)} pts this week with a ${Math.round(x.theirP * 100)}% chance to win it (${pct(x.winsWeekThem)})` : "") + "." : "";
+  const drops = (x.myDrop || []).length || (x.thDrop || []).length
+    ? ` Roster spots: ${[(x.myDrop || []).length ? `you drop ${x.myDrop.map(esc).join(", ")}` : "", (x.thDrop || []).length ? `they drop ${x.thDrop.map(esc).join(", ")}` : ""].filter(Boolean).join("; ")}.` : "";
+  return wk + ros + them + drops;
+}
 let tradeSel = { give: new Set(), get: new Set(), partner: null };
 function renderTrades(c) {
   const { book, mine, valuer } = c;
@@ -269,15 +283,30 @@ function renderTrades(c) {
     const dm = myA - myB, dt = thA - thB;
     const T = set => [...set].reduce((a, p) => a + valuer.tradeValue(p), 0), mg = T(tradeSel.give), mt = T(tradeSel.get);
     const fair = mt === 0 ? 1 : mg / mt;
+    // this week for you: expected points of the open slots with the new roster (locked slots stay yours; incoming
+    // players count only games after the league's trade review period), as a change in win chance
+    const rd = +(base.league.settings?.trade_review_days || 0);
+    const from = rd > 0 ? new Date(Date.parse(etToday() + "T12:00:00Z") + rd * 864e5).toISOString().slice(0, 10) : null;
+    const myNew = swap(mine.players, tradeSel.give, tradeSel.get);
+    const wkD = c.wp.weekTotal(myNew, { from, outgoing: [...tradeSel.give] }) - c.wp.weekTotal(mine.players);
+    const o = c.basePlan.outlook, Phi = z => 0.5 * (1 + Math.tanh(0.7978845608 * (z + 0.044715 * z ** 3)));
+    const sd = Math.sqrt(o.var + (o.opp?.var || 0) + 1), om = o.opp?.mean;
+    const vsOpp = c.opp && them.roster_id === c.opp.roster_id;
+    const wkP = om != null ? Phi((o.mean + wkD - om) / sd) - Phi((o.mean - om) / sd) : null;
+    const S = (vals => vals[Math.floor(vals.length / 2)])(live.rosters.map(r => valuer.team(r.players || [])).sort((a, b) => a - b));
+    const rosW = dm * valuer.discSum * WINS_PER_SCORE / S;
+    $("verdict2").innerHTML = `This week: <b class="${wkD >= 0 ? "good" : "bad"}">${wkD >= 0 ? "+" : ""}${r1(wkD)}</b> expected pts for you` +
+      (wkP != null ? ` (win chance ${pct(wkP)}${vsOpp ? "; they're your opponent this week, so their side moves too, not counted here" : ""})` : "") +
+      `${rd ? ` · trades take ${rd} day${rd > 1 ? "s" : ""} to go through in your league` : ""}. Total: <b>${wins(rosW + (wkP || 0))}</b> expected wins (${wins(rosW)} rest of season).`;
     $("verdict").innerHTML = `Your team: <b class="${dm >= 0 ? "good" : "bad"}">${dm >= 0 ? "+" : ""}${r1(dm)}</b> locked pts per week, rest of season · theirs: <b class="${dt >= 0 ? "good" : "bad"}">${dt >= 0 ? "+" : ""}${r1(dt)}</b>. ` +
       (dm > 0 && dt >= 0 ? "Helps both of you." : dm > 0 ? "Good for you, but it makes their lineup worse." : "This makes your team worse.") +
       ` Market value (above waiver level, stars weighted up): you give ${r1(mg)}, you get ${r1(mt)}` +
       (fair < 0.9 ? " — <b class=\"bad\">lopsided, they'll likely decline</b>." : fair > 1.3 ? " — you're overpaying." : " — fair.");
-  } else $("verdict").textContent = "";
+  } else { $("verdict").textContent = ""; $("verdict2").textContent = ""; }
   const sug = live.moves?.trades || [];
-  $("ideas").innerHTML = `<tr><th>With</th><th>You give</th><th>You get</th><th>You</th><th>Them</th><th></th></tr>` +
-    sug.map((x, i) => `<tr><td>${esc(x.partner)}</td><td>${x.giveNames.map(esc).join(" + ")}</td><td>${x.getNames.map(esc).join(" + ")}</td><td class="n good">+${r1(x.dm)}</td><td class="n">+${r1(x.dt)}</td><td><button data-loadtrade="${i}">Load</button></td></tr>`).join("") ||
-    `<tr><td colspan="6" class="pos">No trades found that help both sides right now.</td></tr>`;
+  $("ideas").innerHTML = `<tr><th>With</th><th>You give</th><th>You get</th><th title="expected wins: this week's win chance + rest of season">You (wins)</th><th>This week</th><th>Them (wins)</th><th></th></tr>` +
+    sug.map((x, i) => `<tr><td>${esc(x.partner)}</td><td>${x.giveNames.map(esc).join(" + ")}</td><td>${x.getNames.map(esc).join(" + ")}</td><td class="n good">${x.winsMe != null ? wins(x.winsMe) : "+" + r1(x.dm)}</td><td class="n">${x.winsWeekMe != null ? pct(x.winsWeekMe) : ""}</td><td class="n">${x.winsThem != null ? wins(x.winsThem) : "+" + r1(x.dt)}</td><td><button data-loadtrade="${i}">Load</button></td></tr>`).join("") ||
+    `<tr><td colspan="7" class="pos">No trades found that help both sides right now.</td></tr>`;
 }
 
 function renderIR(ir) {
@@ -301,8 +330,9 @@ function renderMoves() {
       `<p>Drop <b>${esc(x.dropName)}</b>. ${x.weekGain != null ? `+${r1(x.weekGain)} locked pts this week, ${x.rosGain >= 0 ? "+" : ""}${r1(x.rosGain)}/week after` : `Team +${r1(x.gain)}`} · ${r1(x.fpg)} FP/G · ${x.left} games left this week${x.experts ? ` · ${Math.round(x.experts.bull_share * 100)}% of experts say add` : ""}${x.trend ? ` · ${x.trend.toLocaleString()} adds in 24h` : ""}</p>` +
       ((x.uncertain || []).length ? `<p class="bad">Value uncertain: ${x.uncertain.map(esc).join(", ")} ${x.uncertain.length > 1 ? "are" : "is"} out long-term with no reported return timeline.</p>` : "") + (x.reason ? `<p><i>${esc(x.reason)}</i></p>` : "") + `</div>`).join("")
     : `<div class="box"><div class="row"><span class="pos">No add/drop improves your team right now.</span></div></div>`;
-  $("trades2").innerHTML = (m.trades || []).length ? m.trades.map((x, i) => `<div class="slot start"><div class="top"><span class="nm">${esc(x.partner)}</span><span class="tag">+${r1(x.dm)} you / +${r1(x.dt)} them</span></div>` +
+  $("trades2").innerHTML = (m.trades || []).length ? m.trades.map((x, i) => `<div class="slot start"><div class="top"><span class="nm">${esc(x.partner)}</span><span class="tag">${x.winsMe != null ? `${wins(x.winsMe)} wins you / ${wins(x.winsThem)} them` : `+${r1(x.dm)} you / +${r1(x.dt)} them`}</span></div>` +
       `<p>Give <b>${x.giveNames.map(esc).join(" + ")}</b>, get <b>${x.getNames.map(esc).join(" + ")}</b></p>` +
+      (x.winsMe != null ? `<p>${tradeLines(x)}</p>` : "") +
       ((x.theirFit || []).length ? `<p class="pos">For them: ${x.theirFit.map(f => `${esc(f.inName)} takes their ${esc(f.slot)} spot from ${esc(f.outName)} (${f.gain >= 0 ? "+" : ""}${r1(f.gain)}/wk)`).join("; ")}</p>` : "") +
       ((x.myFit || []).length ? `<p class="pos">For you: ${x.myFit.map(f => `${esc(f.inName)} replaces ${esc(f.outName)} at ${esc(f.slot)} (${f.gain >= 0 ? "+" : ""}${r1(f.gain)}/wk)`).join("; ")}</p>` : "") + ((x.uncertain || []).length ? `<p class="bad">Value uncertain: ${x.uncertain.map(esc).join(", ")} ${x.uncertain.length > 1 ? "are" : "is"} out long-term with no reported return timeline.</p>` : "") + (x.reason ? `<p><i>${esc(x.reason)}</i></p>` : "") +
       `<div class="acts"><button data-loadtrade="${i}">Open in trade builder</button></div></div>`).join("")
