@@ -1,4 +1,4 @@
-import { Book, WeekPlan, Valuer, eligFromSnaps, mergeMatchups, irMoves, studyBarScale, usesFaab, waiverMoves, weekDays, teamGames, fits, range80 } from "./engine.js";
+import { Book, WeekPlan, Valuer, eligFromSnaps, mergeSnaps, mergeMatchups, irMoves, studyBarScale, usesFaab, waiverMoves, weekDays, teamGames, fits, range80 } from "./engine.js";
 
 // ---- config -----------------------------------------------------------------------------------
 const LEAGUE = "1400915575915491328", USER = "1388708038000533504";
@@ -86,7 +86,7 @@ async function loadLive() {
     get(`static/health.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({})),
     get(`static/winprob.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => null)]);
   // backend (minute-level lineup records, shared answers) wins over the 15-minute GitHub state branch
-  const snaps = { ...snapsGh, ...(backend.lineups || {}) };
+  const snaps = mergeSnaps(snapsGh, backend.lineups);
   const overrides = { ...overridesGh, ...(backend.elig || {}) };
   const locks = { ...locksGh, ...(backend.locks || {}) };
   base.schedule = schedule;

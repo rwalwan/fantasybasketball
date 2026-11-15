@@ -4,7 +4,7 @@
 // written once (OpenRouter key stays server-side; never shipped to the browser).
 import { stageOf, calibration } from "./winprob.mjs";
 import fs from "node:fs";
-import { Book, WeekPlan, Valuer, eligFromSnaps, mergeMatchups, irMoves, studyBarScale, selectAdds, weekDays, tradeIdeas, waiverMoves, playerValue } from "../site/engine.js";
+import { Book, WeekPlan, Valuer, eligFromSnaps, mergeSnaps, mergeMatchups, irMoves, studyBarScale, selectAdds, weekDays, tradeIdeas, waiverMoves, playerValue } from "../site/engine.js";
 
 const LEAGUE = "1400915575915491328", USER = "1388708038000533504";
 const S1 = "https://api.sleeper.app/v1", S2 = "https://api.sleeper.com";
@@ -30,7 +30,7 @@ const userName = Object.fromEntries(users.map(u => [u.user_id, u.display_name]))
 const backend = process.env.WORKER_URL ? await get(`${process.env.WORKER_URL}/state?season=${season}&week=${week}`).catch(() => ({})) : {};
 const locks = { ...readState(`locks_w${week}.json`, {}), ...(backend.locks || {}) };
 const ov = { ...readState("eligibility_overrides.json", {}), ...(backend.elig || {}) };
-const snaps = { ...readState(`lineups_${season}_w${week}.json`, {}), ...(backend.lineups || {}) };
+const snaps = mergeSnaps(readState(`lineups_${season}_w${week}.json`, {}), backend.lineups);
 const tipsRaw = st("tips");
 
 const ctxMap = (() => { try { return st("context"); } catch { return {}; } })();

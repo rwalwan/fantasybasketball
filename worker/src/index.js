@@ -67,6 +67,13 @@ async function snapshot(env) {
     const slot = slotOf[pid] ?? null, i = idxOf[pid] ?? null;   // i: which slot (names repeat); a game locks only there
     if (!cur || cur.slot !== slot || (cur.i ?? null) !== i) { snaps[k] = { slot, i, seen: stamp, frozen: false }; changed = true; }
   }
+  // a game is lockable only in the slot he played it in, and moving him out loses it for good (even if moved back):
+  // mark every frozen record of this week whose player is no longer in that slot
+  for (const [k, rec] of Object.entries(snaps)) {
+    if (!rec.frozen || rec.slot == null || rec.left) continue;
+    const pid = k.split("|")[1];
+    if (rec.i != null ? (idxOf[pid] ?? null) !== rec.i : (slotOf[pid] ?? null) !== rec.slot) { rec.left = true; changed = true; }
+  }
   // KV free plan = 1,000 writes/day. Only write when a lineup actually changes (~10-40 writes on a game day).
   if (changed) await env.KV.put(key, JSON.stringify(snaps));
   return { date, changed };

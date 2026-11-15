@@ -252,9 +252,16 @@ export function studyBarScale(study) {
 }
 // Lineup records -> was a game lockable? A record is final once frozen at tip (or once the game has tipped, when the
 // caller passes tipped(pid, date)). Lock-In only lets a game be locked in the slot he played it in, so the record's
-// slot (and, since Nov 15, its slot index) is returned too: eligFromSnaps(...).slot(pid, date) -> {slot, i} | null.
+// slot (and, since Nov 15, its slot index) is returned too: eligFromSnaps(...).slot(pid, date) -> {slot, i, left} | null.
 // No record for a date the tracker covered = he wasn't on the roster that day (Nov 15: Neemias Queta's 52 from before
 // he was picked up was offered as a lock): not lockable. No record on a date before tracking: unknown (null).
+// Merge two lineup-record sets (the job's and the Worker's minute-level one): the second wins, but "left" (he was moved
+// out of that slot after the game) sticks if either saw it.
+export function mergeSnaps(a = {}, b = {}) {
+  const out = { ...a };
+  for (const [k, v] of Object.entries(b || {})) out[k] = (a[k]?.left || v?.left) ? { ...a[k], ...v, left: true } : { ...a[k], ...v };
+  return out;
+}
 export function eligFromSnaps(snaps, overrides = {}, tipped = null) {
   const days = new Set(Object.keys(snaps || {}).map(k => k.split("|")[0]));
   const final = (s, pid, date) => s && (s.frozen || (tipped ? tipped(pid, date) : false));
@@ -268,7 +275,7 @@ export function eligFromSnaps(snaps, overrides = {}, tipped = null) {
   f.slot = (pid, date) => {
     const k = `${date}|${pid}`, s = snaps?.[k];
     if (k in overrides || !final(s, pid, date) || s.slot == null) return null;
-    return { slot: s.slot, i: s.i ?? null };
+    return { slot: s.slot, i: s.i ?? null, left: !!s.left };
   };
   return f;
 }
@@ -419,7 +426,9 @@ export class WeekPlan {
     const e = this.elig(p, last.date);
     if (e === false) return { st: "bench", g: last };
     const at = this.elig.slot?.(p, last.date), i = (this.matchup.starters || []).indexOf(p);
-    if (e === true && at && i >= 0 && (at.i != null ? at.i !== i : at.slot !== this.slots[i]))
+    // Moving him out of that slot after the game loses it for good, even if he's moved back (Nov 15): "left" is set by
+    // the lineup trackers once his slot changes after the game.
+    if (e === true && at && i >= 0 && (at.left || (at.i != null ? at.i !== i : at.slot !== this.slots[i])))
       return { st: "moved", g: last, from: at.slot };
     return { st: e === true ? "open" : "confirm", g: last };
   }

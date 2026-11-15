@@ -53,3 +53,12 @@ assert.equal(mk(["O", "Q", "X"], log, pts, snapsQ, { [`${wed}|Q`]: true }).lockS
 // a date the tracker never covered is unknown, not "off the roster"
 assert.equal(eligFromSnaps({})("O", wed), null);
 console.log("ok: nov 15 slot locks");
+
+// Moving him out of the slot after the game loses it for good, even if he's moved back (Sleeper doesn't allow it)
+import { mergeSnaps } from "../site/engine.js";
+const leftSnaps = { [`${wed}|O`]: { slot: "UTIL", i: 1, frozen: true, left: true }, [`${wed}|Q`]: { slot: "C", i: 0, frozen: true } };
+assert.equal(mk(["Q", "O", "X"], log, pts, leftSnaps).lockState("O").st, "moved");     // back in UTIL index 1: still gone
+// the Worker's record (no "left") doesn't erase the job's "left"
+const m = mergeSnaps(leftSnaps, { [`${wed}|O`]: { slot: "UTIL", i: 1, frozen: true } });
+assert.equal(m[`${wed}|O`].left, true);
+console.log("ok: nov 15 moved-and-back");
