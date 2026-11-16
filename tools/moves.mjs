@@ -153,6 +153,15 @@ fs.writeFileSync(stateFile("plan_debug.json"), JSON.stringify({ at: new Date().t
   raw_rosters: { me: mine, opp: oppRoster || null },
   // Nov 16: the Sleeper app reads locks ("matchup picks") from api.sleeper.app/matchup_picks/...; which of these answer
   // without a login?
+  // Nov 16: the app's own GraphQL call (get_matchup_legs) has starters_games = each starter's LOCKED game, all teams.
+  // Does it answer without a login?
+  legs_probe: await (async () => { try {
+    const q = "query get_matchup_legs($leagueId: String!, $round: Int!) { matchup_legs(league_id: $leagueId, round: $round) { league_id leg matchup_id roster_id round starters starters_games points } }";
+    const r = await fetch("https://api.sleeper.app/graphql", { method: "POST", headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({ operationName: "get_matchup_legs", query: q, variables: { leagueId: LEAGUE, round: week - 1 } }) });
+    const t = await r.text();
+    return { status: r.status, len: t.length, head: t.slice(0, 600) };
+  } catch (e) { return { err: String(e) }; } })(),
   picks_probe: await (async () => {
     const urls = [`https://api.sleeper.app/matchup_picks/nba/regular/${season}/${week - 1}/counts`,
       `https://api.sleeper.app/matchup_picks/nba/regular/${season}/${week}/counts`,
