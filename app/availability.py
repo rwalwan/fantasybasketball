@@ -17,6 +17,8 @@ so the designation and hazard numbers can be checked against this league's own p
 import datetime as dt
 import json
 import os
+import re
+from zoneinfo import ZoneInfo
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 STATE = os.path.join(ROOT, "data", "state")
@@ -54,9 +56,48 @@ def _load(name, dflt):
         return dflt
 
 
+ET = ZoneInfo("America/New_York")
+DAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
+NOT_OUT = {"available", "probable", "questionable", "doubtful"}
+
+
+def news_out(items, pid, team, dates, played):
+    """(dates he's reported out for, report) from the latest single-game 'out' news ('Queta (rest) won't play in
+    Monday's game'), or (set(), None). Sleeper's label can lag the team's report by hours (Nov 16: Queta still GTD
+    at 58% two hours after the Celtics ruled him out). Only reports of 1-3 games count (longer ones are timelines);
+    a newer available/probable/questionable/doubtful report cancels it. The games are the ones the report names by
+    weekday, else the team's next ones from the report's (Eastern) date; with no weekday and a game he played on or
+    after that date, the report is ambiguous and ignored."""
+    rep = None
+    for n in sorted((n for n in items if n.get("pid") == pid), key=lambda n: n.get("at", "")):
+        if n.get("team") and team and n["team"] != team:
+            continue
+        g = n.get("games_out_estimate")
+        if n.get("status") == "out" and isinstance(g, int) and 1 <= g <= 3:
+            rep = n
+        elif n.get("status") in NOT_OUT:
+            rep = None
+    if not rep:
+        return set(), None
+    d0 = dt.datetime.fromisoformat(rep["at"]).astimezone(ET).date()
+    words = re.findall(r"(?i)\b(" + "|".join(DAYS) + r")\b", f"{rep.get('title', '')} {rep.get('text', '')}")
+    later = [d for d in dates if d >= d0.isoformat()]
+    if words:
+        wd = DAYS.index(words[0].lower())
+        later = [d for d in later if (dt.date.fromisoformat(d) - d0).days <= 6]
+        first = next((i for i, d in enumerate(later) if dt.date.fromisoformat(d).weekday() == wd), None)
+        if first is None:
+            return set(), None
+        later = later[first:]
+    elif any(d >= d0.isoformat() for d in played):
+        return set(), None
+    return set(later[:rep["games_out_estimate"]]), rep
+
+
 def build(book, meta, team_dates, today, is_final, pids):
     """{pid: {status, missed, timeline, basis, q: {date: prob}}} for injured players among `pids`."""
     timelines = _load("timelines.json", {})
+    news = _load("news.json", [])
     out = {}
     for pid in pids:
         m = meta.get(pid) or {}
@@ -72,9 +113,11 @@ def build(book, meta, team_dates, today, is_final, pids):
         # Markkanen's GTD 48% had become 94% from a day-to-day report)
         if tl and st in DESIG and tl.get("out_max_days") is not None and tl["out_max_days"] <= 3:
             tl = None
-        if st not in INJ and not tl:
-            continue
         dates = sorted(team_dates.get(team, {}))
+        forced, rep = news_out(news, pid, team, dates, played)
+        forced = {d for d in forced if d >= today and not is_final(d, team)}
+        if st not in INJ and not tl and not forced:
+            continue
         past = [d for d in dates if d < today and is_final(d, team)]
         last = played[-1] if played else None
         missed = len([d for d in past if last is None or d > last])
@@ -115,7 +158,14 @@ def build(book, meta, team_dates, today, is_final, pids):
             basis = f"reported timeline ({tl.get('source')}, {tl['at'][:10]}): {tl.get('summary') or ''}".strip()
         else:
             S, k = 1.0, missed
+            rest = rep is not None and (rep.get("kind") != "injury" or "rest" in f"{rep.get('title')} {rep.get('text')}".lower())
             for j, d in enumerate(upcoming):
+                if d in forced:
+                    q[d], S, k = 0.0, 1.0, max(k, 0) + 1
+                    continue
+                if rest and any(f < d for f in forced):                          # sat for rest: back at the healthy rate after it
+                    q[d] = round(healthy_at(j + 1), 3)
+                    continue
                 if j == 0 and st in DESIG:
                     # still carrying the label on game day is a different (higher) rate than the label a day or more
                     # ahead: review 3, finding 2
@@ -133,6 +183,11 @@ def build(book, meta, team_dates, today, is_final, pids):
                 k += 1
             basis = (f"{st}: next game {round(M['designation'].get(DESIG.get(st, ''), 0) * 100) if st in DESIG else 0}% by designation, "
                      f"then the historical return rate after {missed} missed game(s)") if st in DESIG or st in OUTISH else None
+        if forced:
+            for d in forced:
+                q[d] = 0.0
+            basis = (f"ruled out for {', '.join(sorted(forced))} ({rep.get('source')}, {rep['at'][:16]}): "
+                     f"{rep.get('summary') or rep.get('title')}" + (f"; then {basis}" if basis and not tl else (f"; {basis}" if basis else "")))
         if q:
             # long absence, no reported timeline: the return curve is a population average, so say so on cards
             uncertain = st in OUTISH and not tl and missed >= 13
