@@ -42,7 +42,7 @@ const mine = rosters.find(r => r.owner_id === USER), my = matchups.find(m => m.r
 const slots = league.roster_positions.filter(s => s !== "BN" && s !== "IR");
 // Sleeper's own lock record for every team (backend, with Ryan's login); null = not available -> fall back
 const SL = backend.sleeperLocks || null, slFor = rid => sleeperLocksFor(SL, rid);
-console.log(`sleeper locks: ${SL ? SL.status : "none"}`);
+console.log(`sleeper locks: ${SL ? SL.status : "none"} ${JSON.stringify(SL)?.slice(0, 400)}`);
 if (SL?.status === "ok" && SL.teams) fs.writeFileSync(stateFile(`sleeper_locks_${season}_w${week}.json`), JSON.stringify(SL, null, 1));
 const wp = new WeekPlan({ Q: st("quantiles"), book, schedule, week, today, rosterPositions: league.roster_positions,
   roster: mine, matchup: my, rosters, tips: tipsRaw, locks,
