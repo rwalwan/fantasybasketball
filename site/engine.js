@@ -399,13 +399,20 @@ export class WeekPlan {
       return { st: "locked", g: g || null };
     }
     const lv = this.livePlayed(p);
-    if (lv.length) return { st: "live", g: lv.at(-1) };
     // tipped but no stat line yet (Sleeper's first box score row lags the tip by a few minutes): still live, 0 so far.
     // Without this, a game in its first minutes vanished and the slot looked like it had nothing left.
     const t = this.b.team(p), done = new Set((this.b.games[p] || []).map(g => g.date));
     const fresh = this.teamDays(t).find(d => this.tipped(p, d) && !this.final(p, d) && !done.has(d));
-    if (fresh && !OUT.has(this.b.status(p)) && this.elig(p, fresh) !== false) return { st: "live", g: { date: fresh, fp: 0, min: 0, gid: null } };
+    const liveG = lv.length ? lv.at(-1) : fresh && !OUT.has(this.b.status(p)) && this.elig(p, fresh) !== false ? { date: fresh, fp: 0, min: 0, gid: null } : null;
     const raw = this.slotPoints(p);
+    // Playing now, but his slot still shows a finished game's score and not the live one: that game is locked (an unlocked
+    // slot shows the live points). Nov 15: the opponent's Anthony Davis (79.5 locked, live 27), Alexander-Walker (46)
+    // and Jalen Johnson (75.5) were counted at their live games, which put his projected final below his score.
+    if (liveG && raw && this.locks[p] !== false) {
+      const pts = Math.round(raw) / 10, hit = Math.abs(pts - liveG.fp) >= 0.01 && pl.filter(g => Math.abs(g.fp - pts) < 0.01).at(-1);
+      if (hit) return { st: "locked", g: hit, inferred: true };
+    }
+    if (liveG) return { st: "live", g: liveG };
     if (!pl.length || raw == null) return { st: "none", g: null };
     // Sleeper shows 0 for his slot in every copy AND his team has finished a game since his last one that he sat while
     // in the lineup: that game became the slot's game (0) and the earlier score is gone (review 3, finding 4; other
@@ -428,11 +435,15 @@ export class WeekPlan {
     // 39 from UTIL, moved to C, were both offered as locks). The Oct 31 rule that read matching points as "it counted"
     // is gone; the Worker's minute-level lineup record makes the record reliable.
     const e = this.elig(p, last.date);
-    if (e === false) return { st: "bench", g: last };
+    // Not lockable (played from the bench / benched since) -- but whatever his slot shows still COUNTS if he doesn't
+    // play again this week (Sleeper scores a slot with its latest countable game). With no games left that's simply
+    // his score: keep it (Nov 15: the opponent's Caruso showed 40.5 and was counted as 0).
+    const shown = pts > 0 ? { date: (pl.find(g => Math.abs(g.fp - pts) < 0.01) || last).date, fp: pts } : null;
+    if (e === false) return shown && !this.upcoming(p).length ? { st: "open", g: shown, kept: true } : { st: "bench", g: last };
     // moved to the bench after the game began: gone for good, even if he's back in a starting slot now. Moving between
     // starting slots is fine (Sleeper; Nov 15 Okongwu: played in UTIL, benched, then put in C -> "ineligible").
     const at = this.elig.slot?.(p, last.date);
-    if (e === true && at?.benched) return { st: "moved", g: last, from: at.slot };
+    if (e === true && at?.benched) return shown && !this.upcoming(p).length ? { st: "open", g: shown, kept: true } : { st: "moved", g: last, from: at.slot };
     return { st: e === true ? "open" : "confirm", g: last };
   }
   // opts.opp = the opponent's outlook ({mean, var}) -> matchup-aware lock calls
@@ -559,7 +570,8 @@ export class WeekPlan {
         ev = m1 / Qp.length; sd = Math.sqrt(Math.max(0, m2 / Qp.length - ev * ev));
       } else {
         const x = open.find(y => y.i === i);
-        if (x && opts.humanLocks && lockable[i]) {
+        // (only while he still has games: with none left, his score counts whatever the manager does)
+        if (x && opts.humanLocks && lockable[i] && cont[p]?.u.length) {
           // opponent: real managers don't lock like the engine. P(lock | score / his own continuation) from other
           // Lock-In leagues (app/league_study.py measures that same ratio); passing is worth the engine's bar
           const fp = lockable[i].fp, b = bars[i] ?? 0, own = cont[p]?.W || 0, pr = humanLockRate(opts.humanLocks, own ? fp / own : 9), sdP = cont[p]?.sd || 0;
