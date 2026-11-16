@@ -133,7 +133,7 @@ def build(book, meta, team_dates, today, is_final, pids):
             # absences don't start a season), so use the long-absence return rate (13+ games missed)
             missed = max(missed, 13)
         upcoming = [d for d in dates if d >= today and not is_final(d, team)]
-        q, basis = {}, None
+        q, basis, rest = {}, None, False
         if tl and (tl.get("out_min_days") is not None):
             t0 = dt.date.fromisoformat(tl["at"][:10])
             e0 = (t0 + dt.timedelta(days=int(tl["out_min_days"]))).isoformat()
@@ -187,7 +187,8 @@ def build(book, meta, team_dates, today, is_final, pids):
             for d in forced:
                 q[d] = 0.0
             basis = (f"ruled out for {', '.join(sorted(forced))} ({rep.get('source')}, {rep['at'][:16]}): "
-                     f"{rep.get('summary') or rep.get('title')}" + (f"; then {basis}" if basis and not tl else (f"; {basis}" if basis else "")))
+                     f"{rep.get('summary') or rep.get('title')}" + ("; back at the healthy rate after (rest)" if rest and not tl
+                                                              else f"; then {basis}" if basis else ""))
         if q:
             # long absence, no reported timeline: the return curve is a population average, so say so on cards
             uncertain = st in OUTISH and not tl and missed >= 13

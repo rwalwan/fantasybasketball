@@ -827,6 +827,7 @@ export class WeekPlan {
                   : s.st === "moved" ? ` His ${s.g.fp.toFixed(1)} from ${day3(s.g.date)} can't be locked: he was moved to the bench after it began.` : "") + gone;
       return { ...out, action: "start", deadline,
         detail: out.today ? (out.today.move ? `Start ${out.today.name} here today (${out.today.opp}, ${out.today.mu.toFixed(1)} proj).${note}`
+                                            : (pl.draws[0].g.q ?? 1) < 0.05 ? `Ruled out today vs ${g.opp}: this slot scores nothing tonight, and nobody better is free to fill it today.${note}`
                                             : `Plays today vs ${g.opp}: ${g.mu.toFixed(1)} projected (${range80(g.Q || Q, g.mu).join("–")}).${note}`)
                           : `${out.later.move ? `Put ${out.later.name} here` : `${name} plays next`} ${day3(out.later.date)} vs ${out.later.opp}.${note}` };
     });
