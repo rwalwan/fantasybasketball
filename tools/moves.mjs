@@ -151,6 +151,20 @@ fs.writeFileSync(stateFile("plan_debug.json"), JSON.stringify({ at: new Date().t
   // current score)
   points: { me: [my.points, ...(my.alt || []).map(a => a.points)], opp: opp ? [opp.points, ...(opp.alt || []).map(a => a.points)] : null },
   raw_rosters: { me: mine, opp: oppRoster || null },
+  // Nov 16: the Sleeper app reads locks ("matchup picks") from api.sleeper.app/matchup_picks/...; which of these answer
+  // without a login?
+  picks_probe: await (async () => {
+    const urls = [`https://api.sleeper.app/matchup_picks/nba/regular/${season}/${week - 1}/counts`,
+      `https://api.sleeper.app/matchup_picks/nba/regular/${season}/${week}/counts`,
+      `https://api.sleeper.app/matchup_picks/nba/regular/${season}/${week - 1}?league_id=${LEAGUE}`,
+      `https://api.sleeper.app/matchup_picks/nba/regular/${season}/${week - 1}/league/${LEAGUE}`,
+      `https://api.sleeper.app/v1/league/${LEAGUE}/matchup_picks/${week - 1}`,
+      `https://api.sleeper.app/league/${LEAGUE}/matchup_picks/${week - 1}`];
+    const out = [];
+    for (const u of urls) { try { const r = await fetch(u, { headers: { accept: "application/json" } }); const t = await r.text();
+      out.push({ u, status: r.status, len: t.length, head: t.slice(0, 300) }); } catch (e) { out.push({ u, err: String(e) }); } }
+    return out;
+  })(),
   // last week's final as Sleeper's API has it now, both hosts (do locks show once the week is closed?)
   prev_week_final: await (async () => { try {
     const a = await get(`${S1}/league/${LEAGUE}/matchups/${week - 1}`), b = await get(`https://api.sleeper.com/v1/league/${LEAGUE}/matchups/${week - 1}`).catch(() => null);
