@@ -45,8 +45,9 @@ const wp = new WeekPlan({ Q: st("quantiles"), book, schedule, week, today, roste
   elig: eligFromSnaps(snaps, ov) });
 const opp = matchups.find(m => m.matchup_id === my.matchup_id && m.roster_id !== mine.roster_id);
 const oppRoster = opp && rosters.find(r => r.roster_id === opp.roster_id);
-const oppPlan = oppRoster ? new WeekPlan({ Q: st("quantiles"), book, schedule, week, today, rosterPositions: league.roster_positions,
-  roster: oppRoster, matchup: opp, rosters, tips: tipsRaw, locks: {}, elig: eligFromSnaps(readState(`opp_lineups_${season}_w${week}.json`, {})) })
+const oppWp = oppRoster ? new WeekPlan({ Q: st("quantiles"), book, schedule, week, today, rosterPositions: league.roster_positions,
+  roster: oppRoster, matchup: opp, rosters, tips: tipsRaw, locks: {}, elig: eligFromSnaps(readState(`opp_lineups_${season}_w${week}.json`, {})) }) : null;
+const oppPlan = oppWp ? oppWp
   .build({ humanLocks: (s => s.opponent_model_ready ? s.lock_rate_eligible : null)(readState("league_study.json", {})), barScale: studyBarScale(readState("league_study.json", {})) }) : null;
 const plan = wp.build({ opp: oppPlan ? { mean: oppPlan.outlook.mean, var: oppPlan.outlook.var } : null, barScale: studyBarScale(readState("league_study.json", {})) });
 // never suggest dropping someone the plan is counting on: locked/kept games, today's starters and relief, next-up players
@@ -146,6 +147,12 @@ fs.writeFileSync(stateFile("plan_debug.json"), JSON.stringify({ at: new Date().t
   starters_debug: (my.starters || []).map(p => ({ pid: p, name: book.name(p), sleeper: my.players_points?.[p] ?? null, slot: wp.slotPoints(p) ?? null, copies: wp.slotCandidates(p), manualLock: locks[p] ?? null,
     state: wp.lockState(p), played: wp.played(p).map(g => [g.date, g.fp]) })),
   values: Object.fromEntries((mine.players || []).map(p => [book.name(p), Math.round(valuer.perWeek(p) * 10) / 10])),
+  // score totals from each Sleeper host, and the opponent slot by slot (Nov 15: his projected final came out below his
+  // current score)
+  points: { me: [my.points, ...(my.alt || []).map(a => a.points)], opp: opp ? [opp.points, ...(opp.alt || []).map(a => a.points)] : null },
+  opp_debug: oppWp ? { outlook: oppPlan.outlook, slots: oppPlan.slots.map(x => ({ slot: x.slot, name: x.name, action: x.action, score: x.score ?? null, detail: x.detail })),
+    starters: (opp.starters || []).map((p, i) => ({ i, pid: p, name: book.name(p), slot: oppWp.slotPoints(p) ?? null, copies: oppWp.slotCandidates(p),
+      state: oppWp.lockState(p), rec: oppWp.elig.slot?.(p, oppWp.lockState(p).g?.date) ?? null, played: oppWp.played(p).map(g => [g.date, g.fp]), left: oppWp.upcoming(p).length })) } : null,
   grid: plan.grid.map(r => ({ name: r.name, pos: r.pos, starter: r.starter, locked: r.locked, status: r.status, cells: r.cells })) }, null, 1));
 console.log(`moves: ${out.adds.length} adds, ${out.trades.length} trades, ${items.length} new reasons requested`);
 void playerValue;
