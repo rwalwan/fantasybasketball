@@ -150,6 +150,7 @@ fs.writeFileSync(stateFile("plan_debug.json"), JSON.stringify({ at: new Date().t
   // score totals from each Sleeper host, and the opponent slot by slot (Nov 15: his projected final came out below his
   // current score)
   points: { me: [my.points, ...(my.alt || []).map(a => a.points)], opp: opp ? [opp.points, ...(opp.alt || []).map(a => a.points)] : null },
+  raw_matchups: { me: Object.fromEntries(Object.entries(my).filter(([k]) => k !== "alt" && k !== "players_points")), opp: opp ? Object.fromEntries(Object.entries(opp).filter(([k]) => k !== "alt" && k !== "players_points")) : null },
   opp_debug: oppWp ? { outlook: oppPlan.outlook, slots: oppPlan.slots.map(x => ({ slot: x.slot, name: x.name, action: x.action, score: x.score ?? null, detail: x.detail })),
     starters: (opp.starters || []).map((p, i) => ({ i, pid: p, name: book.name(p), slot: oppWp.slotPoints(p) ?? null, copies: oppWp.slotCandidates(p),
       state: oppWp.lockState(p), rec: oppWp.elig.slot?.(p, oppWp.lockState(p).g?.date) ?? null, played: oppWp.played(p).map(g => [g.date, g.fp]), left: oppWp.upcoming(p).length })) } : null,
