@@ -87,29 +87,36 @@ async function snapshot(env) {
 //    (starters_games = each starter's locked game id). It needs Ryan's Sleeper login, stored as the SLEEPER_TOKEN
 //    secret (never in the repo). KV is written only when the locks or the status change.
 const LEGS_Q = "query get_matchup_legs($leagueId: String!, $round: Int!) { matchup_legs(league_id: $leagueId, round: $round) { roster_id matchup_id starters starters_games } }";
+async function legsFor(env, round) {
+  const r = await fetch("https://api.sleeper.app/graphql", { method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json", authorization: env.SLEEPER_TOKEN, "user-agent": "we-back-lock-desk" },
+    body: JSON.stringify({ operationName: "get_matchup_legs", query: LEGS_Q, variables: { leagueId: LEAGUE, round } }) });
+  const j = await r.json().catch(() => null);
+  const legs = j?.data?.matchup_legs;
+  if (!r.ok || !Array.isArray(legs)) throw new Error(j?.errors?.[0]?.message || `HTTP ${r.status}`);
+  return legs;
+}
+// Sleeper's state week can lag the matchup week the site and job use (Nov 16: the site asked for week 5 while the
+// record was filed under Sleeper's week), so the weeks either side are read too; each is stored under its own week.
 async function sleeperLocks(env) {
   const info = await dayInfo(env, etDate());
-  const key = `sleeper_locks_${info.season}_w${info.week}`;
-  let status = "ok", teams = null;
+  const w0 = Number(info.week), out = {};
+  let status = "ok";
   if (!env.SLEEPER_TOKEN) status = "no SLEEPER_TOKEN secret on the worker";
-  else {
+  else for (const w of [w0 - 1, w0, w0 + 1].filter(w => w >= 1)) {
     try {
-      const r = await fetch("https://api.sleeper.app/graphql", { method: "POST",
-        headers: { "content-type": "application/json", accept: "application/json", authorization: env.SLEEPER_TOKEN, "user-agent": "we-back-lock-desk" },
-        body: JSON.stringify({ operationName: "get_matchup_legs", query: LEGS_Q, variables: { leagueId: LEAGUE, round: Number(info.week) } }) });
-      const j = await r.json().catch(() => null);
-      const legs = j?.data?.matchup_legs;
-      if (!r.ok || !Array.isArray(legs)) status = j?.errors?.[0]?.message || `HTTP ${r.status}`;
-      else teams = Object.fromEntries(legs.map(l => [String(l.roster_id), l.starters_games || {}]));
-    } catch (e) { status = String(e.message || e).slice(0, 120); }
+      const legs = await legsFor(env, w);
+      if (!legs.length) continue;                                    // no matchups that week
+      const teams = Object.fromEntries(legs.map(l => [String(l.roster_id), l.starters_games || {}]));
+      const key = `sleeper_locks_${info.season}_w${w}`, prev = await kvGet(env, key, null);
+      if (JSON.stringify(teams) !== JSON.stringify(prev?.teams))
+        await env.KV.put(key, JSON.stringify({ teams, changed: new Date().toISOString(), status: "ok" }), { expirationTtl: 60 * 86400 });
+      out[w] = Object.keys(teams).length;
+    } catch (e) { status = String(e.message || e).slice(0, 120); break; }
   }
-  const prev = await kvGet(env, key, null);
-  const now = new Date().toISOString();
-  if (teams && JSON.stringify(teams) !== JSON.stringify(prev?.teams))
-    await env.KV.put(key, JSON.stringify({ teams, changed: now, status: "ok" }), { expirationTtl: 60 * 86400 });
   const st = await kvGet(env, "sleeper_locks_status", null);
-  if (!st || st.status !== status) await env.KV.put("sleeper_locks_status", JSON.stringify({ status, since: now }));
-  return { status, week: info.week, teams: teams ? Object.keys(teams).length : 0 };
+  if (!st || st.status !== status) await env.KV.put("sleeper_locks_status", JSON.stringify({ status, since: new Date().toISOString() }));
+  return { status, weeks: out };
 }
 
 async function kickWorkflow(env) {
