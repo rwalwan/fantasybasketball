@@ -257,6 +257,12 @@ export function studyBarScale(study) {
 // bench since the game began". Moving between starting slots keeps it lockable; any trip to the bench loses it.
 // No record for a date the tracker covered = he wasn't on the roster that day (Nov 15: Neemias Queta's 52 from before
 // he was picked up was offered as a lock): not lockable. No record on a date before tracking: unknown (null).
+// The backend's copy of Sleeper's lock record -> this team's {player: locked game id}, or null when it can't be trusted
+// (no token, token rejected, or nothing fetched yet), in which case the engine falls back to marks and lineup records.
+export function sleeperLocksFor(sl, rosterId) {
+  if (!sl || sl.status !== "ok" || !sl.teams) return null;
+  return sl.teams[String(rosterId)] || {};
+}
 // Merge two lineup-record sets (the job's and the Worker's minute-level one): the second wins, but "benched" (he was
 // on the bench at some point after the game began) sticks if either saw it. ("left" = the Nov 15 records written
 // while the rule was "any slot change"; read as benched so nothing unlockable is offered for the rest of week 4.)
@@ -333,7 +339,7 @@ export function maxAssign(value) {
 
 // ---------- the week plan ----------
 export class WeekPlan {
-  constructor({ Q, book, schedule, week, today, now, rosterPositions, roster, matchup, rosters, tips, elig, locks }) {
+  constructor({ Q, book, schedule, week, today, now, rosterPositions, roster, matchup, rosters, tips, elig, locks, sleeperLocks }) {
     Object.assign(this, { Q: Array.isArray(Q) ? Q : Q.quantiles, QT: Array.isArray(Q) ? null : Q.tiers,
                           b: book, week, today, now: now || new Date(), roster, matchup, tips: tips || {} });
     this.gstatus = {};
@@ -344,6 +350,10 @@ export class WeekPlan {
     this.rostered = new Set(rosters.flatMap(r => r.players || []));
     this.elig = elig || (() => null);
     this.locks = locks || {};
+    // Sleeper's own lock record for this team (get_matchup_legs.starters_games: player -> locked game id), read by the
+    // backend with Ryan's login (Nov 16). When present it is the truth: a starter in it is locked on exactly that game,
+    // a starter not in it is not locked (manual marks and the slot-score guess are skipped).
+    this.sleeperLocks = sleeperLocks || null;
     if (!book.isFinal) book.isFinal = (p, d) => this.final(p, d);
   }
   teamDays(t) { return Object.keys(this.tg[t] || {}).filter(d => this.days.includes(d)).sort(); }
@@ -384,7 +394,18 @@ export class WeekPlan {
   }
   lockState(p) {
     const pl = this.played(p);
-    if (this.locks[p] === true) {
+    if (this.sleeperLocks) {
+      const gid = this.sleeperLocks[p];
+      if (gid) {
+        const g = pl.find(x => String(x.gid) === String(gid));
+        if (g) return { st: "locked", g, source: "sleeper" };
+        // the game isn't in our box scores yet: take the score his slot shows, dated by the earliest game it matches
+        const cands = this.slotCandidates(p).filter(v => v).map(v => Math.round(v) / 10);
+        const hit = cands.map(pts => pl.find(x => Math.abs(x.fp - pts) < 0.01)).filter(Boolean).sort((a, b) => (a.date < b.date ? -1 : 1))[0];
+        return { st: "locked", g: hit || (cands.length ? { date: null, fp: cands[0], gid } : null), source: "sleeper" };
+      }
+    }
+    if (!this.sleeperLocks && this.locks[p] === true) {
       // 1) the game you marked (saved as "pid|date" when you tap "I locked this")
       const dated = Object.keys(this.locks).filter(k => k.startsWith(`${p}|`) && this.locks[k] === true).map(k => k.slice(p.length + 1)).sort().at(-1);
       const gd = dated && pl.find(x => x.date === dated);
@@ -408,7 +429,7 @@ export class WeekPlan {
     // Playing now, but his slot still shows a finished game's score and not the live one: that game is locked (an unlocked
     // slot shows the live points). Nov 15: the opponent's Anthony Davis (79.5 locked, live 27), Alexander-Walker (46)
     // and Jalen Johnson (75.5) were counted at their live games, which put his projected final below his score.
-    if (liveG && raw && this.locks[p] !== false) {
+    if (liveG && raw && !this.sleeperLocks && this.locks[p] !== false) {
       const pts = Math.round(raw) / 10, hit = Math.abs(pts - liveG.fp) >= 0.01 && pl.filter(g => Math.abs(g.fp - pts) < 0.01).at(-1);
       if (hit) return { st: "locked", g: hit, inferred: true };
     }
@@ -426,7 +447,7 @@ export class WeekPlan {
     // matching means "locked" only if his latest game was countable (played from a starting slot).
     // locks[p] === false is the manager saying "not locked" (overrides the inference).
     const countable = pl.filter(g => this.elig(p, g.date) !== false), latest = countable.at(-1) || pl.at(-1);
-    if (this.locks[p] !== false && countable.length && this.elig(p, pl.at(-1).date) !== false)
+    if (!this.sleeperLocks && this.locks[p] !== false && countable.length && this.elig(p, pl.at(-1).date) !== false)
       for (const g of countable.slice(0, -1)) if (Math.abs(g.fp - pts) < 0.01 && Math.abs(latest.fp - pts) >= 0.01) return { st: "locked", g, inferred: true };
     const last = pl.at(-1);
     // Lockable only if the lineup record says he played it from a starting slot and he hasn't been benched since. Sleeper's slot

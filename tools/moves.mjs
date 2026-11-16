@@ -4,7 +4,7 @@
 // written once (OpenRouter key stays server-side; never shipped to the browser).
 import { stageOf, calibration } from "./winprob.mjs";
 import fs from "node:fs";
-import { Book, WeekPlan, Valuer, eligFromSnaps, mergeSnaps, mergeMatchups, irMoves, studyBarScale, selectAdds, weekDays, tradeIdeas, waiverMoves, playerValue } from "../site/engine.js";
+import { Book, WeekPlan, Valuer, eligFromSnaps, mergeSnaps, sleeperLocksFor, mergeMatchups, irMoves, studyBarScale, selectAdds, weekDays, tradeIdeas, waiverMoves, playerValue } from "../site/engine.js";
 
 const LEAGUE = "1400915575915491328", USER = "1388708038000533504";
 const S1 = "https://api.sleeper.app/v1", S2 = "https://api.sleeper.com";
@@ -40,13 +40,17 @@ const book = new Book({ scoring: league.scoring_settings, players: st("players")
 book.addStats(stats); book.addProjections(proj);
 const mine = rosters.find(r => r.owner_id === USER), my = matchups.find(m => m.roster_id === mine.roster_id);
 const slots = league.roster_positions.filter(s => s !== "BN" && s !== "IR");
+// Sleeper's own lock record for every team (backend, with Ryan's login); null = not available -> fall back
+const SL = backend.sleeperLocks || null, slFor = rid => sleeperLocksFor(SL, rid);
+console.log(`sleeper locks: ${SL ? SL.status : "none"}`);
+if (SL?.status === "ok" && SL.teams) fs.writeFileSync(stateFile(`sleeper_locks_${season}_w${week}.json`), JSON.stringify(SL, null, 1));
 const wp = new WeekPlan({ Q: st("quantiles"), book, schedule, week, today, rosterPositions: league.roster_positions,
   roster: mine, matchup: my, rosters, tips: tipsRaw, locks,
-  elig: eligFromSnaps(snaps, ov) });
+  elig: eligFromSnaps(snaps, ov), sleeperLocks: slFor(mine.roster_id) });
 const opp = matchups.find(m => m.matchup_id === my.matchup_id && m.roster_id !== mine.roster_id);
 const oppRoster = opp && rosters.find(r => r.roster_id === opp.roster_id);
 const oppWp = oppRoster ? new WeekPlan({ Q: st("quantiles"), book, schedule, week, today, rosterPositions: league.roster_positions,
-  roster: oppRoster, matchup: opp, rosters, tips: tipsRaw, locks: {}, elig: eligFromSnaps(readState(`opp_lineups_${season}_w${week}.json`, {})) }) : null;
+  roster: oppRoster, matchup: opp, rosters, tips: tipsRaw, locks: {}, elig: eligFromSnaps(readState(`opp_lineups_${season}_w${week}.json`, {})), sleeperLocks: slFor(oppRoster.roster_id) }) : null;
 const oppPlan = oppWp ? oppWp
   .build({ humanLocks: (s => s.opponent_model_ready ? s.lock_rate_eligible : null)(readState("league_study.json", {})), barScale: studyBarScale(readState("league_study.json", {})) }) : null;
 const plan = wp.build({ opp: oppPlan ? { mean: oppPlan.outlook.mean, var: oppPlan.outlook.var } : null, barScale: studyBarScale(readState("league_study.json", {})) });
@@ -71,7 +75,7 @@ const tradeCtx = (() => {
       const m = matchups.find(x => x.roster_id === r.roster_id); if (!m) continue;
       if (r.roster_id === mine.roster_id) { weekOf[r.roster_id] = { wp, mean: plan.outlook.mean, var: plan.outlook.var, opp: oppOf(r.roster_id) }; continue; }
       const twp = new WeekPlan({ Q: st("quantiles"), book, schedule, week, today, rosterPositions: league.roster_positions,
-        roster: r, matchup: m, rosters, tips: tipsRaw, locks: {}, elig: r.roster_id === oppRoster?.roster_id ? eligFromSnaps(readState(`opp_lineups_${season}_w${week}.json`, {})) : () => true });
+        roster: r, matchup: m, rosters, tips: tipsRaw, locks: {}, elig: r.roster_id === oppRoster?.roster_id ? eligFromSnaps(readState(`opp_lineups_${season}_w${week}.json`, {})) : () => true, sleeperLocks: slFor(r.roster_id) });
       const o = r.roster_id === oppRoster?.roster_id ? oppPlan.outlook : twp.build().outlook;
       weekOf[r.roster_id] = { wp: twp, mean: o.mean, var: o.var, opp: oppOf(r.roster_id) };
     }
@@ -151,36 +155,6 @@ fs.writeFileSync(stateFile("plan_debug.json"), JSON.stringify({ at: new Date().t
   // current score)
   points: { me: [my.points, ...(my.alt || []).map(a => a.points)], opp: opp ? [opp.points, ...(opp.alt || []).map(a => a.points)] : null },
   raw_rosters: { me: mine, opp: oppRoster || null },
-  // Nov 16: the Sleeper app reads locks ("matchup picks") from api.sleeper.app/matchup_picks/...; which of these answer
-  // without a login?
-  // Nov 16: the app's own GraphQL call (get_matchup_legs) has starters_games = each starter's LOCKED game, all teams.
-  // Does it answer without a login?
-  legs_probe: await (async () => { try {
-    const q = "query get_matchup_legs($leagueId: String!, $round: Int!) { matchup_legs(league_id: $leagueId, round: $round) { league_id leg matchup_id roster_id round starters starters_games points } }";
-    const r = await fetch("https://api.sleeper.app/graphql", { method: "POST", headers: { "content-type": "application/json", accept: "application/json" },
-      body: JSON.stringify({ operationName: "get_matchup_legs", query: q, variables: { leagueId: LEAGUE, round: week - 1 } }) });
-    const t = await r.text();
-    return { status: r.status, len: t.length, head: t.slice(0, 600) };
-  } catch (e) { return { err: String(e) }; } })(),
-  picks_probe: await (async () => {
-    const urls = [`https://api.sleeper.app/matchup_picks/nba/regular/${season}/${week - 1}/counts`,
-      `https://api.sleeper.app/matchup_picks/nba/regular/${season}/${week}/counts`,
-      `https://api.sleeper.app/matchup_picks/nba/regular/${season}/${week - 1}?league_id=${LEAGUE}`,
-      `https://api.sleeper.app/matchup_picks/nba/regular/${season}/${week - 1}/league/${LEAGUE}`,
-      `https://api.sleeper.app/v1/league/${LEAGUE}/matchup_picks/${week - 1}`,
-      `https://api.sleeper.app/league/${LEAGUE}/matchup_picks/${week - 1}`];
-    const out = [];
-    for (const u of urls) { try { const r = await fetch(u, { headers: { accept: "application/json" } }); const t = await r.text();
-      out.push({ u, status: r.status, len: t.length, head: t.slice(0, 300) }); } catch (e) { out.push({ u, err: String(e) }); } }
-    return out;
-  })(),
-  // last week's final as Sleeper's API has it now, both hosts (do locks show once the week is closed?)
-  prev_week_final: await (async () => { try {
-    const a = await get(`${S1}/league/${LEAGUE}/matchups/${week - 1}`), b = await get(`https://api.sleeper.com/v1/league/${LEAGUE}/matchups/${week - 1}`).catch(() => null);
-    const pick = arr => { const me = (arr || []).find(m => m.roster_id === mine.roster_id); const op = me && arr.find(m => m.matchup_id === me.matchup_id && m.roster_id !== me.roster_id);
-      return [me, op].map(m => m && { roster_id: m.roster_id, points: m.points, starters: m.starters, starters_points: m.starters_points, names: (m.starters || []).map(p => book.name(p)) }); };
-    return { app: pick(a), com: pick(b) };
-  } catch (e) { return String(e); } })(),
   raw_matchups: { me: Object.fromEntries(Object.entries(my).filter(([k]) => k !== "alt" && k !== "players_points")), opp: opp ? Object.fromEntries(Object.entries(opp).filter(([k]) => k !== "alt" && k !== "players_points")) : null },
   opp_debug: oppWp ? { outlook: oppPlan.outlook, slots: oppPlan.slots.map(x => ({ slot: x.slot, name: x.name, action: x.action, score: x.score ?? null, detail: x.detail })),
     starters: (opp.starters || []).map((p, i) => ({ i, pid: p, name: book.name(p), slot: oppWp.slotPoints(p) ?? null, copies: oppWp.slotCandidates(p),
@@ -221,7 +195,7 @@ try {
     const key = `${week}|${stage}|${mid}`;
     if (!stage || pair.length !== 2 || log.open[key]) continue;
     const out = pair.map(m => new WeekPlan({ Q: st("quantiles"), book, schedule, week, today, rosterPositions: league.roster_positions,
-      roster: rosters.find(x => x.roster_id === m.roster_id), matchup: m, rosters, tips: tipsRaw, locks: {}, elig: () => true }).build().outlook);
+      roster: rosters.find(x => x.roster_id === m.roster_id), matchup: m, rosters, tips: tipsRaw, locks: {}, elig: () => true, sleeperLocks: slFor(m.roster_id) }).build().outlook);
     const p = Phi((out[0].mean - out[1].mean) / Math.sqrt(out[0].var + out[1].var + 1));
     log.open[key] = { week, mid, stage, day: today, days_left: daysLeft, a: pair[0].roster_id, b: pair[1].roster_id, p_a: Math.round(p * 1000) / 1000 };
   }

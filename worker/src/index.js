@@ -83,6 +83,35 @@ async function snapshot(env) {
 // GitHub throttles scheduled workflows on free repos (runs can be hours apart), so the Worker's reliable
 // minute cron kicks the workflow every 15 minutes instead. Needs the GH_TOKEN secret (fine-grained PAT,
 // this repo only, Actions: read & write).
+// 3) Every minute: Sleeper's own lock record for every team, from the app's GraphQL query get_matchup_legs
+//    (starters_games = each starter's locked game id). It needs Ryan's Sleeper login, stored as the SLEEPER_TOKEN
+//    secret (never in the repo). KV is written only when the locks or the status change.
+const LEGS_Q = "query get_matchup_legs($leagueId: String!, $round: Int!) { matchup_legs(league_id: $leagueId, round: $round) { roster_id matchup_id starters starters_games } }";
+async function sleeperLocks(env) {
+  const info = await dayInfo(env, etDate());
+  const key = `sleeper_locks_${info.season}_w${info.week}`;
+  let status = "ok", teams = null;
+  if (!env.SLEEPER_TOKEN) status = "no SLEEPER_TOKEN secret on the worker";
+  else {
+    try {
+      const r = await fetch("https://api.sleeper.app/graphql", { method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json", authorization: env.SLEEPER_TOKEN, "user-agent": "we-back-lock-desk" },
+        body: JSON.stringify({ operationName: "get_matchup_legs", query: LEGS_Q, variables: { leagueId: LEAGUE, round: Number(info.week) } }) });
+      const j = await r.json().catch(() => null);
+      const legs = j?.data?.matchup_legs;
+      if (!r.ok || !Array.isArray(legs)) status = j?.errors?.[0]?.message || `HTTP ${r.status}`;
+      else teams = Object.fromEntries(legs.map(l => [String(l.roster_id), l.starters_games || {}]));
+    } catch (e) { status = String(e.message || e).slice(0, 120); }
+  }
+  const prev = await kvGet(env, key, null);
+  const now = new Date().toISOString();
+  if (teams && JSON.stringify(teams) !== JSON.stringify(prev?.teams))
+    await env.KV.put(key, JSON.stringify({ teams, changed: now, status: "ok" }), { expirationTtl: 60 * 86400 });
+  const st = await kvGet(env, "sleeper_locks_status", null);
+  if (!st || st.status !== status) await env.KV.put("sleeper_locks_status", JSON.stringify({ status, since: now }));
+  return { status, week: info.week, teams: teams ? Object.keys(teams).length : 0 };
+}
+
 async function kickWorkflow(env) {
   let result;
   if (!env.GH_TOKEN) result = { ok: false, status: "no GH_TOKEN secret on the worker" };
@@ -104,6 +133,7 @@ async function kickWorkflow(env) {
 export default {
   async scheduled(event, env, ctx) {
     ctx.waitUntil(snapshot(env).catch(e => console.log("snapshot failed", e.message)));
+    ctx.waitUntil(sleeperLocks(env).catch(e => console.log("sleeper locks failed", e.message)));
     if (new Date(event.scheduledTime).getUTCMinutes() % 15 === 0) ctx.waitUntil(kickWorkflow(env).catch(() => {}));
   },
 
@@ -115,7 +145,10 @@ export default {
       const [elig, locks, lineups] = await Promise.all([kvGet(env, "elig", {}), kvGet(env, `locks_w${week}`, {}),
         kvGet(env, `lineups_${season}_w${week}`, {})]);
       const kick = await kvGet(env, "kick", null);
-      return json({ ok: true, elig, locks, lineups, kick, now: new Date().toISOString() });
+      // Sleeper's lock record: usable only while the token works (status ok); the site and job fall back otherwise
+      const [sl, slStatus] = await Promise.all([kvGet(env, `sleeper_locks_${season}_w${week}`, null), kvGet(env, "sleeper_locks_status", null)]);
+      const sleeperLocks = sl ? { ...sl, status: slStatus?.status || sl.status, since: slStatus?.since || null } : (slStatus ? { teams: null, ...slStatus } : null);
+      return json({ ok: true, elig, locks, lineups, kick, sleeperLocks, now: new Date().toISOString() });
     }
     if (url.pathname === "/answer" && req.method === "POST") {
       if (req.headers.get("x-key") !== env.WRITE_KEY) return json({ error: "bad key" }, 401);
@@ -130,7 +163,7 @@ export default {
     }
     if (url.pathname === "/run") {                                    // manual trigger / health check: key required
       if (req.headers.get("x-key") !== env.WRITE_KEY) return json({ error: "bad key" }, 401);
-      return json(await snapshot(env));
+      return json({ snapshot: await snapshot(env), sleeperLocks: await sleeperLocks(env) });
     }
     if (url.pathname === "/kick" && req.headers.get("x-key") === env.WRITE_KEY) return json(await kickWorkflow(env));
     return json({ service: "lock-desk", ok: true });

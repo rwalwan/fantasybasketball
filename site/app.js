@@ -1,4 +1,4 @@
-import { Book, WeekPlan, Valuer, WINS_PER_SCORE, eligFromSnaps, mergeSnaps, mergeMatchups, irMoves, studyBarScale, usesFaab, waiverMoves, weekDays, teamGames, fits, range80 } from "./engine.js";
+import { Book, WeekPlan, Valuer, WINS_PER_SCORE, eligFromSnaps, mergeSnaps, sleeperLocksFor, mergeMatchups, irMoves, studyBarScale, usesFaab, waiverMoves, weekDays, teamGames, fits, range80 } from "./engine.js";
 
 // ---- config -----------------------------------------------------------------------------------
 const LEAGUE = "1400915575915491328", USER = "1388708038000533504";
@@ -90,7 +90,7 @@ async function loadLive() {
   const overrides = { ...overridesGh, ...(backend.elig || {}) };
   const locks = { ...locksGh, ...(backend.locks || {}) };
   base.schedule = schedule;
-  live = { rosters, matchups, stats, proj, trending, snaps, oppSnaps, overrides, locks, tips, news, claims, moves, context, insights, learning, avail, usage, others, health, winprob, backend: !!backend.ok, at: new Date() };
+  live = { rosters, matchups, stats, proj, trending, snaps, oppSnaps, overrides, locks, tips, news, claims, moves, context, insights, learning, avail, usage, others, health, winprob, backend: !!backend.ok, sleeperLocks: backend.sleeperLocks || null, at: new Date() };
   void tipDays;
 }
 
@@ -119,14 +119,14 @@ function compute() {
   const locks = { ...live.locks, ...local.get(`locks_w${base.week}`) };
   const wp = new WeekPlan({ Q: base.QS, book, schedule: base.schedule, week: base.week, today: etToday(), now: new Date(),
     rosterPositions: base.league.roster_positions, roster: mine, matchup: my, rosters: live.rosters, tips: live.tips,
-    elig: eligFn(my.starters), locks });
+    elig: eligFn(my.starters), locks, sleeperLocks: sleeperLocksFor(live.sleeperLocks, mine.roster_id) });
   // opponent's outlook from the same engine (their recent games assumed countable), then my matchup-aware plan
   let oppOut = null, oppPlan = null;
   const oppRoster = opp && live.rosters.find(r => r.roster_id === opp.roster_id);
   if (oppRoster) {
     oppPlan = new WeekPlan({ Q: base.QS, book, schedule: base.schedule, week: base.week, today: etToday(), now: new Date(),
       rosterPositions: base.league.roster_positions, roster: oppRoster, matchup: opp, rosters: live.rosters, tips: live.tips,
-      elig: eligFromSnaps(live.oppSnaps), locks: {} }).build({ humanLocks: live.others?.opponent_model_ready ? live.others.lock_rate_eligible : null, barScale: studyBarScale(live.others) });
+      elig: eligFromSnaps(live.oppSnaps), locks: {}, sleeperLocks: sleeperLocksFor(live.sleeperLocks, oppRoster.roster_id) }).build({ humanLocks: live.others?.opponent_model_ready ? live.others.lock_rate_eligible : null, barScale: studyBarScale(live.others) });
     oppOut = { mean: oppPlan.outlook.mean, var: oppPlan.outlook.var };
   }
   const waivers = wp.waivers(live.trending);
@@ -239,7 +239,10 @@ function render() {
   renderIR(c.ir);
   renderResearch(c);
   renderInsights(c);
-  $("foot").textContent = `Plan's expected total from open slots: ${r1(plan.expectedTotal || 0)}. Recomputed every minute from Sleeper (scores, schedule, injuries). A game is lockable only if he was starting when it tipped; lineups are recorded by the scheduled job (every 15 min) and by this page while it's open. ${live.backend ? "Answers sync to your backend, and lineups are recorded every minute." : "Answers are saved in this browser only (backend not connected)."}`;
+  const sl = live.sleeperLocks;
+  const slNote = sl?.status === "ok" ? " Locks for both teams come straight from Sleeper (checked every minute)."
+    : sl ? ` Sleeper lock feed unavailable (${sl.status}): locks come from your marks and lineup records, and the opponent's are estimated.` : "";
+  $("foot").textContent = `Plan's expected total from open slots: ${r1(plan.expectedTotal || 0)}.${slNote} Recomputed every minute from Sleeper (scores, schedule, injuries). A game is lockable only if he was starting when it tipped; lineups are recorded by the scheduled job (every 15 min) and by this page while it's open. ${live.backend ? "Answers sync to your backend, and lineups are recorded every minute." : "Answers are saved in this browser only (backend not connected)."}`;
   $("dot").classList.toggle("stale", Date.now() - live.at > 5 * 60000);
   // a job step that failed in the last run (moves, learning, alerts): say so instead of showing stale numbers silently
   const bad = Object.values(live.health || {}).filter(h => !h.ok);
