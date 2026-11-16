@@ -151,6 +151,13 @@ fs.writeFileSync(stateFile("plan_debug.json"), JSON.stringify({ at: new Date().t
   // current score)
   points: { me: [my.points, ...(my.alt || []).map(a => a.points)], opp: opp ? [opp.points, ...(opp.alt || []).map(a => a.points)] : null },
   raw_rosters: { me: mine, opp: oppRoster || null },
+  // last week's final as Sleeper's API has it now, both hosts (do locks show once the week is closed?)
+  prev_week_final: await (async () => { try {
+    const a = await get(`${S1}/league/${LEAGUE}/matchups/${week - 1}`), b = await get(`https://api.sleeper.com/v1/league/${LEAGUE}/matchups/${week - 1}`).catch(() => null);
+    const pick = arr => { const me = (arr || []).find(m => m.roster_id === mine.roster_id); const op = me && arr.find(m => m.matchup_id === me.matchup_id && m.roster_id !== me.roster_id);
+      return [me, op].map(m => m && { roster_id: m.roster_id, points: m.points, starters: m.starters, starters_points: m.starters_points, names: (m.starters || []).map(p => book.name(p)) }); };
+    return { app: pick(a), com: pick(b) };
+  } catch (e) { return String(e); } })(),
   raw_matchups: { me: Object.fromEntries(Object.entries(my).filter(([k]) => k !== "alt" && k !== "players_points")), opp: opp ? Object.fromEntries(Object.entries(opp).filter(([k]) => k !== "alt" && k !== "players_points")) : null },
   opp_debug: oppWp ? { outlook: oppPlan.outlook, slots: oppPlan.slots.map(x => ({ slot: x.slot, name: x.name, action: x.action, score: x.score ?? null, detail: x.detail })),
     starters: (opp.starters || []).map((p, i) => ({ i, pid: p, name: book.name(p), slot: oppWp.slotPoints(p) ?? null, copies: oppWp.slotCandidates(p),
