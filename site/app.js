@@ -7,7 +7,8 @@ const S1 = "https://api.sleeper.app/v1", S2 = "https://api.sleeper.com";
 const ESPN = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=";
 const ESPN_TEAM = { NY: "NYK", GS: "GSW", SA: "SAS", NO: "NOP", UTAH: "UTA", WSH: "WAS" };
 // Backend (Cloudflare Worker). One-time setup per device: open the site with #api=<url>&key=<write key>.
-(() => { const h = new URLSearchParams(location.hash.slice(1));
+let START_TAB = null;     // #tab=matchup opens that tab (also used by the job's screenshot of it)
+(() => { const h = new URLSearchParams(location.hash.slice(1)); START_TAB = h.get("tab");
   if (h.get("api")) { try { localStorage.setItem("lockdesk_api", h.get("api")); localStorage.setItem("lockdesk_key", h.get("key") || ""); } catch {}
     history.replaceState(null, "", location.pathname); } })();
 const API = (() => { try { return localStorage.getItem("lockdesk_api") || ""; } catch { return ""; } })();
@@ -232,6 +233,7 @@ function render() {
   $("waivers").innerHTML = `<tr><th>Player</th><th>Team</th><th>Pos</th><th>FP/G</th><th>Games left</th><th title="Expected locked points gained this week with the best drop">This week</th><th title="Lock-in points per week after this one">Per week after</th><th>Drop</th><th>Last 3</th><th>Adds 24h</th><th>Experts</th><th>Bid</th></tr>` +
     w.list.map(x => `<tr><td>${esc(x.name)}${x.status ? `<span class="st">${esc(x.status)}</span>` : ""}</td><td>${esc(x.team)}</td><td class="pos">${esc(x.pos)}</td><td class="n">${r1(x.fpg)}</td><td class="n">${x.left}</td><td class="n">${x.drop ? (x.weekGain >= 0 ? "+" : "") + r1(x.weekGain) : "–"}</td><td class="n">${x.drop ? (x.rosGain >= 0 ? "+" : "") + r1(x.rosGain) : "–"}</td><td class="pos">${x.drop ? esc(x.drop) : "no gain"}</td><td class="n">${x.recent.map(r1).join(" / ") || "–"}</td><td class="n">${x.trend.toLocaleString()}</td><td class="n">${consCell(x.pid)}</td><td class="n">${x.bid && usesFaab(base.league.settings, live.rosters) ? "$" + x.bid : "–"}</td></tr>`).join("");
 
+  try { renderMatchup(c, oppOwner); } catch (e) { console.error("matchup view:", e); $("h2h").innerHTML = `<div class="box"><div class="row"><span class="pos">Matchup view failed: ${esc(e.message)}</span></div></div>`; }
   renderTrades(c);
   renderExperts();
   renderNews();
@@ -247,6 +249,75 @@ function render() {
   // a job step that failed in the last run (moves, learning, alerts): say so instead of showing stale numbers silently
   const bad = Object.values(live.health || {}).filter(h => !h.ok);
   $("health").innerHTML = (offlineSince != null ? offlineBanner(offlineSince) : "") + (bad.length ? `<div class="banner" style="background:var(--riskbg);color:var(--risk)">⚠ Last update: ${bad.map(h => esc(h.step)).join(", ")} failed (${esc(new Date(bad[0].at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }))}). Those numbers may be out of date.</div>` : "");
+}
+
+// ---- head to head: both lineups slot by slot, with what each slot holds and what's left ----------
+const WD = d => new Date(d + "T12:00:00").toLocaleDateString("en-US", { weekday: "short" });
+const STAB = { Questionable: "Q", Doubtful: "D", Probable: "P", "Day-To-Day": "DTD", Suspended: "SUSP" };
+function h2hCell(s, side, mine) {
+  if (!s || !s.pid || s.pid === "0") return `<div class="cell ${side} s-empty"><div class="n1">(empty)</div><div class="n2">–</div><div class="n3">scores 0</div></div>`;
+  const g = s.game, gd = g?.date ? `${WD(g.date)}${g.opp ? ` vs ${esc(g.opp)}` : ""}` : "";
+  const left = s.left || [], nx = left[0];
+  const nxt = nx ? `${WD(nx.date)}${nx.opp ? ` vs ${esc(nx.opp)}` : ""}${nx.q != null && nx.q < 0.5 ? ` (${Math.round(nx.q * 100)}%)` : ""}` : "";
+  const leftTxt = left.length ? `${left.length} left · next ${nxt}` : "no games left";
+  const st = s.status ? `<span class="chipq" title="${esc(s.status)}">${esc(STAB[s.status] || s.status)}</span>` : "";
+  let cls = "s-none", l2, l3, tip = "";
+  if (s.st === "locked") {
+    cls = "s-locked"; l2 = `🔒 ${g ? r1(g.fp) : "?"}`;
+    l3 = `${gd}${gd ? " · " : ""}${s.lockSource === "sleeper" ? "Sleeper" : s.lockSource === "manual" ? "marked" : "est."}`;
+    tip = `Locked${gd ? ` on ${gd}` : ""}: this score is final for the slot (${s.lockSource === "sleeper" ? "Sleeper's lock record" : s.lockSource === "manual" ? "you marked it" : "read from his slot score"}).`;
+  } else if (s.st === "live") {
+    cls = "s-live"; l2 = `● ${r1(s.score ?? g?.fp ?? 0)} live`;
+    l3 = mine && s.today?.keepBar > 0.05 ? `keep if ≥ ${r1(s.today.keepBar)}` : `${g?.opp ? `vs ${esc(g.opp)} · ` : ""}${left.length} after`;
+    tip = "Game in progress.";
+  } else if (s.kept || (s.st === "open" && !left.length)) {
+    cls = "s-kept"; l2 = `${r1(g.fp)} final`; l3 = `${gd} · done`;
+    tip = "No games left: this score counts as is.";
+  } else if (s.st === "open" || s.st === "confirm") {
+    cls = "s-open"; l2 = `${r1(g.fp)} <span style="font-weight:400">${mine ? (s.action === "lock" ? "· lock" : s.action === "pass" ? "· wait" : "· check") : "· open"}</span>`;
+    l3 = `${gd} · ${left.length} left`;
+    tip = mine ? s.detail : `Could still lock ${r1(g.fp)} (${gd}) or wait: ${leftTxt}.`;
+  } else if (s.st === "bench" || s.st === "moved") {
+    cls = "s-gone"; l2 = g ? r1(g.fp) : "–"; l3 = s.st === "bench" ? "bench game · can't lock" : "benched · can't lock";
+    tip = `${leftTxt}`;
+  } else {
+    l2 = nx ? `next ${nxt}` : "no games"; l3 = left.length ? `${left.length} game${left.length > 1 ? "s" : ""} left` : "slot may score 0";
+  }
+  return `<div class="cell ${side} ${cls}" title="${esc(tip || s.detail || "")}"><div class="n1">${side === "them" ? st : ""}${esc(s.name)}${side === "me" ? st : ""}</div><div class="n2">${l2}</div><div class="n3">${l3}</div></div>`;
+}
+function renderMatchup(c, oppOwner) {
+  const el = $("h2h"); if (!el) return;
+  const A = c.plan, B = c.oppPlan, me = base.users[USER] || "You", them = base.users[oppOwner] || "Opponent";
+  if (!B) { el.innerHTML = `<div class="box"><div class="row"><span class="pos">No opponent this week.</span></div></div>`; return; }
+  const today = etToday();
+  const facts = P => {
+    const banked = P.slots.filter(s => s.st === "locked" || s.kept).reduce((a, s) => a + (s.game?.fp || 0), 0);
+    const ti = P.days.indexOf(today);
+    return { locked: P.slots.filter(s => s.st === "locked").length, banked, n: P.slots.length,
+      live: P.slots.filter(s => s.st === "live").length,
+      left: P.grid.reduce((a, r) => a + (r.left || 0), 0),
+      todayN: ti < 0 ? 0 : P.grid.filter(r => r.cells[ti] && r.cells[ti].kind !== "played").length };
+  };
+  const fa = facts(A), fb = facts(B), wp = A.outlook.winProb;
+  const pctS = p => p == null ? "–" : p < 0.01 ? "<1%" : p > 0.99 ? ">99%" : Math.round(p * 100) + "%";
+  const fr = (k, a, b) => `<span>${a}</span><span class="k">${k}</span><span class="r">${b}</span>`;
+  let html = `<div class="h2h-sum"><div class="side"><div class="who">${esc(me)} · now</div><div class="big">${r1((c.my.points || 0) / 10)}</div></div>` +
+    `<div class="mid"><span class="wp">${pctS(wp)}</span><br>win chance</div>` +
+    `<div class="side r"><div class="who">${esc(them)} · now</div><div class="big">${r1((c.opp?.points || 0) / 10)}</div></div>` +
+    (wp != null ? `<div class="wpbar" title="Your win chance"><i style="width:${Math.round(wp * 100)}%"></i></div>` : "") +
+    `<div class="facts">${fr("projected final", r1(A.outlook.mean), r1(B.outlook.mean))}${fr("slots locked", `${fa.locked}/${fa.n}`, `${fb.locked}/${fb.n}`)}` +
+    `${fr("banked points", r1(fa.banked), r1(fb.banked))}${fr("live now", fa.live, fb.live)}${fr("games left (roster)", fa.left, fb.left)}${fr("playing today", fa.todayN, fb.todayN)}</div></div>`;
+  html += `<div class="h2h"><div class="hd">${esc(me)}</div><div class="hd" style="text-align:center">slot</div><div class="hd r">${esc(them)}</div>`;
+  A.slots.forEach((s, i) => {
+    const o = B.slots[i], d = (s.ev || 0) - (o?.ev || 0);
+    const edge = Math.abs(d) < 1 ? `<span class="edge even">even</span>` : `<span class="edge ${d > 0 ? "up" : "down"}">${d > 0 ? "+" : "−"}${Math.round(Math.abs(d))}</span>`;
+    html += h2hCell(s, "me", true) + `<div class="slotc" title="Projected slot total: you ${r1(s.ev || 0)}, them ${r1(o?.ev || 0)}"><b>${esc(s.slot)}</b>${edge}</div>` + h2hCell(o, "them", false);
+  });
+  html += `</div><div class="legend"><span><i style="background:var(--lockbg);border-color:var(--lock)"></i>locked</span><span><i style="border-color:var(--risk)"></i>live</span>` +
+    `<span><i style="border-color:var(--pass)"></i>score that can still be locked</span><span><i style="background:var(--chip)"></i>no game yet</span><span>±N = projected slot edge (yours − theirs)</span></div>`;
+  const sl = live.sleeperLocks;
+  html += `<p class="foot" style="margin-top:8px">${sl?.status === "ok" ? "Locks for both teams come from Sleeper's lock record (checked every minute)." : "Sleeper's lock feed is unavailable: your locks come from your marks, theirs are read from their slot scores."} Projected totals use the same engine as the Locks tab; for the opponent it assumes they lock the way real managers in other Lock-In leagues do.</p>`;
+  el.innerHTML = html;
 }
 
 // ---- trade assistant ------------------------------------------------------------------------------
@@ -510,3 +581,4 @@ if (standalone && !API) {
 // an app resumed from the background may show minutes-old data: refresh right away
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && base) tick(false); });
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+if (START_TAB) document.querySelector(`#tabs button[data-t="${CSS.escape(START_TAB)}"]`)?.click();

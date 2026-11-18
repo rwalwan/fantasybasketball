@@ -765,7 +765,11 @@ export class WeekPlan {
     // ---- 3) one plan per slot: the lock call + today's sequence, rendered everywhere from this ------
     const slots = this.slots.map((slot, i) => {
       const p = starters[i], s = ls[p] || { st: "none" }, name = nm(p);
-      const out = { slot, pid: p, name, status: this.b.status(p), today: null, later: null };
+      const out = { slot, pid: p, name, status: this.b.status(p), today: null, later: null,
+                    // for the side-by-side matchup view: the slot's state, the game it shows/holds, and what's left
+                    st: s.st, game: s.g ? { date: s.g.date, fp: s.g.fp, opp: s.g.date ? this.tg[this.b.team(p)]?.[s.g.date]?.opp || "" : "" } : null,
+                    lockSource: s.st === "locked" ? (s.source || (s.inferred ? "inferred" : "manual")) : null, kept: !!s.kept,
+                    left: (cont[p]?.u || []).map(g => ({ date: g.date, opp: g.opp, mu: g.mu, q: g.q, tip: g.tip })) };
       if (s.st === "locked") return { ...out, action: "locked", score: s.g?.fp ?? null, inferred: !!s.inferred,
         detail: s.g ? `Locked ${s.g.fp.toFixed(1)} (${s.g.date})${s.inferred ? " — read from Sleeper's score; tap Not locked if that's wrong" : ""}.` : "Locked." };
       if (s.st === "live") {

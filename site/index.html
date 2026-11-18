@@ -62,6 +62,29 @@ select{font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);
 .pick h3{font-size:13px;margin:8px 0 4px;color:var(--quiet);font-weight:500}
 .pick label{display:flex;gap:8px;align-items:center;padding:3px 0;font-size:14px}.pick label span.v{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--quiet)}
 .verdict{margin-top:12px;font-size:15px}.good{color:var(--lock)}.bad{color:var(--risk)}
+.h2h-sum{display:grid;grid-template-columns:1fr auto 1fr;gap:6px 10px;align-items:end;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:10px}
+.h2h-sum .side{min-width:0}.h2h-sum .side.r{text-align:right}.h2h-sum .who{font-size:12px;color:var(--quiet);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.h2h-sum .big{font-family:"IBM Plex Mono",monospace;font-size:22px;font-weight:600;line-height:1.1}.h2h-sum .mid{text-align:center;font-size:12px;color:var(--quiet)}
+.h2h-sum .wp{font-family:"IBM Plex Mono",monospace;font-size:15px;color:var(--ink);font-weight:600}
+.h2h-sum .facts{grid-column:1/-1;display:grid;grid-template-columns:1fr auto 1fr;gap:0 10px;font-size:12px;line-height:1.6;border-top:1px solid var(--line);padding-top:6px;margin-top:2px}
+.h2h-sum .facts span{font-family:"IBM Plex Mono",monospace}.h2h-sum .facts .r{text-align:right}.h2h-sum .facts .k{color:var(--quiet);text-align:center;font-family:inherit}
+.wpbar{grid-column:1/-1;height:6px;border-radius:99px;background:var(--riskbg);overflow:hidden}.wpbar i{display:block;height:100%;background:var(--lock)}
+.h2h{display:grid;grid-template-columns:minmax(0,1fr) 48px minmax(0,1fr);gap:5px 6px}
+.h2h .cell{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 8px;min-width:0;font-size:12px;line-height:1.35}
+.h2h .me{border-left:4px solid var(--line)}.h2h .them{border-right:4px solid var(--line);text-align:right}
+.h2h .cell .n1{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.h2h .cell .n2{font-family:"IBM Plex Mono",monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.h2h .cell .n3{color:var(--quiet);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.h2h .cell.s-locked{background:var(--lockbg);border-color:var(--lock)}.h2h .cell.s-locked .n2{color:var(--lock);font-weight:600}
+.h2h .cell.s-live{border-color:var(--risk)}.h2h .cell.s-live .n2{color:var(--risk);font-weight:600}
+.h2h .cell.s-open .n2{color:var(--pass);font-weight:600}.h2h .me.s-open{border-left-color:var(--pass)}.h2h .them.s-open{border-right-color:var(--pass)}
+.h2h .cell.s-kept .n2{color:var(--lock)}.h2h .cell.s-gone .n2{color:var(--quiet);text-decoration:line-through}
+.h2h .cell.s-empty{opacity:.6}
+.h2h .slotc{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--quiet)}
+.h2h .slotc b{font-size:12px;color:var(--ink);font-weight:600}.h2h .edge{font-size:10.5px;padding:0 4px;border-radius:99px;white-space:nowrap}
+.h2h .edge.up{background:var(--lockbg);color:var(--lock)}.h2h .edge.down{background:var(--riskbg);color:var(--risk)}.h2h .edge.even{background:var(--chip)}
+.h2h .hd{font-size:11px;color:var(--quiet);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.h2h .hd.r{text-align:right}
+.h2h .chipq{font-size:10px;color:var(--risk);font-weight:600;margin:0 4px;font-family:"IBM Plex Mono",monospace}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--quiet);margin-top:10px}.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px;border:1px solid var(--line)}
 </style>
 </head>
 <body>
@@ -74,7 +97,7 @@ select{font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);
 <div id="health"></div>
 <div class="now" id="now">Loading…</div>
 <nav id="tabs">
-  <button data-t="locks" class="on">Locks</button><button data-t="week">Week</button><button data-t="moves">Moves</button><button data-t="waivers">Waivers</button><button data-t="trades">Trades</button><button data-t="research">Research</button><button data-t="insights">Insights</button><button data-t="news">News</button><button data-t="experts">Experts</button>
+  <button data-t="locks" class="on">Locks</button><button data-t="matchup">Matchup</button><button data-t="week">Week</button><button data-t="moves">Moves</button><button data-t="waivers">Waivers</button><button data-t="trades">Trades</button><button data-t="research">Research</button><button data-t="insights">Insights</button><button data-t="news">News</button><button data-t="experts">Experts</button>
 </nav>
 
 <section data-p="locks">
@@ -82,6 +105,9 @@ select{font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);
   <h2>Today's lineup: now vs plan</h2>
   <p class="foot" style="margin-top:0">Open slots only count a game if he's starting at tip. Make changes as late as you safely can (final injury reports come ~30–60 min before tip). Relief: if the first player's game misses the keep line, pass on it and slide the later player into that slot before his tip.</p>
   <div class="box" id="lineup"></div>
+</section>
+<section data-p="matchup" class="hide">
+  <h2>Head to head, slot by slot</h2><div id="h2h"></div>
 </section>
 <section data-p="week" class="hide">
   <h2>This week, game by game</h2><div class="wrap"><table id="grid"></table></div>

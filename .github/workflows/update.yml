@@ -84,6 +84,8 @@ jobs:
           cat data/state/site_check.json
           timeout 60 google-chrome --headless=new --disable-gpu --no-sandbox --hide-scrollbars --force-device-scale-factor=1 \
             --window-size=390,3200 --virtual-time-budget=25000 --screenshot=data/state/mobile.png "http://localhost:8099/#api=${{ vars.WORKER_URL }}" >/dev/null 2>&1 || true
+          timeout 60 google-chrome --headless=new --disable-gpu --no-sandbox --hide-scrollbars --force-device-scale-factor=2 \
+            --window-size=390,1500 --virtual-time-budget=25000 --screenshot=data/state/mobile_matchup.png "http://localhost:8099/#api=${{ vars.WORKER_URL }}&tab=matchup" >/dev/null 2>&1 || true
 
       - name: Save state to the state branch (daily copy kept on state-backup)
         run: tools/state.sh save
