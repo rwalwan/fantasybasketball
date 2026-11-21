@@ -1,0 +1,3436 @@
+{
+ "at": "2026-11-21T16:02:01.042Z",
+ "today": "2026-11-21",
+ "week": 5,
+ "expectedTotal": 259.5,
+ "slots": [
+  {
+   "slot": "PG",
+   "pid": "1970",
+   "name": "Luka Dončić",
+   "status": null,
+   "today": null,
+   "later": null,
+   "st": "open",
+   "game": {
+    "date": "2026-11-20",
+    "fp": 54,
+    "opp": "SAC"
+   },
+   "lockSource": null,
+   "kept": false,
+   "left": [],
+   "score": 54,
+   "bar": 38.1,
+   "yourBar": 38.1,
+   "gameDate": "2026-11-20",
+   "deadline": null,
+   "matchup": null,
+   "pWaitBeats": 0.145,
+   "whatIf": null,
+   "action": "keep",
+   "detail": "54.0 counts automatically: he has no games left and nothing else beats it.",
+   "ev": 54,
+   "sd": 0
+  },
+  {
+   "slot": "SG",
+   "pid": "2752",
+   "name": "Cam Spencer",
+   "status": null,
+   "today": null,
+   "later": null,
+   "st": "locked",
+   "game": {
+    "date": "2026-11-18",
+    "fp": 48.5,
+    "opp": "CLE"
+   },
+   "lockSource": "sleeper",
+   "kept": false,
+   "left": [],
+   "action": "locked",
+   "score": 48.5,
+   "inferred": false,
+   "detail": "Locked 48.5 (2026-11-18).",
+   "ev": 48.5,
+   "sd": 0
+  },
+  {
+   "slot": "G",
+   "pid": "1747",
+   "name": "Jamal Murray",
+   "status": null,
+   "today": {
+    "pid": "2090",
+    "name": "Ty Jerome",
+    "tip": "2026-11-22T01:00Z",
+    "opp": "MIN",
+    "mu": 48.2,
+    "keepBar": 48.4,
+    "move": true,
+    "gain": 3.7,
+    "bestTime": "2026-11-22T00:20:00.000Z"
+   },
+   "later": null,
+   "st": "open",
+   "game": {
+    "date": "2026-11-20",
+    "fp": 33,
+    "opp": "HOU"
+   },
+   "lockSource": null,
+   "kept": false,
+   "left": [
+    {
+     "date": "2026-11-22",
+     "opp": "CHI",
+     "mu": 51.5,
+     "q": 0.94,
+     "tip": "2026-11-23T00:00Z"
+    }
+   ],
+   "score": 33,
+   "bar": 52.1,
+   "yourBar": 52.1,
+   "gameDate": "2026-11-20",
+   "deadline": {
+    "date": "2026-11-22",
+    "tip": "2026-11-23T00:00Z"
+   },
+   "matchup": {
+    "pLock": 0.0002720595385736213,
+    "pPass": 0.014830839171965371,
+    "evCall": "pass",
+    "call": "pass",
+    "flipped": false
+   },
+   "pWaitBeats": 0.926,
+   "whatIf": null,
+   "action": "pass",
+   "detail": "Don't lock: 33.0 is under 52.1, what this slot is expected to get by waiting. Today: start Ty Jerome here (MIN, 48.2 proj). (Matchup looks decided, so this call maximizes points.)",
+   "ev": 52.1,
+   "sd": 18.2
+  },
+  {
+   "slot": "SF",
+   "pid": "1433",
+   "name": "Kevin Durant",
+   "status": null,
+   "today": null,
+   "later": null,
+   "st": "open",
+   "game": {
+    "date": "2026-11-20",
+    "fp": 32,
+    "opp": "DEN"
+   },
+   "lockSource": null,
+   "kept": false,
+   "left": [],
+   "score": 32,
+   "bar": 25.4,
+   "yourBar": 25.4,
+   "gameDate": "2026-11-20",
+   "deadline": null,
+   "matchup": null,
+   "pWaitBeats": 0.294,
+   "whatIf": null,
+   "action": "keep",
+   "detail": "32.0 counts automatically: he has no games left and nothing else beats it.",
+   "ev": 32,
+   "sd": 0
+  },
+  {
+   "slot": "PF",
+   "pid": "2136",
+   "name": "Onyeka Okongwu",
+   "status": null,
+   "today": null,
+   "later": null,
+   "st": "locked",
+   "game": {
+    "date": "2026-11-18",
+    "fp": 56.5,
+    "opp": "OKC"
+   },
+   "lockSource": "sleeper",
+   "kept": false,
+   "left": [],
+   "action": "locked",
+   "score": 56.5,
+   "inferred": false,
+   "detail": "Locked 56.5 (2026-11-18).",
+   "ev": 56.5,
+   "sd": 0
+  },
+  {
+   "slot": "F",
+   "pid": "2733",
+   "name": "Alex Sarr",
+   "status": null,
+   "today": {
+    "pid": "1975",
+    "name": "Mikal Bridges",
+    "tip": "2026-11-22T00:30Z",
+    "opp": "POR",
+    "mu": 24.3,
+    "keepBar": 30.8,
+    "move": true,
+    "gain": 2.6,
+    "bestTime": "2026-11-21T23:50:00.000Z"
+   },
+   "later": null,
+   "st": "open",
+   "game": {
+    "date": "2026-11-20",
+    "fp": 13,
+    "opp": "CHI"
+   },
+   "lockSource": null,
+   "kept": false,
+   "left": [
+    {
+     "date": "2026-11-22",
+     "opp": "ORL",
+     "mu": 32.8,
+     "q": 0.94,
+     "tip": "2026-11-23T00:00Z"
+    }
+   ],
+   "score": 13,
+   "bar": 33.4,
+   "yourBar": 33.4,
+   "gameDate": "2026-11-20",
+   "deadline": {
+    "date": "2026-11-22",
+    "tip": "2026-11-23T00:00Z"
+   },
+   "matchup": {
+    "pLock": 0.000835841539071347,
+    "pPass": 0.014830839171965426,
+    "evCall": "pass",
+    "call": "pass",
+    "flipped": false
+   },
+   "pWaitBeats": 0.965,
+   "whatIf": null,
+   "action": "pass",
+   "detail": "Don't lock: 13.0 is under 33.4, what this slot is expected to get by waiting. Today: start Mikal Bridges here (POR, 24.3 proj). (Matchup looks decided, so this call maximizes points.)",
+   "ev": 33.4,
+   "sd": 13.3
+  },
+  {
+   "slot": "C",
+   "pid": "1883",
+   "name": "Wendell Carter Jr.",
+   "status": null,
+   "today": null,
+   "later": null,
+   "st": "locked",
+   "game": {
+    "date": "2026-11-18",
+    "fp": 40.5,
+    "opp": "PHI"
+   },
+   "lockSource": "sleeper",
+   "kept": false,
+   "left": [],
+   "action": "locked",
+   "score": 40.5,
+   "inferred": false,
+   "detail": "Locked 40.5 (2026-11-18).",
+   "ev": 40.5,
+   "sd": 0
+  },
+  {
+   "slot": "C",
+   "pid": "2275",
+   "name": "Day'Ron Sharpe",
+   "status": null,
+   "today": null,
+   "later": null,
+   "st": "open",
+   "game": {
+    "date": "2026-11-20",
+    "fp": 48,
+    "opp": "ORL"
+   },
+   "lockSource": null,
+   "kept": false,
+   "left": [],
+   "score": 48,
+   "bar": 29.1,
+   "yourBar": 29.1,
+   "gameDate": "2026-11-20",
+   "deadline": null,
+   "matchup": null,
+   "pWaitBeats": 0.029,
+   "whatIf": null,
+   "action": "keep",
+   "detail": "48.0 counts automatically: he has no games left and nothing else beats it.",
+   "ev": 48,
+   "sd": 0
+  },
+  {
+   "slot": "UTIL",
+   "pid": "1660",
+   "name": "Mario Hezonja",
+   "status": null,
+   "today": null,
+   "later": null,
+   "st": "open",
+   "game": {
+    "date": "2026-11-20",
+    "fp": 40,
+    "opp": "IND"
+   },
+   "lockSource": null,
+   "kept": false,
+   "left": [],
+   "score": 40,
+   "bar": 38.1,
+   "yourBar": 38.1,
+   "gameDate": "2026-11-20",
+   "deadline": null,
+   "matchup": null,
+   "pWaitBeats": 0.473,
+   "whatIf": null,
+   "action": "keep",
+   "detail": "40.0 counts automatically: he has no games left and nothing else beats it.",
+   "ev": 40,
+   "sd": 0
+  },
+  {
+   "slot": "UTIL",
+   "pid": "1350",
+   "name": "Rudy Gobert",
+   "status": null,
+   "today": null,
+   "later": null,
+   "st": "locked",
+   "game": {
+    "date": "2026-11-16",
+    "fp": 59,
+    "opp": "POR"
+   },
+   "lockSource": "sleeper",
+   "kept": false,
+   "left": [],
+   "action": "locked",
+   "score": 59,
+   "inferred": false,
+   "detail": "Locked 59.0 (2026-11-16).",
+   "ev": 59,
+   "sd": 0
+  }
+ ],
+ "actions": [
+  {
+   "kind": "move",
+   "slot": "F",
+   "pid": "1975",
+   "by": "2026-11-22T00:30Z",
+   "t": "2026-11-21T23:50:00.000Z",
+   "best": "2026-11-21T23:50:00.000Z",
+   "text": "Start Mikal Bridges at F (bench Alex Sarr)"
+  },
+  {
+   "kind": "move",
+   "slot": "G",
+   "pid": "2090",
+   "by": "2026-11-22T01:00Z",
+   "t": "2026-11-22T00:20:00.000Z",
+   "best": "2026-11-22T00:20:00.000Z",
+   "text": "Start Ty Jerome at G (bench Jamal Murray)"
+  },
+  {
+   "kind": "pass",
+   "slot": "G",
+   "pid": "1747",
+   "by": "2026-11-23T00:00Z",
+   "t": "2026-11-23T00:00Z",
+   "text": "Don't lock Jamal Murray's 33.0 (G)"
+  },
+  {
+   "kind": "pass",
+   "slot": "F",
+   "pid": "2733",
+   "by": "2026-11-23T00:00Z",
+   "t": "2026-11-23T00:00Z",
+   "text": "Don't lock Alex Sarr's 13.0 (F)"
+  }
+ ],
+ "idle": [
+  {
+   "pid": "1830",
+   "name": "Derrick White"
+  },
+  {
+   "pid": "1997",
+   "name": "Daniel Gafford"
+  },
+  {
+   "pid": "2302",
+   "name": "Neemias Queta"
+  }
+ ],
+ "outlook": {
+  "mean": 464.0056949417973,
+  "var": 506.40321061558836,
+  "sd": 22.50340442278875,
+  "winProb": 0.014830839171965371,
+  "opp": {
+   "mean": 532.618857903203,
+   "var": 490.8859558733614
+  }
+ },
+ "adds": [],
+ "trades": [
+  {
+   "partner": "OUTOUTOUT",
+   "roster_id": 5,
+   "give": [
+    "1433",
+    "1883",
+    "1830"
+   ],
+   "get": [
+    "4760"
+   ],
+   "giveNames": [
+    "Kevin Durant",
+    "Wendell Carter Jr.",
+    "Derrick White"
+   ],
+   "getNames": [
+    "Cooper Flagg"
+   ],
+   "dm": 6.4,
+   "dt": 1,
+   "theirFit": [
+    {
+     "slot": "SG",
+     "in": "1830",
+     "out": "4760",
+     "gain": -17.8,
+     "inName": "Derrick White",
+     "outName": "Cooper Flagg"
+    },
+    {
+     "slot": "PF",
+     "in": "1433",
+     "out": "2233",
+     "gain": 15.5,
+     "inName": "Kevin Durant",
+     "outName": "Naji Marshall"
+    },
+    {
+     "slot": "C",
+     "in": "1883",
+     "out": "2146",
+     "gain": 5.5,
+     "inName": "Wendell Carter Jr.",
+     "outName": "Devin Vassell"
+    }
+   ],
+   "myFit": [
+    {
+     "slot": "G",
+     "in": "1959",
+     "out": "1433",
+     "gain": -10.5,
+     "inName": "Grayson Allen",
+     "outName": "Kevin Durant"
+    },
+    {
+     "slot": "SF",
+     "in": "4760",
+     "out": "1883",
+     "gain": 16.9,
+     "inName": "Cooper Flagg",
+     "outName": "Wendell Carter Jr."
+    },
+    {
+     "slot": "UTIL",
+     "in": "2275",
+     "out": "1830",
+     "gain": -0.1,
+     "inName": "Day'Ron Sharpe",
+     "outName": "Derrick White"
+    }
+   ],
+   "myWeek": 0,
+   "theirWeek": 0,
+   "winsMe": 0.456,
+   "winsThem": 0.072,
+   "winsWeekMe": 0,
+   "winsWeekThem": 0,
+   "winsRosMe": 0.456,
+   "winsRosThem": 0.072,
+   "theirP": 0.06,
+   "myDrop": [],
+   "thDrop": [
+    "Caleb Wilson",
+    "Terrence Shannon Jr."
+   ],
+   "marketGive": 118,
+   "marketGet": 129,
+   "uncertain": [],
+   "reason": "Flagg's 54.2 projection gives us +6.3/wk; for them, Durant upgrades PF by +15.5/wk but losing Flagg costs -17.8/wk at SG, netting only +1.0."
+  },
+  {
+   "partner": "OUTOUTOUT",
+   "roster_id": 5,
+   "give": [
+    "1433",
+    "1883",
+    "1830"
+   ],
+   "get": [
+    "4760",
+    "4881"
+   ],
+   "giveNames": [
+    "Kevin Durant",
+    "Wendell Carter Jr.",
+    "Derrick White"
+   ],
+   "getNames": [
+    "Cooper Flagg",
+    "Keaton Wagler"
+   ],
+   "dm": 6.4,
+   "dt": 1,
+   "theirFit": [
+    {
+     "slot": "SG",
+     "in": "1830",
+     "out": "4760",
+     "gain": -17.8,
+     "inName": "Derrick White",
+     "outName": "Cooper Flagg"
+    },
+    {
+     "slot": "PF",
+     "in": "1433",
+     "out": "2233",
+     "gain": 15.5,
+     "inName": "Kevin Durant",
+     "outName": "Naji Marshall"
+    },
+    {
+     "slot": "C",
+     "in": "1883",
+     "out": "2146",
+     "gain": 5.5,
+     "inName": "Wendell Carter Jr.",
+     "outName": "Devin Vassell"
+    }
+   ],
+   "myFit": [
+    {
+     "slot": "G",
+     "in": "1959",
+     "out": "1433",
+     "gain": -10.5,
+     "inName": "Grayson Allen",
+     "outName": "Kevin Durant"
+    },
+    {
+     "slot": "SF",
+     "in": "4760",
+     "out": "1883",
+     "gain": 16.9,
+     "inName": "Cooper Flagg",
+     "outName": "Wendell Carter Jr."
+    },
+    {
+     "slot": "UTIL",
+     "in": "2275",
+     "out": "1830",
+     "gain": -0.1,
+     "inName": "Day'Ron Sharpe",
+     "outName": "Derrick White"
+    }
+   ],
+   "myWeek": 0,
+   "theirWeek": 0,
+   "winsMe": 0.456,
+   "winsThem": 0.072,
+   "winsWeekMe": 0,
+   "winsWeekThem": 0,
+   "winsRosMe": 0.456,
+   "winsRosThem": 0.072,
+   "theirP": 0.06,
+   "myDrop": [],
+   "thDrop": [
+    "Caleb Wilson"
+   ],
+   "marketGive": 118,
+   "marketGet": 129,
+   "uncertain": [],
+   "reason": "Wagler's 28.0 projection relies on preseason numbers, so Flagg drives the +6.3/wk gain. For them, Durant fixes PF (+15.5/wk) but nets only +1.0/wk."
+  },
+  {
+   "partner": "SreckTheBoss",
+   "roster_id": 4,
+   "give": [
+    "2090",
+    "1883",
+    "1830"
+   ],
+   "get": [
+    "2126",
+    "2040"
+   ],
+   "giveNames": [
+    "Ty Jerome",
+    "Wendell Carter Jr.",
+    "Derrick White"
+   ],
+   "getNames": [
+    "Tyrese Maxey",
+    "Ja Morant"
+   ],
+   "dm": 6.1,
+   "dt": 0,
+   "theirFit": [
+    {
+     "slot": "PG",
+     "in": "2090",
+     "out": "2126",
+     "gain": -5.1,
+     "inName": "Ty Jerome",
+     "outName": "Tyrese Maxey"
+    },
+    {
+     "slot": "C",
+     "in": "1883",
+     "out": "2040",
+     "gain": 2.2,
+     "inName": "Wendell Carter Jr.",
+     "outName": "Ja Morant"
+    },
+    {
+     "slot": "UTIL",
+     "in": "1830",
+     "out": "2233",
+     "gain": 6,
+     "inName": "Derrick White",
+     "outName": "Naji Marshall"
+    }
+   ],
+   "myFit": [
+    {
+     "slot": "SG",
+     "in": "2040",
+     "out": "2090",
+     "gain": -12.8,
+     "inName": "Ja Morant",
+     "outName": "Ty Jerome"
+    },
+    {
+     "slot": "UTIL",
+     "in": "2126",
+     "out": "1883",
+     "gain": 15.7,
+     "inName": "Tyrese Maxey",
+     "outName": "Wendell Carter Jr."
+    },
+    {
+     "slot": "UTIL",
+     "in": "1959",
+     "out": "1830",
+     "gain": -1,
+     "inName": "Grayson Allen",
+     "outName": "Derrick White"
+    }
+   ],
+   "myWeek": 0,
+   "theirWeek": 0,
+   "winsMe": 0.436,
+   "winsThem": 0.003,
+   "winsWeekMe": 0,
+   "winsWeekThem": 0,
+   "winsRosMe": 0.436,
+   "winsRosThem": 0.003,
+   "theirP": 0,
+   "myDrop": [],
+   "thDrop": [
+    "Jalen Williams"
+   ],
+   "marketGive": 131,
+   "marketGet": 137,
+   "uncertain": [],
+   "reason": "Their side nets +0.0 locked pts/wk and they're at 0% to win this week, so this trade doesn't fix their matchup."
+  },
+  {
+   "partner": "SreckTheBoss",
+   "roster_id": 4,
+   "give": [
+    "2733",
+    "1830"
+   ],
+   "get": [
+    "1913"
+   ],
+   "giveNames": [
+    "Alex Sarr",
+    "Derrick White"
+   ],
+   "getNames": [
+    "Miles Bridges"
+   ],
+   "dm": 4.6,
+   "dt": 1.2,
+   "theirFit": [
+    {
+     "slot": "UTIL",
+     "in": "2733",
+     "out": "1913",
+     "gain": -5.4,
+     "inName": "Alex Sarr",
+     "outName": "Miles Bridges"
+    },
+    {
+     "slot": "UTIL",
+     "in": "1830",
+     "out": "2233",
+     "gain": 6,
+     "inName": "Derrick White",
+     "outName": "Naji Marshall"
+    }
+   ],
+   "myFit": [
+    {
+     "slot": "F",
+     "in": "1913",
+     "out": "2733",
+     "gain": 5.4,
+     "inName": "Miles Bridges",
+     "outName": "Alex Sarr"
+    },
+    {
+     "slot": "UTIL",
+     "in": "1959",
+     "out": "1830",
+     "gain": -1,
+     "inName": "Grayson Allen",
+     "outName": "Derrick White"
+    }
+   ],
+   "myWeek": 0,
+   "theirWeek": 0,
+   "winsMe": 0.326,
+   "winsThem": 0.083,
+   "winsWeekMe": 0,
+   "winsWeekThem": 0,
+   "winsRosMe": 0.326,
+   "winsRosThem": 0.083,
+   "theirP": 0,
+   "myDrop": [],
+   "thDrop": [
+    "Jalen Williams"
+   ],
+   "marketGive": 44,
+   "marketGet": 49,
+   "uncertain": [],
+   "reason": "Bridges's 39.4 projection adds +5.4/wk at F for us. For them, White's +6/wk at UTIL outweighs losing Bridges (-5.4/wk), netting +1.2."
+  },
+  {
+   "partner": "SreckTheBoss",
+   "roster_id": 4,
+   "give": [
+    "2136",
+    "1350",
+    "1830"
+   ],
+   "get": [
+    "2126"
+   ],
+   "giveNames": [
+    "Onyeka Okongwu",
+    "Rudy Gobert",
+    "Derrick White"
+   ],
+   "getNames": [
+    "Tyrese Maxey"
+   ],
+   "dm": 4.3,
+   "dt": 1.6,
+   "theirFit": [
+    {
+     "slot": "F",
+     "in": "2136",
+     "out": "2126",
+     "gain": -9.1,
+     "inName": "Onyeka Okongwu",
+     "outName": "Tyrese Maxey"
+    },
+    {
+     "slot": "C",
+     "in": "1350",
+     "out": "2233",
+     "gain": 8.3,
+     "inName": "Rudy Gobert",
+     "outName": "Naji Marshall"
+    }
+   ],
+   "myFit": [
+    {
+     "slot": "F",
+     "in": "1959",
+     "out": "2136",
+     "gain": -8.6,
+     "inName": "Grayson Allen",
+     "outName": "Onyeka Okongwu"
+    },
+    {
+     "slot": "UTIL",
+     "in": "2126",
+     "out": "1350",
+     "gain": 14.3,
+     "inName": "Tyrese Maxey",
+     "outName": "Rudy Gobert"
+    },
+    {
+     "slot": "UTIL",
+     "in": "2275",
+     "out": "1830",
+     "gain": -0.1,
+     "inName": "Day'Ron Sharpe",
+     "outName": "Derrick White"
+    }
+   ],
+   "myWeek": 0,
+   "theirWeek": 0,
+   "winsMe": 0.304,
+   "winsThem": 0.114,
+   "winsWeekMe": 0,
+   "winsWeekThem": 0,
+   "winsRosMe": 0.304,
+   "winsRosThem": 0.114,
+   "theirP": 0,
+   "myDrop": [],
+   "thDrop": [
+    "Jalen Williams",
+    "Cason Wallace"
+   ],
+   "marketGive": 113,
+   "marketGet": 120,
+   "uncertain": [],
+   "reason": "Maxey's 51.7 projection gives +14.3/wk at UTIL, outweighing Okongwu's loss (-10.4/wk at F). For them, Gobert upgrades C by +8.3/wk, netting +1.6."
+  },
+  {
+   "partner": "asurap",
+   "roster_id": 1,
+   "give": [
+    "1883",
+    "2733",
+    "1830"
+   ],
+   "get": [
+    "2568",
+    "2718"
+   ],
+   "giveNames": [
+    "Wendell Carter Jr.",
+    "Alex Sarr",
+    "Derrick White"
+   ],
+   "getNames": [
+    "Brandon Miller",
+    "Zach Edey"
+   ],
+   "dm": 4.4,
+   "dt": 0.4,
+   "theirFit": [
+    {
+     "slot": "C",
+     "in": "1883",
+     "out": "2568",
+     "gain": -6.4,
+     "inName": "Wendell Carter Jr.",
+     "outName": "Brandon Miller"
+    },
+    {
+     "slot": "UTIL",
+     "in": "2733",
+     "out": "2718",
+     "gain": 2.8,
+     "inName": "Alex Sarr",
+     "outName": "Zach Edey"
+    },
+    {
+     "slot": "UTIL",
+     "in": "1830",
+     "out": "2050",
+     "gain": 3.8,
+     "inName": "Derrick White",
+     "outName": "De'Andre Hunter"
+    }
+   ],
+   "myFit": [
+    {
+     "slot": "G",
+     "in": "1959",
+     "out": "2733",
+     "gain": -1.2,
+     "inName": "Grayson Allen",
+     "outName": "Alex Sarr"
+    },
+    {
+     "slot": "F",
+     "in": "2568",
+     "out": "1883",
+     "gain": 6.4,
+     "inName": "Brandon Miller",
+     "outName": "Wendell Carter Jr."
+    },
+    {
+     "slot": "UTIL",
+     "in": "2275",
+     "out": "1830",
+     "gain": -0.1,
+     "inName": "Day'Ron Sharpe",
+     "outName": "Derrick White"
+    }
+   ],
+   "myWeek": 0,
+   "theirWeek": 0,
+   "winsMe": 0.315,
+   "winsThem": 0.027,
+   "winsWeekMe": 0,
+   "winsWeekThem": 0,
+   "winsRosMe": 0.315,
+   "winsRosThem": 0.027,
+   "theirP": 0.94,
+   "myDrop": [],
+   "thDrop": [
+    "Kasparas Jakučionis"
+   ],
+   "marketGive": 69,
+   "marketGet": 70,
+   "uncertain": [],
+   "reason": "Miller's 40.7 projection gives +7.1/wk at F. For them, losing Miller at C costs -6.4/wk, but Sarr and White add +2.8 and +3.8 at UTIL, netting +0.4."
+  },
+  {
+   "partner": "asurap",
+   "roster_id": 1,
+   "give": [
+    "2090",
+    "1350",
+    "2733"
+   ],
+   "get": [
+    "1957"
+   ],
+   "giveNames": [
+    "Ty Jerome",
+    "Rudy Gobert",
+    "Alex Sarr"
+   ],
+   "getNames": [
+    "Shai Gilgeous-Alexander"
+   ],
+   "dm": 4.4,
+   "dt": 0.2,
+   "theirFit": [
+    {
+     "slot": "PG",
+     "in": "2090",
+     "out": "1957",
+     "gain": -9.4,
+     "inName": "Ty Jerome",
+     "outName": "Shai Gilgeous-Alexander"
+    },
+    {
+     "slot": "C",
+     "in": "1350",
+     "out": "2718",
+     "gain": 4.9,
+     "inName": "Rudy Gobert",
+     "outName": "Zach Edey"
+    },
+    {
+     "slot": "UTIL",
+     "in": "2733",
+     "out": "2050",
+     "gain": 4,
+     "inName": "Alex Sarr",
+     "outName": "De'Andre Hunter"
+    }
+   ],
+   "myFit": [
+    {
+     "slot": "G",
+     "in": "1957",
+     "out": "2090",
+     "gain": 9.4,
+     "inName": "Shai Gilgeous-Alexander",
+     "outName": "Ty Jerome"
+    },
+    {
+     "slot": "F",
+     "in": "1959",
+     "out": "2733",
+     "gain": -1.2,
+     "inName": "Grayson Allen",
+     "outName": "Alex Sarr"
+    },
+    {
+     "slot": "UTIL",
+     "in": "2275",
+     "out": "1350",
+     "gain": -2.4,
+     "inName": "Day'Ron Sharpe",
+     "outName": "Rudy Gobert"
+    }
+   ],
+   "myWeek": 0,
+   "theirWeek": 0,
+   "winsMe": 0.318,
+   "winsThem": 0.013,
+   "winsWeekMe": 0,
+   "winsWeekThem": 0,
+   "winsRosMe": 0.318,
+   "winsRosThem": 0.013,
+   "theirP": 0.94,
+   "myDrop": [],
+   "thDrop": [
+    "Kasparas Jakučionis",
+    "Ja'Kobe Walter"
+   ],
+   "marketGive": 139,
+   "marketGet": 153,
+   "uncertain": [],
+   "reason": "Adds SGA at G (+9.4/wk), netting us +4.4 weekly; projections lean on last season early. Fixes their C and UTIL spots (+4.9, +6.2/wk)."
+  },
+  {
+   "partner": "darksteel123",
+   "roster_id": 11,
+   "give": [
+    "2090",
+    "1350",
+    "1830"
+   ],
+   "get": [
+    "1739",
+    "2726"
+   ],
+   "giveNames": [
+    "Ty Jerome",
+    "Rudy Gobert",
+    "Derrick White"
+   ],
+   "getNames": [
+    "Domantas Sabonis",
+    "Kel'el Ware"
+   ],
+   "dm": 4.1,
+   "dt": 0.3,
+   "theirFit": [
+    {
+     "slot": "SG",
+     "in": "2090",
+     "out": "1739",
+     "gain": -8.7,
+     "inName": "Ty Jerome",
+     "outName": "Domantas Sabonis"
+    },
+    {
+     "slot": "UTIL",
+     "in": "1350",
+     "out": "2457",
+     "gain": 4.8,
+     "inName": "Rudy Gobert",
+     "outName": "Christian Braun"
+    },
+    {
+     "slot": "UTIL",
+     "in": "1830",
+     "out": "1487",
+     "gain": 5.7,
+     "inName": "Derrick White",
+     "outName": "Tobias Harris"
+    }
+   ],
+   "myFit": [
+    {
+     "slot": "SG",
+     "in": "1959",
+     "out": "2090",
+     "gain": -12.5,
+     "inName": "Grayson Allen",
+     "outName": "Ty Jerome"
+    },
+    {
+     "slot": "PF",
+     "in": "1739",
+     "out": "1350",
+     "gain": 17.9,
+     "inName": "Domantas Sabonis",
+     "outName": "Rudy Gobert"
+    },
+    {
+     "slot": "UTIL",
+     "in": "2275",
+     "out": "1830",
+     "gain": -0.1,
+     "inName": "Day'Ron Sharpe",
+     "outName": "Derrick White"
+    }
+   ],
+   "myWeek": 0,
+   "theirWeek": 0,
+   "winsMe": 0.29,
+   "winsThem": 0.022,
+   "winsWeekMe": 0,
+   "winsWeekThem": 0,
+   "winsRosMe": 0.29,
+   "winsRosThem": 0.022,
+   "theirP": 0.99,
+   "myDrop": [],
+   "thDrop": [
+    "Reed Sheppard"
+   ],
+   "marketGive": 138,
+   "marketGet": 152,
+   "uncertain": [],
+   "reason": "Big upgrade: Sabonis (54.3 proj, recent 45/51.5/56) replaces Gobert at PF for +17.9/wk. For them, it fixes SG and UTIL depth, netting only +0.3."
+  },
+  {
+   "partner": "darksteel123",
+   "roster_id": 11,
+   "give": [
+    "2438",
+    "1883",
+    "1830"
+   ],
+   "get": [
+    "1240"
+   ],
+   "giveNames": [
+    "Jalen Duren",
+    "Wendell Carter Jr.",
+    "Derrick White"
+   ],
+   "getNames": [
+    "James Harden"
+   ],
+   "dm": 4,
+   "dt": 0.3,
+   "theirFit": [
+    {
+     "slot": "C",
+     "in": "2438",
+     "out": "1240",
+     "gain": -9.1,
+     "inName": "Jalen Duren",
+     "outName": "James Harden"
+    },
+    {
+     "slot": "UTIL",
+     "in": "1883",
+     "out": "2457",
+     "gain": 3.4,
+     "inName": "Wendell Carter Jr.",
+     "outName": "Christian Braun"
+    },
+    {
+     "slot": "UTIL",
+     "in": "1830",
+     "out": "1487",
+     "gain": 5.7,
+     "inName": "Derrick White",
+     "outName": "Tobias Harris"
+    }
+   ],
+   "myFit": [
+    {
+     "slot": "SF",
+     "in": "1959",
+     "out": "2438",
+     "gain": -5.1,
+     "inName": "Grayson Allen",
+     "outName": "Jalen Duren"
+    },
+    {
+     "slot": "UTIL",
+     "in": "1240",
+     "out": "1883",
+     "gain": 12.2,
+     "inName": "James Harden",
+     "outName": "Wendell Carter Jr."
+    },
+    {
+     "slot": "UTIL",
+     "in": "2275",
+     "out": "1830",
+     "gain": -0.1,
+     "inName": "Day'Ron Sharpe",
+     "outName": "Derrick White"
+    }
+   ],
+   "myWeek": 0,
+   "theirWeek": 0,
+   "winsMe": 0.286,
+   "winsThem": 0.021,
+   "winsWeekMe": 0,
+   "winsWeekThem": 0,
+   "winsRosMe": 0.286,
+   "winsRosThem": 0.021,
+   "theirP": 0.99,
+   "myDrop": [],
+   "thDrop": [
+    "Reed Sheppard",
+    "Klay Thompson"
+   ],
+   "marketGive": 87,
+   "marketGet": 95,
+   "uncertain": [],
+   "reason": "Harden's 47.8 projection adds +12.2/wk at UTIL over Carter, outweighing Duren's -6.9/wk drop. For them, Carter and White fill UTIL, but losing Harden nets +0.3."
+  },
+  {
+   "partner": "OUTOUTOUT",
+   "roster_id": 5,
+   "give": [
+    "2733",
+    "1830"
+   ],
+   "get": [
+    "2285"
+   ],
+   "giveNames": [
+    "Alex Sarr",
+    "Derrick White"
+   ],
+   "getNames": [
+    "Trey Murphy III"
+   ],
+   "dm": 3.4,
+   "dt": 1.1,
+   "theirFit": [
+    {
+     "slot": "SG",
+     "in": "1830",
+     "out": "2285",
+     "gain": -4.4,
+     "inName": "Derrick White",
+     "outName": "Trey Murphy III"
+    },
+    {
+     "slot": "F",
+     "in": "2733",
+     "out": "2146",
+     "gain": 4.8,
+     "inName": "Alex Sarr",
+     "outName": "Devin Vassell"
+    }
+   ],
+   "myFit": [
+    {
+     "slot": "F",
+     "in": "2285",
+     "out": "2733",
+     "gain": 4.2,
+     "inName": "Trey Murphy III",
+     "outName": "Alex Sarr"
+    },
+    {
+     "slot": "UTIL",
+     "in": "1959",
+     "out": "1830",
+     "gain": -1,
+     "inName": "Grayson Allen",
+     "outName": "Derrick White"
+    }
+   ],
+   "myWeek": 0,
+   "theirWeek": 0,
+   "winsMe": 0.243,
+   "winsThem": 0.078,
+   "winsWeekMe": 0,
+   "winsWeekThem": 0,
+   "winsRosMe": 0.243,
+   "winsRosThem": 0.078,
+   "theirP": 0.06,
+   "myDrop": [],
+   "thDrop": [
+    "Caleb Wilson"
+   ],
+   "marketGive": 44,
+   "marketGet": 42,
+   "uncertain": [],
+   "reason": "Murphy's 39.3 projection adds +4.2/wk at F for us. For them, Sarr's +4.8/wk at F outweighs losing Murphy (-4.4/wk), netting +1.1."
+  }
+ ],
+ "bar_debug": {
+  "1433": {
+   "noLock": 249.2,
+   "noLockStreams": 3.7,
+   "rest": 221.3,
+   "restStreams": 6.2,
+   "slotGets": "Mikal Bridges",
+   "ownW": 0,
+   "ownGames": [],
+   "noLockPick": [
+    [
+     "PG",
+     "Luka Dončić",
+     54
+    ],
+    [
+     "G",
+     "Jamal Murray",
+     48.4
+    ],
+    [
+     "SF",
+     "Mikal Bridges",
+     27.9
+    ],
+    [
+     "F",
+     "Alex Sarr",
+     30.8
+    ],
+    [
+     "C",
+     "Day'Ron Sharpe",
+     48
+    ],
+    [
+     "UTIL",
+     "Mario Hezonja",
+     40
+    ]
+   ],
+   "restPick": [
+    [
+     "PG",
+     "Luka Dončić"
+    ],
+    [
+     "G",
+     "Jamal Murray"
+    ],
+    [
+     "F",
+     "Alex Sarr"
+    ],
+    [
+     "C",
+     "Day'Ron Sharpe"
+    ],
+    [
+     "UTIL",
+     "Mario Hezonja"
+    ]
+   ]
+  },
+  "1660": {
+   "noLock": 248,
+   "noLockStreams": 9.6,
+   "rest": 213.3,
+   "restStreams": 6.2,
+   "slotGets": "Ty Jerome",
+   "ownW": 0,
+   "ownGames": [],
+   "noLockPick": [
+    [
+     "PG",
+     "Luka Dončić",
+     54
+    ],
+    [
+     "G",
+     "Jamal Murray",
+     48.4
+    ],
+    [
+     "SF",
+     "Kevin Durant",
+     32
+    ],
+    [
+     "F",
+     "Alex Sarr",
+     30.8
+    ],
+    [
+     "C",
+     "Day'Ron Sharpe",
+     48
+    ],
+    [
+     "UTIL",
+     "Ty Jerome",
+     34.7
+    ]
+   ],
+   "restPick": [
+    [
+     "PG",
+     "Luka Dončić"
+    ],
+    [
+     "G",
+     "Jamal Murray"
+    ],
+    [
+     "SF",
+     "Kevin Durant"
+    ],
+    [
+     "F",
+     "Alex Sarr"
+    ],
+    [
+     "C",
+     "Day'Ron Sharpe"
+    ]
+   ]
+  },
+  "1747": {
+   "noLock": 253.3,
+   "noLockStreams": 6.2,
+   "rest": 204.9,
+   "restStreams": 2.6,
+   "slotGets": "Jamal Murray",
+   "ownW": 48.4,
+   "ownGames": [
+    [
+     "2026-11-22",
+     51.5,
+     0.94
+    ]
+   ],
+   "noLockPick": [
+    [
+     "PG",
+     "Luka Dončić",
+     54
+    ],
+    [
+     "G",
+     "Jamal Murray",
+     48.4
+    ],
+    [
+     "SF",
+     "Kevin Durant",
+     32
+    ],
+    [
+     "F",
+     "Alex Sarr",
+     30.8
+    ],
+    [
+     "C",
+     "Day'Ron Sharpe",
+     48
+    ],
+    [
+     "UTIL",
+     "Mario Hezonja",
+     40
+    ]
+   ],
+   "restPick": [
+    [
+     "PG",
+     "Luka Dončić"
+    ],
+    [
+     "SF",
+     "Kevin Durant"
+    ],
+    [
+     "F",
+     "Alex Sarr"
+    ],
+    [
+     "C",
+     "Day'Ron Sharpe"
+    ],
+    [
+     "UTIL",
+     "Mario Hezonja"
+    ]
+   ]
+  },
+  "1970": {
+   "noLock": 234,
+   "noLockStreams": 9.6,
+   "rest": 199.3,
+   "restStreams": 6.2,
+   "slotGets": "Ty Jerome",
+   "ownW": 0,
+   "ownGames": [],
+   "noLockPick": [
+    [
+     "PG",
+     "Ty Jerome",
+     34.7
+    ],
+    [
+     "G",
+     "Jamal Murray",
+     48.4
+    ],
+    [
+     "SF",
+     "Kevin Durant",
+     32
+    ],
+    [
+     "F",
+     "Alex Sarr",
+     30.8
+    ],
+    [
+     "C",
+     "Day'Ron Sharpe",
+     48
+    ],
+    [
+     "UTIL",
+     "Mario Hezonja",
+     40
+    ]
+   ],
+   "restPick": [
+    [
+     "G",
+     "Jamal Murray"
+    ],
+    [
+     "SF",
+     "Kevin Durant"
+    ],
+    [
+     "F",
+     "Alex Sarr"
+    ],
+    [
+     "C",
+     "Day'Ron Sharpe"
+    ],
+    [
+     "UTIL",
+     "Mario Hezonja"
+    ]
+   ]
+  },
+  "2275": {
+   "noLock": 234.3,
+   "noLockStreams": 6.2,
+   "rest": 205.3,
+   "restStreams": 6.2,
+   "slotGets": "Daniel Gafford",
+   "ownW": 0,
+   "ownGames": [],
+   "noLockPick": [
+    [
+     "PG",
+     "Luka Dončić",
+     54
+    ],
+    [
+     "G",
+     "Jamal Murray",
+     48.4
+    ],
+    [
+     "SF",
+     "Kevin Durant",
+     32
+    ],
+    [
+     "F",
+     "Alex Sarr",
+     30.8
+    ],
+    [
+     "C",
+     "Daniel Gafford",
+     29.1
+    ],
+    [
+     "UTIL",
+     "Mario Hezonja",
+     40
+    ]
+   ],
+   "restPick": [
+    [
+     "PG",
+     "Luka Dončić"
+    ],
+    [
+     "G",
+     "Jamal Murray"
+    ],
+    [
+     "SF",
+     "Kevin Durant"
+    ],
+    [
+     "F",
+     "Alex Sarr"
+    ],
+    [
+     "UTIL",
+     "Mario Hezonja"
+    ]
+   ]
+  },
+  "2733": {
+   "noLock": 253.3,
+   "noLockStreams": 6.2,
+   "rest": 222.5,
+   "restStreams": 3.7,
+   "slotGets": "Alex Sarr",
+   "ownW": 30.8,
+   "ownGames": [
+    [
+     "2026-11-22",
+     32.8,
+     0.94
+    ]
+   ],
+   "noLockPick": [
+    [
+     "PG",
+     "Luka Dončić",
+     54
+    ],
+    [
+     "G",
+     "Jamal Murray",
+     48.4
+    ],
+    [
+     "SF",
+     "Kevin Durant",
+     32
+    ],
+    [
+     "F",
+     "Alex Sarr",
+     30.8
+    ],
+    [
+     "C",
+     "Day'Ron Sharpe",
+     48
+    ],
+    [
+     "UTIL",
+     "Mario Hezonja",
+     40
+    ]
+   ],
+   "restPick": [
+    [
+     "PG",
+     "Luka Dončić"
+    ],
+    [
+     "G",
+     "Jamal Murray"
+    ],
+    [
+     "SF",
+     "Kevin Durant"
+    ],
+    [
+     "C",
+     "Day'Ron Sharpe"
+    ],
+    [
+     "UTIL",
+     "Mario Hezonja"
+    ]
+   ]
+  }
+ },
+ "week_schedule": {
+  "G0": [
+   "11-22 Jamal Murray"
+  ],
+  "F1": [
+   "11-22 Alex Sarr"
+  ]
+ },
+ "today_options": [
+  [
+   "G",
+   48.4,
+   [
+    [
+     "Derrick White",
+     0,
+     23.76
+    ],
+    [
+     "Mikal Bridges",
+     0,
+     24.3
+    ],
+    [
+     "Ty Jerome",
+     0,
+     34.71
+    ]
+   ]
+  ],
+  [
+   "F",
+   30.8,
+   [
+    [
+     "Mikal Bridges",
+     0,
+     24.3
+    ]
+   ]
+  ]
+ ],
+ "ir": {
+  "activate": [
+   {
+    "pid": "1959",
+    "name": "Grayson Allen",
+    "status": "DTD",
+    "perWeek": 38.2,
+    "call": "activate",
+    "best": {
+     "drop": "1997",
+     "dropName": "Daniel Gafford",
+     "gain": 14,
+     "weekGain": 0,
+     "rosGain": 0.9,
+     "noise": 3.7,
+     "protected": false,
+     "value": 29.9
+    },
+    "options": [
+     {
+      "drop": "1997",
+      "dropName": "Daniel Gafford",
+      "gain": 14,
+      "weekGain": 0,
+      "rosGain": 0.9,
+      "noise": 3.7,
+      "protected": false,
+      "value": 29.9
+     },
+     {
+      "drop": "1975",
+      "dropName": "Mikal Bridges",
+      "gain": 14,
+      "weekGain": 0,
+      "rosGain": 0.9,
+      "noise": 4,
+      "protected": false,
+      "value": 30.7
+     },
+     {
+      "drop": "2302",
+      "dropName": "Neemias Queta",
+      "gain": 9.1,
+      "weekGain": 0,
+      "rosGain": 0.6,
+      "noise": 3.9,
+      "protected": false,
+      "value": 35.7
+     },
+     {
+      "drop": "1660",
+      "dropName": "Mario Hezonja",
+      "gain": 8.7,
+      "weekGain": -5.3,
+      "rosGain": 0.9,
+      "noise": 3.7,
+      "protected": true,
+      "value": 32.6
+     },
+     {
+      "drop": "2752",
+      "dropName": "Cam Spencer",
+      "gain": 4.9,
+      "weekGain": 0,
+      "rosGain": 0.3,
+      "noise": 3.8,
+      "protected": true,
+      "value": 36.4
+     },
+     {
+      "drop": "1830",
+      "dropName": "Derrick White",
+      "gain": -10.4,
+      "weekGain": 0,
+      "rosGain": -0.7,
+      "noise": 3.7,
+      "protected": false,
+      "value": 39.2
+     },
+     {
+      "drop": "2733",
+      "dropName": "Alex Sarr",
+      "gain": -16.1,
+      "weekGain": -2.9,
+      "rosGain": -0.8,
+      "noise": 3.8,
+      "protected": false,
+      "value": 39.4
+     },
+     {
+      "drop": "1883",
+      "dropName": "Wendell Carter Jr.",
+      "gain": -25.3,
+      "weekGain": 0,
+      "rosGain": -1.6,
+      "noise": 3.7,
+      "protected": true,
+      "value": 40.1
+     },
+     {
+      "drop": "2275",
+      "dropName": "Day'Ron Sharpe",
+      "gain": -27.7,
+      "weekGain": -18.9,
+      "rosGain": -0.6,
+      "noise": 3.7,
+      "protected": true,
+      "value": 39.1
+     },
+     {
+      "drop": "1350",
+      "dropName": "Rudy Gobert",
+      "gain": -47.4,
+      "weekGain": 0,
+      "rosGain": -3,
+      "noise": 3.8,
+      "protected": true,
+      "value": 41.5
+     },
+     {
+      "drop": "2136",
+      "dropName": "Onyeka Okongwu",
+      "gain": -130.4,
+      "weekGain": 0,
+      "rosGain": -8.2,
+      "noise": 4,
+      "protected": true,
+      "value": 46.7
+     },
+     {
+      "drop": "1433",
+      "dropName": "Kevin Durant",
+      "gain": -164.5,
+      "weekGain": -4.1,
+      "rosGain": -10.1,
+      "noise": 3.7,
+      "protected": true,
+      "value": 48.6
+     },
+     {
+      "drop": "2090",
+      "dropName": "Ty Jerome",
+      "gain": -192.8,
+      "weekGain": 0,
+      "rosGain": -12.2,
+      "noise": 4.1,
+      "protected": false,
+      "value": 50.7
+     },
+     {
+      "drop": "1747",
+      "dropName": "Jamal Murray",
+      "gain": -322.9,
+      "weekGain": -13.7,
+      "rosGain": -19.5,
+      "noise": 4.2,
+      "protected": false,
+      "value": 58
+     },
+     {
+      "drop": "1970",
+      "dropName": "Luka Dončić",
+      "gain": -684,
+      "weekGain": -19.3,
+      "rosGain": -41.9,
+      "noise": 5,
+      "protected": true,
+      "value": 78.9
+     }
+    ]
+   }
+  ],
+  "toIR": []
+ },
+ "starters_debug": [
+  {
+   "pid": "1970",
+   "name": "Luka Dončić",
+   "sleeper": 540,
+   "slot": 540,
+   "copies": [
+    540,
+    540
+   ],
+   "manualLock": null,
+   "state": {
+    "st": "open",
+    "g": {
+     "date": "2026-11-20",
+     "fp": 54,
+     "min": 36.1,
+     "gid": "1393301046507364352"
+    }
+   },
+   "played": [
+    [
+     "2026-11-17",
+     72
+    ],
+    [
+     "2026-11-18",
+     58
+    ],
+    [
+     "2026-11-20",
+     54
+    ]
+   ]
+  },
+  {
+   "pid": "2752",
+   "name": "Cam Spencer",
+   "sleeper": 485,
+   "slot": 485,
+   "copies": [
+    485,
+    485
+   ],
+   "manualLock": true,
+   "state": {
+    "st": "locked",
+    "g": {
+     "date": "2026-11-18",
+     "fp": 48.5,
+     "min": 29.45,
+     "gid": "1393723893692235776"
+    },
+    "source": "sleeper"
+   },
+   "played": [
+    [
+     "2026-11-16",
+     43
+    ],
+    [
+     "2026-11-18",
+     48.5
+    ],
+    [
+     "2026-11-19",
+     37.5
+    ]
+   ]
+  },
+  {
+   "pid": "1747",
+   "name": "Jamal Murray",
+   "sleeper": 500,
+   "slot": 500,
+   "copies": [
+    500,
+    500
+   ],
+   "manualLock": null,
+   "state": {
+    "st": "open",
+    "g": {
+     "date": "2026-11-20",
+     "fp": 33,
+     "min": 35.75,
+     "gid": "1393301046545113088"
+    }
+   },
+   "played": [
+    [
+     "2026-11-16",
+     48
+    ],
+    [
+     "2026-11-18",
+     50
+    ],
+    [
+     "2026-11-20",
+     33
+    ]
+   ]
+  },
+  {
+   "pid": "1433",
+   "name": "Kevin Durant",
+   "sleeper": 320,
+   "slot": 320,
+   "copies": [
+    320,
+    320
+   ],
+   "manualLock": null,
+   "state": {
+    "st": "open",
+    "g": {
+     "date": "2026-11-20",
+     "fp": 32,
+     "min": 35.18,
+     "gid": "1393301046545113088"
+    }
+   },
+   "played": [
+    [
+     "2026-11-16",
+     35.5
+    ],
+    [
+     "2026-11-18",
+     35
+    ],
+    [
+     "2026-11-20",
+     32
+    ]
+   ]
+  },
+  {
+   "pid": "2136",
+   "name": "Onyeka Okongwu",
+   "sleeper": 355,
+   "slot": 355,
+   "copies": [
+    355,
+    355
+   ],
+   "manualLock": null,
+   "state": {
+    "st": "locked",
+    "g": {
+     "date": "2026-11-18",
+     "fp": 56.5,
+     "min": 35.9,
+     "gid": "1393723898737983488"
+    },
+    "source": "sleeper"
+   },
+   "played": [
+    [
+     "2026-11-18",
+     56.5
+    ],
+    [
+     "2026-11-20",
+     35.5
+    ]
+   ]
+  },
+  {
+   "pid": "2733",
+   "name": "Alex Sarr",
+   "sleeper": 130,
+   "slot": 130,
+   "copies": [
+    130,
+    130
+   ],
+   "manualLock": null,
+   "state": {
+    "st": "open",
+    "g": {
+     "date": "2026-11-20",
+     "fp": 13,
+     "min": 20.25,
+     "gid": "1393301042686353408"
+    }
+   },
+   "played": [
+    [
+     "2026-11-16",
+     20
+    ],
+    [
+     "2026-11-18",
+     30.5
+    ],
+    [
+     "2026-11-20",
+     13
+    ]
+   ]
+  },
+  {
+   "pid": "1883",
+   "name": "Wendell Carter Jr.",
+   "sleeper": 310,
+   "slot": 310,
+   "copies": [
+    310,
+    310
+   ],
+   "manualLock": null,
+   "state": {
+    "st": "locked",
+    "g": {
+     "date": "2026-11-18",
+     "fp": 40.5,
+     "min": 31.5,
+     "gid": "1393723893679652864"
+    },
+    "source": "sleeper"
+   },
+   "played": [
+    [
+     "2026-11-16",
+     19
+    ],
+    [
+     "2026-11-18",
+     40.5
+    ],
+    [
+     "2026-11-20",
+     31
+    ]
+   ]
+  },
+  {
+   "pid": "2275",
+   "name": "Day'Ron Sharpe",
+   "sleeper": 480,
+   "slot": 480,
+   "copies": [
+    480,
+    480
+   ],
+   "manualLock": null,
+   "state": {
+    "st": "open",
+    "g": {
+     "date": "2026-11-20",
+     "fp": 48,
+     "min": 26.48,
+     "gid": "1393301040899579904"
+    }
+   },
+   "played": [
+    [
+     "2026-11-16",
+     37
+    ],
+    [
+     "2026-11-18",
+     19.5
+    ],
+    [
+     "2026-11-20",
+     48
+    ]
+   ]
+  },
+  {
+   "pid": "1660",
+   "name": "Mario Hezonja",
+   "sleeper": 400,
+   "slot": 400,
+   "copies": [
+    400,
+    400
+   ],
+   "manualLock": null,
+   "state": {
+    "st": "open",
+    "g": {
+     "date": "2026-11-20",
+     "fp": 40,
+     "min": 19.6,
+     "gid": "1393301042665381888"
+    }
+   },
+   "played": [
+    [
+     "2026-11-16",
+     23.5
+    ],
+    [
+     "2026-11-18",
+     43.5
+    ],
+    [
+     "2026-11-20",
+     40
+    ]
+   ]
+  },
+  {
+   "pid": "1350",
+   "name": "Rudy Gobert",
+   "sleeper": 260,
+   "slot": 260,
+   "copies": [
+    260,
+    260
+   ],
+   "manualLock": null,
+   "state": {
+    "st": "locked",
+    "g": {
+     "date": "2026-11-16",
+     "fp": 59,
+     "min": 32.02,
+     "gid": "1393723887409168384"
+    },
+    "source": "sleeper"
+   },
+   "played": [
+    [
+     "2026-11-16",
+     59
+    ],
+    [
+     "2026-11-17",
+     12
+    ],
+    [
+     "2026-11-19",
+     26
+    ]
+   ]
+  }
+ ],
+ "values": {
+  "Rudy Gobert": 41.5,
+  "Kevin Durant": 48.6,
+  "Mario Hezonja": 32.6,
+  "Jamal Murray": 58,
+  "Derrick White": 39.2,
+  "Wendell Carter Jr.": 40.1,
+  "Grayson Allen": 38.2,
+  "Luka Dončić": 78.9,
+  "Mikal Bridges": 30.7,
+  "Daniel Gafford": 29.9,
+  "Ty Jerome": 50.7,
+  "Onyeka Okongwu": 46.7,
+  "Day'Ron Sharpe": 39.1,
+  "Neemias Queta": 35.7,
+  "Jalen Duren": 43.2,
+  "Alex Sarr": 39.4,
+  "Cam Spencer": 36.4
+ },
+ "points": {
+  "me": [
+   3780,
+   3780
+  ],
+  "opp": [
+   4955,
+   4955
+  ]
+ },
+ "raw_rosters": {
+  "me": {
+   "co_owners": null,
+   "keepers": null,
+   "league_id": "1400915575915491328",
+   "metadata": {
+    "record": "LWWL",
+    "streak": "1L"
+   },
+   "owner_id": "1388708038000533504",
+   "player_map": null,
+   "players": [
+    "1350",
+    "1433",
+    "1660",
+    "1747",
+    "1830",
+    "1883",
+    "1959",
+    "1970",
+    "1975",
+    "1997",
+    "2090",
+    "2136",
+    "2275",
+    "2302",
+    "2438",
+    "2733",
+    "2752"
+   ],
+   "reserve": [
+    "1959",
+    "2438"
+   ],
+   "roster_id": 3,
+   "settings": {
+    "fpts": 20550,
+    "fpts_against": 19705,
+    "fpts_against_decimal": 0,
+    "fpts_decimal": 0,
+    "losses": 2,
+    "ppts": 22520,
+    "ppts_decimal": 0,
+    "ties": 0,
+    "total_moves": 0,
+    "waiver_budget_used": 0,
+    "waiver_position": 10,
+    "wins": 2
+   },
+   "starters": [
+    "1970",
+    "2752",
+    "1747",
+    "1433",
+    "2136",
+    "2733",
+    "1883",
+    "2275",
+    "1660",
+    "1350"
+   ],
+   "taxi": null
+  },
+  "opp": {
+   "co_owners": null,
+   "keepers": null,
+   "league_id": "1400915575915491328",
+   "metadata": {
+    "record": "WWWW",
+    "streak": "4W"
+   },
+   "owner_id": "1001778302912126976",
+   "player_map": null,
+   "players": [
+    "1074",
+    "1081",
+    "1240",
+    "1380",
+    "1487",
+    "1511",
+    "1526",
+    "1739",
+    "2091",
+    "2304",
+    "2457",
+    "2719",
+    "2726",
+    "4743",
+    "4754",
+    "4755"
+   ],
+   "reserve": [
+    "1487"
+   ],
+   "roster_id": 11,
+   "settings": {
+    "fpts": 21175,
+    "fpts_against": 18060,
+    "fpts_against_decimal": 0,
+    "fpts_decimal": 0,
+    "losses": 0,
+    "ppts": 22870,
+    "ppts_decimal": 0,
+    "ties": 0,
+    "total_moves": 0,
+    "waiver_budget_used": 0,
+    "waiver_position": 8,
+    "wins": 4
+   },
+   "starters": [
+    "1240",
+    "1074",
+    "1526",
+    "2304",
+    "1380",
+    "2457",
+    "1511",
+    "1739",
+    "2726",
+    "2719"
+   ],
+   "taxi": null
+  }
+ },
+ "raw_matchups": {
+  "me": {
+   "points": 3780,
+   "players": [
+    "1350",
+    "1433",
+    "1660",
+    "1747",
+    "1830",
+    "1883",
+    "1959",
+    "1970",
+    "1975",
+    "1997",
+    "2090",
+    "2136",
+    "2275",
+    "2302",
+    "2438",
+    "2733",
+    "2752"
+   ],
+   "roster_id": 3,
+   "custom_points": null,
+   "matchup_id": 3,
+   "starters": [
+    "1970",
+    "2752",
+    "1747",
+    "1433",
+    "2136",
+    "2733",
+    "1883",
+    "2275",
+    "1660",
+    "1350"
+   ],
+   "starters_points": [
+    540,
+    485,
+    500,
+    320,
+    355,
+    130,
+    310,
+    480,
+    400,
+    260
+   ],
+   "disagree": false
+  },
+  "opp": {
+   "points": 4955,
+   "players": [
+    "1074",
+    "1081",
+    "1240",
+    "1380",
+    "1487",
+    "1511",
+    "1526",
+    "1739",
+    "2091",
+    "2304",
+    "2457",
+    "2719",
+    "2726",
+    "4743",
+    "4754",
+    "4755"
+   ],
+   "roster_id": 11,
+   "custom_points": null,
+   "matchup_id": 3,
+   "starters": [
+    "1240",
+    "1074",
+    "1526",
+    "2304",
+    "1380",
+    "2457",
+    "1511",
+    "1739",
+    "2726",
+    "2719"
+   ],
+   "starters_points": [
+    885,
+    270,
+    475,
+    740,
+    660,
+    455,
+    595,
+    560,
+    260,
+    55
+   ],
+   "disagree": false
+  }
+ },
+ "opp_debug": {
+  "outlook": {
+   "mean": 532.618857903203,
+   "var": 490.8859558733614,
+   "sd": 22.15594628702104,
+   "winProb": null,
+   "opp": null
+  },
+  "slots": [
+   {
+    "slot": "PG",
+    "name": "James Harden",
+    "action": "locked",
+    "score": 88.5,
+    "detail": "Locked 88.5 (2026-11-20)."
+   },
+   {
+    "slot": "SG",
+    "name": "Paul George",
+    "action": "locked",
+    "score": 50.5,
+    "detail": "Locked 50.5 (2026-11-16)."
+   },
+   {
+    "slot": "G",
+    "name": "Zach LaVine",
+    "action": "lock",
+    "score": 47.5,
+    "detail": "47.5 beats the best alternative for this slot (33.0 expected). Lock before Sat's tip."
+   },
+   {
+    "slot": "SF",
+    "name": "Franz Wagner",
+    "action": "locked",
+    "score": 74,
+    "detail": "Locked 74.0 (2026-11-18)."
+   },
+   {
+    "slot": "PF",
+    "name": "Giannis Antetokounmpo",
+    "action": "locked",
+    "score": 78,
+    "detail": "Locked 78.0 (2026-11-18)."
+   },
+   {
+    "slot": "F",
+    "name": "Christian Braun",
+    "action": "locked",
+    "score": 35,
+    "detail": "Locked 35.0 (2026-11-18)."
+   },
+   {
+    "slot": "C",
+    "name": "Joel Embiid",
+    "action": "locked",
+    "score": 55.5,
+    "detail": "Locked 55.5 (2026-11-16)."
+   },
+   {
+    "slot": "C",
+    "name": "Domantas Sabonis",
+    "action": "lock",
+    "score": 56,
+    "detail": "56.0 beats the best alternative for this slot (47.6 expected). Lock before Sat's tip."
+   },
+   {
+    "slot": "UTIL",
+    "name": "Kel'el Ware",
+    "action": "pass",
+    "score": 26,
+    "detail": "Don't lock: 26.0 is under 31.9, what this slot is expected to get by waiting."
+   },
+   {
+    "slot": "UTIL",
+    "name": "Reed Sheppard",
+    "action": "pass",
+    "score": 5.5,
+    "detail": "Don't lock: 5.5 is under 26.4, what this slot is expected to get by waiting. Today: start Dylan Harper here (NOP, 37.9 proj)."
+   }
+  ],
+  "starters": [
+   {
+    "i": 0,
+    "pid": "1240",
+    "name": "James Harden",
+    "slot": 885,
+    "copies": [
+     885,
+     885
+    ],
+    "state": {
+     "st": "locked",
+     "g": {
+      "date": "2026-11-20",
+      "fp": 88.5,
+      "min": 40.12,
+      "gid": "1393301042665381888"
+     },
+     "source": "sleeper"
+    },
+    "rec": {
+     "slot": "PG",
+     "i": 0,
+     "benched": false
+    },
+    "played": [
+     [
+      "2026-11-16",
+      40.5
+     ],
+     [
+      "2026-11-18",
+      48.5
+     ],
+     [
+      "2026-11-20",
+      88.5
+     ]
+    ],
+    "left": 0
+   },
+   {
+    "i": 1,
+    "pid": "1074",
+    "name": "Paul George",
+    "slot": 270,
+    "copies": [
+     270,
+     270
+    ],
+    "state": {
+     "st": "locked",
+     "g": {
+      "date": "2026-11-16",
+      "fp": 50.5,
+      "min": 36.08,
+      "gid": "1393723881923018752"
+     },
+     "source": "sleeper"
+    },
+    "rec": {
+     "slot": "SG",
+     "i": 1,
+     "benched": false
+    },
+    "played": [
+     [
+      "2026-11-16",
+      50.5
+     ],
+     [
+      "2026-11-18",
+      27
+     ]
+    ],
+    "left": 2
+   },
+   {
+    "i": 2,
+    "pid": "1526",
+    "name": "Zach LaVine",
+    "slot": 475,
+    "copies": [
+     475,
+     475
+    ],
+    "state": {
+     "st": "open",
+     "g": {
+      "date": "2026-11-20",
+      "fp": 47.5,
+      "min": 38.88,
+      "gid": "1393301046507364352"
+     }
+    },
+    "rec": {
+     "slot": "G",
+     "i": 2,
+     "benched": false
+    },
+    "played": [
+     [
+      "2026-11-18",
+      35.5
+     ],
+     [
+      "2026-11-20",
+      47.5
+     ]
+    ],
+    "left": 1
+   },
+   {
+    "i": 3,
+    "pid": "2304",
+    "name": "Franz Wagner",
+    "slot": 740,
+    "copies": [
+     740,
+     740
+    ],
+    "state": {
+     "st": "locked",
+     "g": {
+      "date": "2026-11-18",
+      "fp": 74,
+      "min": 35.9,
+      "gid": "1393723893679652864"
+     },
+     "source": "sleeper"
+    },
+    "rec": {
+     "slot": "SF",
+     "i": 3,
+     "benched": false
+    },
+    "played": [
+     [
+      "2026-11-16",
+      56.5
+     ],
+     [
+      "2026-11-18",
+      74
+     ],
+     [
+      "2026-11-20",
+      62.5
+     ]
+    ],
+    "left": 1
+   },
+   {
+    "i": 4,
+    "pid": "1380",
+    "name": "Giannis Antetokounmpo",
+    "slot": 660,
+    "copies": [
+     660,
+     660
+    ],
+    "state": {
+     "st": "locked",
+     "g": {
+      "date": "2026-11-18",
+      "fp": 78,
+      "min": 32.25,
+      "gid": "1393723895210573824"
+     },
+     "source": "sleeper"
+    },
+    "rec": {
+     "slot": "PF",
+     "i": 4,
+     "benched": false
+    },
+    "played": [
+     [
+      "2026-11-16",
+      66
+     ],
+     [
+      "2026-11-18",
+      78
+     ]
+    ],
+    "left": 1
+   },
+   {
+    "i": 5,
+    "pid": "2457",
+    "name": "Christian Braun",
+    "slot": 455,
+    "copies": [
+     455,
+     455
+    ],
+    "state": {
+     "st": "locked",
+     "g": {
+      "date": "2026-11-18",
+      "fp": 35,
+      "min": 34.87,
+      "gid": "1393723900092743680"
+     },
+     "source": "sleeper"
+    },
+    "rec": {
+     "slot": "UTIL",
+     "i": 9,
+     "benched": false
+    },
+    "played": [
+     [
+      "2026-11-16",
+      28.5
+     ],
+     [
+      "2026-11-18",
+      35
+     ],
+     [
+      "2026-11-20",
+      45.5
+     ]
+    ],
+    "left": 1
+   },
+   {
+    "i": 6,
+    "pid": "1511",
+    "name": "Joel Embiid",
+    "slot": 595,
+    "copies": [
+     595,
+     595
+    ],
+    "state": {
+     "st": "locked",
+     "g": {
+      "date": "2026-11-16",
+      "fp": 55.5,
+      "min": 32.17,
+      "gid": "1393723884657704960"
+     },
+     "source": "sleeper"
+    },
+    "rec": {
+     "slot": "C",
+     "i": 6,
+     "benched": false
+    },
+    "played": [
+     [
+      "2026-11-16",
+      55.5
+     ],
+     [
+      "2026-11-18",
+      59.5
+     ]
+    ],
+    "left": 1
+   },
+   {
+    "i": 7,
+    "pid": "1739",
+    "name": "Domantas Sabonis",
+    "slot": 560,
+    "copies": [
+     560,
+     560
+    ],
+    "state": {
+     "st": "open",
+     "g": {
+      "date": "2026-11-20",
+      "fp": 56,
+      "min": 38.4,
+      "gid": "1393301046507364352"
+     }
+    },
+    "rec": {
+     "slot": "C",
+     "i": 7,
+     "benched": false
+    },
+    "played": [
+     [
+      "2026-11-18",
+      51.5
+     ],
+     [
+      "2026-11-20",
+      56
+     ]
+    ],
+    "left": 1
+   },
+   {
+    "i": 8,
+    "pid": "2726",
+    "name": "Kel'el Ware",
+    "slot": 260,
+    "copies": [
+     260,
+     260
+    ],
+    "state": {
+     "st": "open",
+     "g": {
+      "date": "2026-11-19",
+      "fp": 26,
+      "min": 25.6,
+      "gid": "1393723906585526272"
+     }
+    },
+    "rec": {
+     "slot": "UTIL",
+     "i": 8,
+     "benched": false
+    },
+    "played": [
+     [
+      "2026-11-18",
+      21.5
+     ],
+     [
+      "2026-11-19",
+      26
+     ]
+    ],
+    "left": 1
+   },
+   {
+    "i": 9,
+    "pid": "2719",
+    "name": "Reed Sheppard",
+    "slot": 55,
+    "copies": [
+     55,
+     55
+    ],
+    "state": {
+     "st": "open",
+     "g": {
+      "date": "2026-11-20",
+      "fp": 5.5,
+      "min": 14.15,
+      "gid": "1393301046545113088"
+     }
+    },
+    "rec": {
+     "slot": "UTIL",
+     "i": 9,
+     "benched": false
+    },
+    "played": [
+     [
+      "2026-11-16",
+      14
+     ],
+     [
+      "2026-11-18",
+      41
+     ],
+     [
+      "2026-11-20",
+      5.5
+     ]
+    ],
+    "left": 0
+   }
+  ]
+ },
+ "grid": [
+  {
+   "name": "Luka Dončić",
+   "pos": "PG",
+   "starter": true,
+   "locked": false,
+   "status": null,
+   "cells": [
+    null,
+    {
+     "kind": "played",
+     "fp": 72,
+     "opp": "CHA",
+     "started": true
+    },
+    {
+     "kind": "played",
+     "fp": 58,
+     "opp": "UTA",
+     "started": true
+    },
+    null,
+    {
+     "kind": "played",
+     "fp": 54,
+     "opp": "SAC",
+     "started": true
+    },
+    null,
+    null
+   ]
+  },
+  {
+   "name": "Jamal Murray",
+   "pos": "PG",
+   "starter": true,
+   "locked": false,
+   "status": null,
+   "cells": [
+    {
+     "kind": "played",
+     "fp": 48,
+     "opp": "PHX",
+     "started": true
+    },
+    null,
+    {
+     "kind": "played",
+     "fp": 50,
+     "opp": "BOS",
+     "started": false
+    },
+    null,
+    {
+     "kind": "played",
+     "fp": 33,
+     "opp": "HOU",
+     "started": true
+    },
+    null,
+    {
+     "kind": "upcoming",
+     "mu": 51.5,
+     "opp": "CHI",
+     "tip": "2026-11-23T00:00Z"
+    }
+   ]
+  },
+  {
+   "name": "Ty Jerome",
+   "pos": "PG/SG",
+   "starter": false,
+   "locked": false,
+   "status": "GTD",
+   "cells": [
+    {
+     "kind": "live",
+     "opp": "WAS",
+     "fp": null
+    },
+    null,
+    {
+     "kind": "live",
+     "opp": "CLE",
+     "fp": null
+    },
+    {
+     "kind": "live",
+     "opp": "GSW",
+     "fp": null
+    },
+    null,
+    {
+     "kind": "upcoming",
+     "mu": 48.2,
+     "opp": "MIN",
+     "tip": "2026-11-22T01:00Z"
+    },
+    null
+   ]
+  },
+  {
+   "name": "Kevin Durant",
+   "pos": "PF/SF",
+   "starter": true,
+   "locked": false,
+   "status": null,
+   "cells": [
+    {
+     "kind": "played",
+     "fp": 35.5,
+     "opp": "MIA",
+     "started": true
+    },
+    null,
+    {
+     "kind": "played",
+     "fp": 35,
+     "opp": "IND",
+     "started": true
+    },
+    null,
+    {
+     "kind": "played",
+     "fp": 32,
+     "opp": "DEN",
+     "started": true
+    },
+    null,
+    null
+   ]
+  },
+  {
+   "name": "Onyeka Okongwu",
+   "pos": "C/PF",
+   "starter": true,
+   "locked": true,
+   "status": null,
+   "cells": [
+    null,
+    null,
+    {
+     "kind": "played",
+     "fp": 56.5,
+     "opp": "OKC",
+     "started": true
+    },
+    null,
+    {
+     "kind": "played",
+     "fp": 35.5,
+     "opp": "CHA",
+     "started": true
+    },
+    null,
+    {
+     "kind": "upcoming",
+     "mu": 40.6,
+     "opp": "DET",
+     "tip": "2026-11-22T20:30Z"
+    }
+   ]
+  },
+  {
+   "name": "Rudy Gobert",
+   "pos": "C",
+   "starter": true,
+   "locked": true,
+   "status": null,
+   "cells": [
+    {
+     "kind": "played",
+     "fp": 59,
+     "opp": "POR",
+     "started": true
+    },
+    {
+     "kind": "played",
+     "fp": 12,
+     "opp": "POR",
+     "started": true
+    },
+    null,
+    {
+     "kind": "played",
+     "fp": 26,
+     "opp": "NYK",
+     "started": true
+    },
+    null,
+    {
+     "kind": "upcoming",
+     "mu": 36.5,
+     "opp": "MEM",
+     "tip": "2026-11-22T01:00Z"
+    },
+    null
+   ]
+  },
+  {
+   "name": "Wendell Carter Jr.",
+   "pos": "C",
+   "starter": true,
+   "locked": true,
+   "status": null,
+   "cells": [
+    {
+     "kind": "played",
+     "fp": 19,
+     "opp": "BOS",
+     "started": true
+    },
+    null,
+    {
+     "kind": "played",
+     "fp": 40.5,
+     "opp": "PHI",
+     "started": true
+    },
+    null,
+    {
+     "kind": "played",
+     "fp": 31,
+     "opp": "BKN",
+     "started": true
+    },
+    null,
+    {
+     "kind": "upcoming",
+     "mu": 34.3,
+     "opp": "WAS",
+     "tip": "2026-11-23T00:00Z"
+    }
+   ]
+  },
+  {
+   "name": "Derrick White",
+   "pos": "PG/SG",
+   "starter": false,
+   "locked": false,
+   "status": "GTD",
+   "cells": [
+    {
+     "kind": "played",
+     "fp": 20,
+     "opp": "ORL",
+     "started": true
+    },
+    null,
+    {
+     "kind": "played",
+     "fp": 35.5,
+     "opp": "DEN",
+     "started": true
+    },
+    null,
+    null,
+    {
+     "kind": "upcoming",
+     "mu": 33,
+     "opp": "SAC",
+     "tip": "2026-11-22T03:00Z"
+    },
+    {
+     "kind": "upcoming",
+     "mu": 33.2,
+     "opp": "GSW",
+     "tip": "2026-11-23T01:30Z"
+    }
+   ]
+  },
+  {
+   "name": "Alex Sarr",
+   "pos": "C/PF",
+   "starter": true,
+   "locked": false,
+   "status": null,
+   "cells": [
+    {
+     "kind": "played",
+     "fp": 20,
+     "opp": "MEM",
+     "started": true
+    },
+    null,
+    {
+     "kind": "played",
+     "fp": 30.5,
+     "opp": "TOR",
+     "started": true
+    },
+    null,
+    {
+     "kind": "played",
+     "fp": 13,
+     "opp": "CHI",
+     "started": true
+    },
+    null,
+    {
+     "kind": "upcoming",
+     "mu": 32.8,
+     "opp": "ORL",
+     "tip": "2026-11-23T00:00Z"
+    }
+   ]
+  },
+  {
+   "name": "Day'Ron Sharpe",
+   "pos": "C",
+   "starter": true,
+   "locked": false,
+   "status": null,
+   "cells": [
+    {
+     "kind": "played",
+     "fp": 37,
+     "opp": "PHI",
+     "started": true
+    },
+    null,
+    {
+     "kind": "played",
+     "fp": 19.5,
+     "opp": "CHI",
+     "started": true
+    },
+    null,
+    {
+     "kind": "played",
+     "fp": 48,
+     "opp": "ORL",
+     "started": true
+    },
+    null,
+    null
+   ]
+  },
+  {
+   "name": "Cam Spencer",
+   "pos": "PG/SF/SG",
+   "starter": true,
+   "locked": true,
+   "status": null,
+   "cells": [
+    {
+     "kind": "played",
+     "fp": 43,
+     "opp": "WAS",
+     "started": true
+    },
+    null,
+    {
+     "kind": "played",
+     "fp": 48.5,
+     "opp": "CLE",
+     "started": true
+    },
+    {
+     "kind": "played",
+     "fp": 37.5,
+     "opp": "GSW",
+     "started": true
+    },
+    null,
+    {
+     "kind": "upcoming",
+     "mu": 36.2,
+     "opp": "MIN",
+     "tip": "2026-11-22T01:00Z"
+    },
+    null
+   ]
+  },
+  {
+   "name": "Neemias Queta",
+   "pos": "C",
+   "starter": false,
+   "locked": false,
+   "status": null,
+   "cells": [
+    {
+     "kind": "live",
+     "opp": "ORL",
+     "fp": null
+    },
+    null,
+    {
+     "kind": "played",
+     "fp": 48,
+     "opp": "DEN",
+     "started": false
+    },
+    null,
+    null,
+    {
+     "kind": "upcoming",
+     "mu": 24.7,
+     "opp": "SAC",
+     "tip": "2026-11-22T03:00Z"
+    },
+    {
+     "kind": "upcoming",
+     "mu": 24.3,
+     "opp": "GSW",
+     "tip": "2026-11-23T01:30Z"
+    }
+   ]
+  },
+  {
+   "name": "Mario Hezonja",
+   "pos": "PF/SF",
+   "starter": true,
+   "locked": false,
+   "status": null,
+   "cells": [
+    {
+     "kind": "played",
+     "fp": 23.5,
+     "opp": "CHI",
+     "started": false
+    },
+    null,
+    {
+     "kind": "played",
+     "fp": 43.5,
+     "opp": "MEM",
+     "started": false
+    },
+    null,
+    {
+     "kind": "played",
+     "fp": 40,
+     "opp": "IND",
+     "started": true
+    },
+    null,
+    null
+   ]
+  },
+  {
+   "name": "Daniel Gafford",
+   "pos": "C",
+   "starter": false,
+   "locked": false,
+   "status": null,
+   "cells": [
+    null,
+    null,
+    {
+     "kind": "played",
+     "fp": 25,
+     "opp": "GSW",
+     "started": true
+    },
+    null,
+    null,
+    {
+     "kind": "upcoming",
+     "mu": 26.7,
+     "opp": "LAC",
+     "tip": "2026-11-22T01:00Z"
+    },
+    {
+     "kind": "upcoming",
+     "mu": 26.3,
+     "opp": "UTA",
+     "tip": "2026-11-23T00:00Z"
+    }
+   ]
+  },
+  {
+   "name": "Mikal Bridges",
+   "pos": "PF/SF/SG",
+   "starter": false,
+   "locked": false,
+   "status": null,
+   "cells": [
+    null,
+    {
+     "kind": "played",
+     "fp": 31,
+     "opp": "TOR",
+     "started": true
+    },
+    null,
+    {
+     "kind": "played",
+     "fp": 26.5,
+     "opp": "MIN",
+     "started": true
+    },
+    null,
+    {
+     "kind": "upcoming",
+     "mu": 24.3,
+     "opp": "POR",
+     "tip": "2026-11-22T00:30Z"
+    },
+    {
+     "kind": "upcoming",
+     "mu": 25.4,
+     "opp": "IND",
+     "tip": "2026-11-23T01:00Z"
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,135 @@
+{
+ "leagues": 73,
+ "weeks": [
+  1,
+  2,
+  3,
+  4
+ ],
+ "decision_points": 19183,
+ "starter_weeks": 12317,
+ "unchecked_starter_weeks": 15371,
+ "player_weeks": 490,
+ "method": "lineup-checked weeks only; DNPs count as 0; production bar (RotoWire x scale, tiers, b2b); CI by NBA player-week",
+ "tier_units": "we back FP/G",
+ "eligible_points": 19183,
+ "lock_rate_eligible": [
+  {
+   "score_vs_bar": "0.00-0.70",
+   "lo": 0,
+   "hi": 0.7,
+   "n": 3704,
+   "lock_rate": 0.017
+  },
+  {
+   "score_vs_bar": "0.70-0.85",
+   "lo": 0.7,
+   "hi": 0.85,
+   "n": 2498,
+   "lock_rate": 0.061
+  },
+  {
+   "score_vs_bar": "0.85-1.00",
+   "lo": 0.85,
+   "hi": 1.0,
+   "n": 3251,
+   "lock_rate": 0.133
+  },
+  {
+   "score_vs_bar": "1.00-1.15",
+   "lo": 1.0,
+   "hi": 1.15,
+   "n": 3307,
+   "lock_rate": 0.353
+  },
+  {
+   "score_vs_bar": "1.15-1.30",
+   "lo": 1.15,
+   "hi": 1.3,
+   "n": 2626,
+   "lock_rate": 0.54
+  },
+  {
+   "score_vs_bar": "1.30-1.50",
+   "lo": 1.3,
+   "hi": 1.5,
+   "n": 1880,
+   "lock_rate": 0.565
+  },
+  {
+   "score_vs_bar": "1.50+",
+   "lo": 1.5,
+   "hi": 99,
+   "n": 1917,
+   "lock_rate": 0.685
+  }
+ ],
+ "opponent_model_ready": true,
+ "engine_minus_manager": {
+  "mean_pct_of_proj": 6.14,
+  "ci95": [
+   3.42,
+   8.79
+  ],
+  "share_engine_better": 0.289,
+  "share_same": 0.59
+ },
+ "bar_scale": [
+  {
+   "scale": 0.85,
+   "mean_pct_of_proj": 116.09,
+   "vs_current": -2.0
+  },
+  {
+   "scale": 0.9,
+   "mean_pct_of_proj": 117.26,
+   "vs_current": -0.83
+  },
+  {
+   "scale": 0.95,
+   "mean_pct_of_proj": 118.1,
+   "vs_current": 0.01,
+   "ci95_vs_current": [
+    -0.47,
+    0.41
+   ]
+  },
+  {
+   "scale": 1.0,
+   "mean_pct_of_proj": 118.09,
+   "vs_current": 0.0
+  },
+  {
+   "scale": 1.05,
+   "mean_pct_of_proj": 117.85,
+   "vs_current": -0.24
+  },
+  {
+   "scale": 1.1,
+   "mean_pct_of_proj": 117.08,
+   "vs_current": -1.01
+  },
+  {
+   "scale": 1.15,
+   "mean_pct_of_proj": 115.6,
+   "vs_current": -2.49
+  }
+ ],
+ "best_scale": {
+  "scale": 0.95,
+  "mean_pct_of_proj": 118.1,
+  "vs_current": 0.01,
+  "ci95_vs_current": [
+   -0.47,
+   0.41
+  ]
+ },
+ "at": "2026-11-20",
+ "candidates": 60,
+ "snapshot_rows": 668,
+ "verified": {
+  "checked": 73,
+  "lock_in": 73,
+  "not_lock_in": 0
+ }
+}
