@@ -251,8 +251,8 @@ export function studyBarScale(study) {
   return study?.tier_units && b && b.scale !== 1 && Array.isArray(b.ci95_vs_current) && b.ci95_vs_current[0] > 0 ? b.scale : 1;
 }
 // Lineup records -> was a game lockable? A record is final once frozen at tip (or once the game has tipped, when the
-// caller passes tipped(pid, date)). Lock-In only lets a game be locked in the slot he played it in, so the record's
-// slot is returned too: eligFromSnaps(...).slot(pid, date) -> {slot, i, benched} | null. Sleeper's rule (its own
+// caller passes tipped(pid, date)). The record's slot is returned too (an unlocked game can still be moved with him to
+// another starting slot and locked there; docs/SYSTEM.md section 1): eligFromSnaps(...).slot(pid, date) -> {slot, i, benched} | null. Sleeper's rule (its own
 // message, Nov 15): a game is ineligible if he "was not in the starting lineup at the scheduled game time OR was moved to
 // bench since the game began". Moving between starting slots keeps it lockable; any trip to the bench loses it.
 // No record for a date the tracker covered = he wasn't on the roster that day (Nov 15: Neemias Queta's 52 from before

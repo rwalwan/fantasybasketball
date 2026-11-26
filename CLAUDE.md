@@ -34,7 +34,8 @@ it on trust. Each one in SYSTEM.md lists its evidence so you can.
 3. **Fix it.** Comment non-obvious code with the date, the case and the evidence (that is the house style; see
    engine.js). Keep explanations in plain words. Ryan reads the site and alert text on his phone.
 4. **Run everything:** `bash tests/run_all.sh` (runs every `tests/test_*.mjs` with node and `tests/test_*.py` with python3;
-   stops at the first failure). Also `node --check site/app.js site/engine.js` after editing the site.
+   stops at the first failure). After editing the site also run `for f in site/app.js site/engine.js; do node --check $f; done`
+   (`node --check a b` checks only `a`: the second file is passed to it as an argument).
 5. **Update docs/SYSTEM.md** in the same commit if behavior, a rule, a data file or a decision changed.
 6. **Commit and push to `main`** (identity below). Pushing to main is how changes ship.
 7. **Deploy:** wait for the **Tests** workflow to pass on your commit, *then* start **Update Lock Desk**. The update job
@@ -53,7 +54,8 @@ it on trust. Each one in SYSTEM.md lists its evidence so you can.
 
 ### Commit identity
 
-Commits need Ryan as author and Claude as committer (a repository hook asks for this):
+Commits have Ryan as author and Claude as committer (the session's commit check has asked for this; every commit
+since Nov 15 follows it):
 ```bash
 git -c user.name=Claude -c user.email=noreply@anthropic.com commit \
   --author="rwalwan <185106406+rwalwan@users.noreply.github.com>" -m "<summary>
@@ -75,11 +77,21 @@ gh run view <run-id> --log | grep -i "availability\|news\|error"        # what t
 ```
 - **The cloud sandbox can't reach Sleeper, ESPN or the Worker** (network allowlist); GitHub works through `gh` and git.
   To check live behavior: read the state branch, or start the update workflow and read its log and outputs.
-- The page can't be loaded from the sandbox with live data. To check UI changes, either render the changed piece with a
-  fixture plan in headless Chromium (Playwright is preinstalled; build the plan with `site/engine.js` the way
-  `tests/test_nov26_rotate.mjs` does) or read the job's screenshots (`mobile.png` = Locks tab, `mobile_matchup.png`
-  = Matchup tab) from the state branch after a run. `#tab=<name>` in the site URL opens a tab.
-- Check phone width (390 px) and both light and dark themes for any UI change.
+- For a lock that looks wrong, start with `plan_debug.json` `starters_debug` (Ryan's slots) and `opp_debug` (the
+  opponent's): each slot's lock state, every Sleeper copy of the slot score, manual marks and the lineup record.
+  Ryan's own device can differ from it (see SYSTEM.md 3, "Site vs job"). Worker KV and his browser storage can't be
+  read from the sandbox. Ask him for a screenshot when it matters.
+- The page can't be loaded from the sandbox with live data: `site/static/` isn't in git, `site/app.js` exports nothing
+  and runs on load, and it fetches Sleeper, the Worker and the state branch. To check a UI change, either
+  - lift the render function out of `app.js` and run it on a plan built from a fixture with `site/engine.js` (the
+    way `tests/test_nov26_rotate.mjs` builds one), then screenshot that HTML with the page's CSS in headless Chromium
+    (Playwright is preinstalled), or
+  - push, run the job, and read its screenshots from the state branch (`mobile.png` = Locks tab, `mobile_matchup.png`
+    = Matchup tab; `#tab=<name>` in the site URL opens a tab). Other tabs need a screenshot line added in `update.yml`.
+- Check phone width (390 px, no sideways scroll) and both themes (dark mode follows the system setting,
+  `prefers-color-scheme`). A new tab = a button in `#tabs` + a `section[data-p]` in `index.html`, a render function
+  called from `render()` in `app.js`, and its ids in `tools/site_check.py`.
+- `tests/smoke.mjs` isn't in `run_all.sh` (it needs the network).
 
 ## Simulations and studies
 

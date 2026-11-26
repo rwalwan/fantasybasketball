@@ -22,7 +22,7 @@ something measured in Sleeper's data, and the source is noted.
    **not been moved to the bench since the game began**. Moving him to the bench, even briefly and even if he's moved
    back, makes that game unlockable. Moving between starting slots is fine. (Ryan's Sleeper screenshot, Nov 15:
    Okongwu played from UTIL, was benched, then put at C, and Sleeper showed "ineligible".)
-   Tests: `test_nov15_slot_lock.mjs`, `test_nov15_lineup_benched.py`, `test_oct29_bugs.mjs`.
+   Tests: `test_nov15_slot_lock.mjs`, `test_nov15_lineup_benched.py`.
 4. **An unlocked score moves with its player.** A finished, unlocked, lockable game can be moved with the player to any
    other starting slot he fits and locked there. (Ryan, Nov 26.) This is what rotation (section 4.5) exploits.
    Test: `test_nov26_rotate.mjs`.
@@ -47,17 +47,21 @@ something measured in Sleeper's data, and the source is noted.
 | `app/learn.py`, `app/alerts.py` | Same job | Logs and grades decisions; sends phone alerts (ntfy) from the engine's own action list |
 | `site/` | GitHub Pages; recomputes **in the browser every minute** | The app Ryan uses (installable PWA). Loads `static/*.json` + live Sleeper + Worker + state branch |
 | `worker/` | Cloudflare Worker, cron **every minute** | Lineup snapshots (lock eligibility), Sleeper's lock record, stores site answers, kicks the update workflow every 15 min |
-| `app/league_run.py` | **Other Lock-In leagues** workflow, daily 8:07 AM PT | Finds other Lock-In leagues, snapshots them, studies real managers' locks (bar calibration, opponent lock model) |
+| `app/league_run.py` | **Other Lock-In leagues** workflow, daily 15:07 UTC (7:07 AM PST, 8:07 PDT) | Finds other Lock-In leagues, snapshots them, studies real managers' locks (bar calibration, opponent lock model) |
 | `research/` | By hand | Fits the constants in `app/data/*.json` from 2021-24 box scores |
-| `tests/` | **Tests** workflow on every push | `tests/run_all.sh`; the update job only runs code that passed (`tools/tested_code.sh`) |
+| `tests/` | **Tests** workflow on pushes to main and PRs | `tests/run_all.sh`; the update job runs the newest code that passed (`tools/tested_code.sh`; with no passing run at all it runs HEAD). The Worker deploy is **not** gated on Tests, and no test covers `worker/src/index.js` |
 
 **One engine.** All decision logic is in `site/engine.js`, which runs both in the browser and in Node (`tools/moves.mjs`).
 Don't add Node-only APIs to it, and don't re-implement engine logic in Python (`test_r2_f9_one_engine.py`).
-`app/lockin.py` and `app/league_study.py` keep a Python copy of the stopping recursion only for the other-league study.
+`app/lockin.py` and `app/league_study.py` keep a Python copy of the stopping math for the other-league study and for
+grading decisions (`app/learn.py`). `engine.js` also holds hand copies of some fitted constants (`BASELINE`,
+`DEFAULT_AVAIL`, `B2B_FACTOR`); a refit of `app/data/*.json` must update them too.
 
 **Workflows** (`.github/workflows/`): `update.yml` (every 15 min + manual; also kicked by the Worker because GitHub
 throttles schedules), `tests.yml` (push), `worker.yml` (push touching `worker/**`), `leagues.yml` (daily),
-`llm-eval.yml` (manual AI model comparison). All but Tests share the `lock-desk` concurrency group.
+`llm-eval.yml` (manual AI model comparison). Update, leagues and llm-eval share the `lock-desk` concurrency group.
+A crash in `python -m app.run` stops the run before the Pages deploy (the site keeps its previous version); the later
+steps (moves, learn, alerts) run through `tools/step.sh`, which records a failure in `step_health.json` and carries on.
 
 ## 3. Data flow
 
@@ -76,8 +80,20 @@ Worker (every minute): Sleeper lineup ─> KV lineups_<season>_w<week>   Sleeper
   if either source saw it.
 - Sleeper's servers disagree sometimes (CDN copies hours old; `api.sleeper.app` vs `api.sleeper.com`). Live requests
   bust the cache, and matchups from both hosts are merged (`mergeMatchups`); `lockState` reads every copy's slot points.
-- `tools/state.sh` restores and saves `data/state` from/to the `state` branch (refuses to run on empty state; keeps a
-  daily copy on `state-backup`; repairs a corrupt file from the backup).
+- `tools/state.sh` restores and saves `data/state` from/to the `state` branch (refuses to run on empty state; repairs a
+  corrupt file from the backup). **`state` is a single force-pushed commit with no history;** `state-backup` is a
+  once-a-day snapshot of the previous state. So the state branch can't show you yesterday's files beyond that one copy.
+- **Ryan's answers** ("I locked this", "was he starting?") are saved to Worker KV (`locks_w<week>`, `elig`) and to his
+  browser's localStorage, which wins on that device. Nothing in the job writes `locks_w*.json` or
+  `eligibility_overrides.json` on the state branch; they're read if present.
+- **Lineup records:** Ryan's come from the Worker every minute and the job every 15 min; the opponent's come only from
+  the job (every 15 min), so the opponent's "benched since tip" is coarser.
+- **Site vs job:** the site and `tools/moves.mjs` run the same engine, but not on identical inputs. The site passes
+  `isTipped` to `eligFromSnaps` (a record not yet frozen after tip counts as final), uses localStorage answers and the
+  current minute; `moves.mjs` does none of those. So `plan_debug.json` can briefly differ from Ryan's screen (e.g.
+  "confirm" in the job where the site already shows "lock").
+- The Worker's `/state` is unauthenticated (read-only); writes need `WRITE_KEY`. The Worker reads `players.json` from
+  the Pages site for its player→team map, so a broken Pages deploy affects its tip/team data.
 
 ## 4. How the engine decides (`site/engine.js`)
 
@@ -86,16 +102,22 @@ Worker (every minute): Sleeper lineup ─> KV lineups_<season>_w<week>   Sleeper
 - **Projection `mu`** (`Book.gameMu`): a blend of RotoWire (via Sleeper projections), the model (per-minute baseline,
   `app/model.py`), matchup context (`app/memory.py`: opponent vs position, pace, rest, teammates out) and usage
   (`app/usage.py`: rotation minutes missing on his team, opponent rim protection). Weights are fitted on graded games
-  (`experts.stack_weights`) and scaled for bias. Bench players who sat recent team games get a participation factor.
+  (`experts.stack_weights`) and scaled for bias.
 - **Play probability `q`** (`Book.playProb`, from `static/availability.json` built by `app/availability.py`):
-  - Healthy: historical curve by games ahead (about 94% next game; this season's graded rate replaces the first point).
+  - Healthy: historical curve by games ahead. The next-game point is a stage-of-season default (0.955 / 0.944 / 0.930)
+    until 300 of this season's games are graded, then this season's rate. Games tipping today use separate game-day
+    rates (`healthy_gameday`, `designation_gameday`), because by then the designation is final.
+  - Healthy bench players (< 20 min/game) who sat recent team games get a participation factor on `q`.
   - Sleeper designation: calibrated rates for Probable / Questionable(GTD/DTD) / Doubtful / Out, blending this season's
     graded results with a published table.
   - After k straight missed games: the return hazard (fitted 2021-24).
   - A news timeline ("out 2-4 weeks") with a minimum overrides these. Outlets vote; the latest report per outlet within 48 h counts.
-  - **A fresh single-game "ruled out" report** (1-3 games, by weekday or his next games) sets those games to 0% even
-    while Sleeper still shows GTD; a newer available/probable/questionable/doubtful report cancels it. Rest days return
-    to the healthy rate after (Nov 16, Queta; `test_nov16_news_out.py`).
+  - **A single-game "ruled out" report** (the newest report for him says out for 1-3 games) sets those games to 0%
+    even while Sleeper still shows GTD; a newer available/probable/questionable/doubtful report cancels it. The games
+    are the ones it names by weekday (within 6 days), else his next ones from the report's date; with no weekday and a
+    game he played on/after that date, it's ignored as ambiguous. No freshness window beyond the news store's 7 days;
+    a report about a finished game simply has no upcoming game left to affect. Rest days return to the healthy rate
+    after (Nov 16, Queta; `test_nov16_news_out.py`). Only rostered players and injured players with a team are modeled.
   - The engine uses the job's curve only while the live Sleeper status still matches the status it was built for.
 - **Outcome** = `mu × R`, with `R` from 100 quantiles of the player's FP/G tier (`app/data/game_ratio_quantiles.json`,
   blended toward our own projection errors), widened or narrowed by the player's own spread (`app/volatility.py`).
@@ -106,13 +128,15 @@ For his remaining games, the value of arriving unlocked at game j is
 
 ### 4.3 The week plan (`WeekPlan.buildOnce`)
 1. **Lock state of every starter** (`lockState`), checked in this order:
-   1. Sleeper's lock record (`sleeperLocks`) when the feed status is `ok`; it's authoritative, and inferred locks are off.
-   2. Ryan's manual lock marks.
+   1. Sleeper's lock record (`sleeperLocks`) when the feed status is `ok`. It's authoritative: while it's on, Ryan's
+      manual marks and both inferred-lock checks below are skipped (a player not in the record isn't locked).
+   2. Ryan's manual lock marks (only when the feed is off).
    3. **Live**: if the game is in progress, but his slot shows an earlier game's score instead of the live points, that earlier game is locked.
    4. **Wiped**: the slot shows 0 after a DNP in the lineup.
    5. **Inferred lock** from slot points matching an earlier countable game.
    6. **Bench / moved** (not lockable). If he has no games left, the score shown still counts (`kept`).
    7. **Open** (lockable) or **confirm** (no lineup record: ask Ryan).
+   Also possible: **live** (game in progress, after step 3) and **none** (no game played yet, or no slot points).
 2. **Rest-of-week assignment**: max-weight assignment (`maxAssign`) of players to open slots, where
    value = continuation `W` (or `max(score, W)` for a lockable score). Idle bench players **stream** into slots on days
    that slot's player doesn't play (each idle player assigned to one slot).
@@ -145,17 +169,22 @@ plan or trade checks, because it costs about 85 ms per plan versus 6 ms.
   for that week's games (more games = more chances at a big one), discounted 3%/week in the regular season (playoff
   weeks full), with missing roster spots filled by the best free agent.
 - **Trades are valued in expected wins:** this week = change in win probability (each team's outlook, with the trade
-  taking effect after the review period; locked slots stay); rest of season = Δpoints/week × `WINS_PER_SCORE` (2.2) / S,
-  where S is a typical team's weekly score. A deal is offered only if it adds wins for Ryan, doesn't cost the partner
+  taking effect after the review period; locked slots stay); rest of season = Δ(lock-in value per week) ×
+  `valuer.discSum` (the discounted count of remaining weeks) × `WINS_PER_SCORE` (2.2) / S, where S is the median team
+  value across the league's rosters (`tradeCtx` in `moves.mjs`, default 500). A deal is offered only if it adds wins for Ryan, doesn't cost the partner
   wins by the same model, and gives the partner back at least ~90% of the market value he gives up. Shapes from 1-for-1
   to 3-for-2, with caps so ideas don't repeat the same players.
 - **Waiver adds**: best free agent adds with the best drop, bid suggestions when the league uses FAAB.
 - **IR**: activate or release a returning player; move an Out player to IR to free a spot.
 
 ### 4.7 Phone alerts (`app/alerts.py`, ntfy)
-Sent once each (deduplicated in `data/state/alerts.json`): a lock reminder when a lock/confirm decision's tip is within
-75 min, lineup moves within 60 min, a starter ruled Out/Doubtful, and a morning brief. The text comes straight from
-`plan.actions`, so an alert always matches the page.
+Sent once each (deduplicated in `data/state/alerts.json`):
+- a **lock** or **confirm** call whose deadline is within 75 min, and a lineup **move** within 60 min: text taken from
+  `plan.actions`, so it matches the page. A rotation folded into a lock call ("Move X … then lock") rides on that alert;
+  standalone `rotate`, `relief` and `later` actions get no alert of their own.
+- a **fallback** alert, once a week per slot, when a slot has no games left (text from `plan.actions`);
+- a starter ruled **Out/Doubtful** whose game is today and hasn't tipped (text written in `alerts.py`);
+- a **morning brief**, once per Pacific day, 7-11 AM PT (written in `alerts.py`).
 
 ## 5. Learning loops
 - **Projections**: every source's pre-tip projection is logged and graded once the game is final (`app/experts.py`,
@@ -163,8 +192,11 @@ Sent once each (deduplicated in `data/state/alerts.json`): a lock reminder when 
 - **Availability**: each next-game play chance is logged and graded (`availability_log.json`); designation rates and the
   healthy rate update from it.
 - **Usage**: graded by horizon; a horizon that makes projections worse (100+ games) is switched off (`usage.gate`).
-- **Decisions**: lock/pass calls and lineup moves logged and graded vs the counterfactual (`app/learn.py`, `learning.json`).
+- **Decisions**: lock/pass calls and lineup moves logged in the `decisions` table of `memory.sqlite` and graded vs the
+  counterfactual (`app/learn.py`); the site reads the summary from `site/static/learning.json`.
 - **Win chance**: one prediction per matchup per stage of the week, graded (`tools/winprob.mjs`, `winprob_log.json`).
+  The logged win chance is a **simpler model than the one on the page** (no human-lock opponent, no matchup-aware calls,
+  no rotation, every game treated as lockable), so its grades don't measure the displayed number exactly.
 - **Experts/news**: RSS + polite crawler (`app/sources.py`: robots.txt, rate limits, public pages only); an AI model via
   OpenRouter extracts structured items; expert calls are graded and weighted (`app/news.py`).
 - **Other leagues** (daily): bar calibration and real managers' lock rates (`league_study.json`).
@@ -175,10 +207,10 @@ Sent once each (deduplicated in `data/state/alerts.json`): a lock reminder when 
 
 | File | Holds |
 |---|---|
-| `plan_debug.json` | This week's plan from `moves.mjs`: `slots`, `actions`, `rotation`, `outlook`, `bar_debug`, `week_schedule`, `today_options`, raw rosters/matchups, trade debug |
+| `plan_debug.json` | This week's plan from `moves.mjs`: `slots`, `actions`, `rotation`, `outlook`, `bar_debug`, `week_schedule`, `today_options`, **`starters_debug`** and **`opp_debug`** (per slot: lock state, every Sleeper copy of the slot score, manual mark, lineup record; start here for lock bugs), raw rosters/matchups, trade debug |
 | `lineups_<season>_w<week>.json`, `opp_lineups_*` | Lineup record per `"date|pid"`: `{slot, i, seen, frozen, benched}` (Ryan's and the opponent's) |
 | `sleeper_locks_<season>_w<week>.json` | Sleeper's lock record per roster (copied from the Worker) |
-| `eligibility_overrides.json`, `locks_w<week>.json` | Ryan's answers: "was he starting?" and "I locked this" |
+| `eligibility_overrides.json`, `locks_w<week>.json` | Old copies of Ryan's answers, read if present; live answers are in Worker KV (section 3) |
 | `availability_now.json`, `availability_log.json` | Current play chances with their basis; logged predictions + calibration |
 | `timelines.json`, `news.json`, `claims.json`, `expert_takes.json`, `seen_items.json`, `source_report.json` | News, injury timelines, expert claims, crawler state |
 | `memory.sqlite` | Every player-game with context (minutes, rest, teammates out, projections before tip) |
@@ -187,6 +219,8 @@ Sent once each (deduplicated in `data/state/alerts.json`): a lock reminder when 
 | `league_study.json`, `leagues.sqlite` | Other-league study and its data |
 | `winprob_log.json`, `alerts.json`, `reasons.json`, `kick.json` | Win-chance log, sent alerts, cached AI reasons, Worker kick status |
 | `site_check.json`, `step_health.json`, `mobile.png`, `mobile_matchup.png` | Health of the last run: page check, step outcomes, phone-width screenshots |
+| `projlog_done_<season>.json`, `ctx_prior_<season>.json`, `diag_run.json`, `diag_prior.json`, `llm_eval.json` | Graded projections kept a few days, last season's opponent-vs-position table, run diagnostics, AI model comparison |
+| `availability_err.txt`, `*.corrupt` | Present only after a failure: the availability traceback; a damaged file moved aside by `state.sh` |
 
 **`site/static/`** (generated each run, not in git): `players`, `gamelog`, `priors`, `priors_min`, `participation`,
 `quantiles`, `volatility`, `league`, `tips`, `availability`, `usage`, `context`, `experts`, `news`, `claims`, `insights`,
@@ -206,6 +240,7 @@ Never in the repo. Names only:
 - **Worker secrets**: `WRITE_KEY` (the site's key for saving answers; the site keeps it in localStorage from Ryan's
   setup link), `GH_TOKEN` (lets the minute cron start the update workflow), `SLEEPER_TOKEN` (Ryan's Sleeper login, for
   the lock record).
+- The site's ⚙ Backend dialog shows Ryan's setup link, which contains `WRITE_KEY`: never ask him to paste or screenshot it.
 - If the Sleeper token stops working, the feed status leaves `ok` and the engine falls back to manual marks and
   inferred locks. The site's footer says which source is active. Ryan has to get a fresh token from the Sleeper app
   himself and set it with `wrangler secret put SLEEPER_TOKEN`. Never handle the token value.
@@ -216,7 +251,7 @@ Each of these can be re-checked. If new evidence overturns one, change it and up
 | Decision | Evidence | Re-check with |
 |---|---|---|
 | Lock bars = true opportunity cost with rotation on both sides | `test_bar_star.mjs` (Nov 10: bar 46.2 → 74.7 after the locked player's own later games stopped filling other slots) | `plan_debug.json` `bar_debug` |
-| Bars × calibration from real Lock-In leagues, only when significant | as of Nov 10: ×0.90 scored +2.2% of projection (CI 0.4-4.1), 6,788 lineup-checked starter-weeks | `league_study.json` `bar_scale`, `best_scale`; `app/league_study.py` |
+| Bars × calibration from real Lock-In leagues, only when its 95% interval excludes 0 and the study used the right volatility tiers | The Nov 10 ×0.90 came from a study bug (every player got the bench tier); as of Nov 25 the best scale is 1.05 with CI [-0.49, 0.68], so **no calibration is applied** (`studyBarScale` returns 1) | `league_study.json` `best_scale`, `tier_units`; `studyBarScale` |
 | The engine's lock rule beats real managers | as of Nov 10: +6.1% of projection (CI 2.5-9.7) | `league_study.json` `engine_minus_manager` |
 | Opponent modeled with real managers' lock rates, not the engine's | other-league study; `test_human_locks.mjs`, `test_nov15_opp_final.mjs` | `league_study.json` `lock_rate_eligible` |
 | Today's starters by expected points, not option value | option-value ranking benched stars for ~0.2-point edges inside model error | `test_today_pick.mjs` |
@@ -227,8 +262,8 @@ Each of these can be re-checked. If new evidence overturns one, change it and up
 | News "ruled out" beats a lagging Sleeper label | Nov 16 Queta: ruled out 5:16 pm ET, Sleeper GTD for 2+ h | `test_nov16_news_out.py` |
 | Sleeper's lock record is authoritative when available | it's the app's own record; inference misread locks before (Oct 29, Nov 1, Nov 15) | `test_nov16_sleeper_locks.mjs` |
 | Trades in expected wins, 2.2 wins per unit of weekly score | Nov 15: final margins of 1,155 Lock-In matchups in 72 leagues (0.020-0.024 across band widths) | `test_nov15_trades.mjs` |
-| Rotate lockable scores into the tightest slot | Nov 26: +1.4 to +1.75 pts/week, 95% CIs above 0 on three seeds (900 simulated weeks) | `node tools/rotate_study.mjs` |
-| Only tested code runs in production | a broken commit once ran in the 15-min job (review 2, 7b) | `tools/tested_code.sh`, `test_r2_7_tested_code.py` |
+| Rotate lockable scores into the tightest slot | Nov 26: +1.4 to +1.75 pts/week, 95% CIs above 0 on three seeds (900 simulated weeks); cost measured that day at ~85 ms vs ~6 ms per plan | `node tools/rotate_study.mjs` |
+| Only tested code runs in the 15-min job (not the Worker) | a broken commit once ran in the 15-min job (review 2, 7b) | `tools/tested_code.sh`, `test_r2_7_tested_code.py` |
 
 ## 9. Known limits and open questions
 - Rule 5 (what a never-locked slot keeps after a DNP) isn't fully confirmed.
@@ -238,4 +273,7 @@ Each of these can be re-checked. If new evidence overturns one, change it and up
 - Win chance is a normal approximation; it has few graded matchups so far (`winprob_log.json`).
 - The bar calibration is measured on single-player bars (the study can't see other teams' benches) and applied to the full rotation bar.
 - The lock record depends on Ryan's Sleeper token, which can expire.
+- The job's plan (`plan_debug.json`, alerts) and the site can briefly differ (section 3, "Site vs job").
+- The logged win chance uses a simpler model than the displayed one (section 5).
+- The opponent's lineup record is 15-minute resolution.
 - League and user ids are constants in `app/run.py`, `tools/moves.mjs`, `site/app.js` and `worker/src/index.js`.
