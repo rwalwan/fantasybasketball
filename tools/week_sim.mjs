@@ -83,9 +83,14 @@ export function runEngine(week, QS, slots, { rule = "keep", opts = {} } = {}) {
   const applyLocks = plan => plan.slots.forEach((s, i) => {
     if ((s.action === "lock" || s.action === "confirm") && lockedPts[i] == null && s.score != null) { locks[s.pid] = true; locks[`${s.pid}|${s.gameDate}`] = true; lockedPts[i] = s.score; }
   });
+  // opts.rotate: the plan may first move a lockable score to another open starting slot (swap seats; the score and
+  // the "started" record travel with the player, which is the Sleeper rule for starting-slot to starting-slot moves)
+  let rotations = 0;
+  const rotate = plan => { for (const m of plan.rotation || []) { [starters[m.fromIdx], starters[m.toIdx]] = [starters[m.toIdx], starters[m.fromIdx]]; rotations++; } };
   for (let d = 0; d < 7; d++) {
     const plan = build(d, false);
     if (d === 0) forecast = plan.expectedTotal;
+    rotate(plan);
     applyLocks(plan);
     const want = plan.slots.map((s, i) => (lockedPts[i] == null && s.today ? s.today.pid : null)), moved = new Set(want.filter(Boolean));
     starters = starters.map((p, i) => (want[i] ? want[i] : lockedPts[i] == null && moved.has(p) ? "0" : p));
@@ -95,11 +100,13 @@ export function runEngine(week, QS, slots, { rule = "keep", opts = {} } = {}) {
       started[`${p.pid}|${DAYS[d]}`] = on;
       if (on && lockedPts[i] == null) hand[p.pid] = { x: g.x, d };
     }
-    applyLocks(build(d, true));
+    const eve = build(d, true);
+    rotate(eve);
+    applyLocks(eve);
   }
   let total = 0;
   starters.forEach((p, i) => { total += lockedPts[i] != null ? lockedPts[i] : p !== "0" && alive(p, 6) ? hand[p].x : 0; });
-  return { total, forecast };
+  return { total, forecast, rotations };
 }
 
 // ---------------- hold: nobody locks, every player runs his own stopping rule ----------------

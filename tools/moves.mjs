@@ -53,7 +53,7 @@ const oppWp = oppRoster ? new WeekPlan({ Q: st("quantiles"), book, schedule, wee
   roster: oppRoster, matchup: opp, rosters, tips: tipsRaw, locks: {}, elig: eligFromSnaps(readState(`opp_lineups_${season}_w${week}.json`, {})), sleeperLocks: slFor(oppRoster.roster_id) }) : null;
 const oppPlan = oppWp ? oppWp
   .build({ humanLocks: (s => s.opponent_model_ready ? s.lock_rate_eligible : null)(readState("league_study.json", {})), barScale: studyBarScale(readState("league_study.json", {})) }) : null;
-const plan = wp.build({ opp: oppPlan ? { mean: oppPlan.outlook.mean, var: oppPlan.outlook.var } : null, barScale: studyBarScale(readState("league_study.json", {})) });
+const plan = wp.build({ opp: oppPlan ? { mean: oppPlan.outlook.mean, var: oppPlan.outlook.var } : null, barScale: studyBarScale(readState("league_study.json", {})), rotate: true });
 // never suggest dropping someone the plan is counting on: locked/kept games, today's starters and relief, next-up players
 const protect = new Set([...(mine.reserve || []),
   ...plan.slots.filter(s => ["locked", "lock", "keep", "live", "confirm"].includes(s.action)).map(s => s.pid),
@@ -145,7 +145,7 @@ fs.writeFileSync("site/static/plan.json", JSON.stringify({ week, generated: out.
   oppName: oppRoster ? (userName[oppRoster.owner_id] || "Opponent") : null }));
 // full plan snapshot on the state branch, for debugging what the engine saw
 fs.writeFileSync(stateFile("plan_debug.json"), JSON.stringify({ at: new Date().toISOString(), today, week, expectedTotal: plan.expectedTotal,
-  slots: plan.slots, actions: plan.actions, idle: plan.idle, outlook: plan.outlook, adds: out.adds, trades: out.trades,
+  slots: plan.slots, actions: plan.actions, rotation: plan.rotation, idle: plan.idle, outlook: plan.outlook, adds: out.adds, trades: out.trades,
   bar_debug: wp.barDebug, week_schedule: wp.lastSchedule, today_options: wp.lastToday,
   ir: irMoves(wp, valuer, mine, league.roster_positions, new Set(plan.slots.filter(s => ["locked", "keep", "live"].includes(s.action)).map(s => s.pid))),
   starters_debug: (my.starters || []).map(p => ({ pid: p, name: book.name(p), sleeper: my.players_points?.[p] ?? null, slot: wp.slotPoints(p) ?? null, copies: wp.slotCandidates(p), manualLock: locks[p] ?? null,

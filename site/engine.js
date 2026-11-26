@@ -338,6 +338,7 @@ export function maxAssign(value) {
 }
 
 // ---------- the week plan ----------
+const ROTATE_MIN = 0.5;     // pts of expected final a slot swap must add to be suggested
 export class WeekPlan {
   constructor({ Q, book, schedule, week, today, now, rosterPositions, roster, matchup, rosters, tips, elig, locks, sleeperLocks }) {
     Object.assign(this, { Q: Array.isArray(Q) ? Q : Q.quantiles, QT: Array.isArray(Q) ? null : Q.tiers,
@@ -468,7 +469,62 @@ export class WeekPlan {
     return { st: e === true ? "open" : "confirm", g: last };
   }
   // opts.opp = the opponent's outlook ({mean, var}) -> matchup-aware lock calls
+  // Nov 26 (Ryan): a lock can't move, but an unlocked finished game moves with its player to any starting slot he
+  // fits (starting slot to starting slot keeps it lockable). So before locking, a score can be seated where it costs
+  // the rest of the lineup least: Luka's 70 locked at PG instead of UTIL keeps UTIL open for anyone. opts.rotate:
+  // try swapping each lockable starter with another open starter (or an empty slot) when both fit, keep the swap
+  // that raises the expected final most (by more than ROTATE_MIN, so ties don't make you shuffle), repeat.
   build(opts = {}) {
+    const base = this.buildOnce(opts);
+    if (!opts.rotate) return base;
+    const st0 = this.matchup.starters || [], ls = {};
+    for (const p of st0) if (p && p !== "0") ls[p] = this.lockState(p);
+    let S = st0.slice();
+    const movable = i => { const p = S[i]; return !p || p === "0" || ls[p]?.st === "open" || ls[p]?.st === "none" || ls[p]?.st === "confirm"; };
+    const lockableAt = (S, i) => S[i] && S[i] !== "0" && (ls[S[i]]?.st === "open" || ls[S[i]]?.st === "confirm") && !ls[S[i]]?.kept;
+    const variant = (S, P) => {
+      const c = Object.create(WeekPlan.prototype);
+      Object.assign(c, this, { matchup: { ...this.matchup, starters: S, starters_points: P } });
+      c.lockState = p => ls[p] || this.lockState(p);   // a swap changes the seat, not whether his game is lockable
+      return c;
+    };
+    let P = Array.isArray(this.matchup.starters_points) ? this.matchup.starters_points.slice() : null;
+    let best = base, moves = [];
+    for (let round = 0; round < 3; round++) {
+      let pick = null;
+      for (let i = 0; i < this.slots.length; i++) for (let j = i + 1; j < this.slots.length; j++) {
+        if (!movable(i) || !movable(j) || (!lockableAt(S, i) && !lockableAt(S, j))) continue;
+        const a = S[i], q = S[j], ea = !a || a === "0", eq = !q || q === "0";
+        if ((!ea && !fits(this.slots[j], this.b.pos(a))) || (!eq && !fits(this.slots[i], this.b.pos(q)))) continue;
+        const S2 = S.slice(); [S2[i], S2[j]] = [q || "0", a || "0"];
+        const P2 = P && P.slice(); if (P2) [P2[i], P2[j]] = [P2[j] ?? 0, P2[i] ?? 0];
+        const plan = variant(S2, P2).buildOnce(opts), gain = plan.outlook.mean - best.outlook.mean;
+        if (gain > ROTATE_MIN && (!pick || gain > pick.gain)) {
+          // described from the player whose score is the point: the lockable one with the bigger score
+          const sc = k => (lockableAt(S, k) ? ls[S[k]].g?.fp ?? 0 : -1), [f, t] = sc(i) >= sc(j) ? [i, j] : [j, i];
+          pick = { gain, plan, S2, P2, i: f, j: t, q: !S[t] || S[t] === "0" ? null : S[t] };
+        }
+      }
+      if (!pick) break;
+      moves.push({ pid: S[pick.i], name: this.b.name(S[pick.i]), from: this.slots[pick.i], to: this.slots[pick.j], fromIdx: pick.i, toIdx: pick.j,
+                   withPid: pick.q, withName: pick.q ? this.b.name(pick.q) : null, gain: Math.round(pick.gain * 10) / 10 });
+      S = pick.S2; P = pick.P2; best = pick.plan;
+    }
+    if (!moves.length) return { ...base, rotation: [] };
+    // say it where it's acted on: in the lock call itself ("Move Luka UTIL → PG, then lock — 70.0"; the phone alert
+    // takes its title from the part before " — "), else as its own step first; and on the slot cards
+    const mv = m => `Move ${m.name} ${m.from} → ${m.to}${m.withName ? ` (${m.withName} → ${m.from})` : ""}`;
+    const actions = best.actions.map(a => {
+      const m = (a.kind === "lock" || a.kind === "confirm") && moves.find(y => y.pid === a.pid);
+      return m ? { ...a, rotate: m, text: a.kind === "lock" ? `${mv(m)}, then lock — ${a.text.split(" — ")[1]}` : `${mv(m)} first. ${a.text}` } : a;
+    });
+    const pre = moves.filter(m => !actions.some(a => a.rotate === m)).map(m => ({ kind: "rotate", slot: m.to, pid: m.pid, t: "", by: "",
+      text: `${mv(m)}: +${m.gain.toFixed(1)} expected (his score can still be locked there, and ${m.from} stays open for more players)` }));
+    for (const x of best.slots) { const m = moves.find(y => y.pid === x.pid); if (m) x.movedFrom = m.from; }
+    return { ...best, rotation: moves, actions: [...pre, ...actions] };
+  }
+
+  buildOnce(opts = {}) {
     const Q = this.Q, starters = this.matchup.starters || [], r1 = v => Math.round(v * 10) / 10;
     const reserve = new Set(this.roster.reserve || []);
     const players = (this.roster.players || []).filter(p => !reserve.has(p));

@@ -134,8 +134,8 @@ function compute() {
   const valuer = new Valuer({ book, schedule: base.schedule, Q: base.QS, rosterPositions: base.league.roster_positions, week: base.week, today: etToday(), settings: base.league.settings,
                               freeAgents: waivers.list.map(x => x.pid) });
   const barScale = studyBarScale(live.others);
-  const basePlan = wp.build({ opp: oppOut, lockBias, barScale });
-  const plan = Object.keys(whatIf).length ? wp.build({ opp: oppOut, lockBias, barScale, force: whatIf }) : basePlan;
+  const basePlan = wp.build({ opp: oppOut, lockBias, barScale, rotate: true });
+  const plan = Object.keys(whatIf).length ? wp.build({ opp: oppOut, lockBias, barScale, force: whatIf, rotate: true }) : basePlan;
   // every free agent scored the same way Moves does: best drop, this week's locked-points change + rest of season
   const protect = new Set([...(mine.reserve || []),
     ...plan.slots.filter(s => ["locked", "lock", "keep", "live", "confirm"].includes(s.action)).map(s => s.pid),
@@ -196,8 +196,9 @@ function render() {
     (plan.barScale !== 1 ? `<div class="row"><span class="pos">Bars include a ×${plan.barScale.toFixed(2)} calibration from ${(live.others?.starter_weeks || 0).toLocaleString()} real starter-weeks in other Lock-In leagues (that rule scored ${live.others?.best_scale?.vs_current}% of projection more).</span></div>` : "") +
     `<div class="row"><span class="pos">safer</span><input type="range" id="biasr" min="-0.2" max="0.2" step="0.05" value="${lockBias}" style="flex:1;margin:0 8px"><span class="pos">gamble</span></div></div>` + wi;
   $("slots").innerHTML = plan.slots.map(s => {
-    const nums = s.score != null && s.action !== "locked" && s.action !== "live" ? `<div class="nums">game <b>${r1(s.score)}</b>${s.bar != null ? ` · bar ${r1(s.bar)}${s.yourBar != null && s.yourBar !== s.bar ? ` (yours ${r1(s.yourBar)})` : ""}` : ""}${s.deadline ? ` · decide by ${esc(tipTime(s.deadline.tip) || day(s.deadline.date))}` : ""}</div>` +
-      (s.pWaitBeats != null && s.deadline ? `<div class="nums">lock certainty <b>${Math.round((1 - s.pWaitBeats) * 100)}%</b> <span class="pos">· waiting ends higher in ${Math.round(s.pWaitBeats * 100)}% of 3,000 simulated weeks</span></div>` : "") : "";
+    const mvd = s.movedFrom ? `<div class="nums" style="color:var(--pass)">↔ <b>Move him here from ${esc(s.movedFrom)} first</b> <span class="pos">· his game stays lockable, and ${esc(s.movedFrom)} stays open for more players</span></div>` : "";
+    const nums = mvd + (s.score != null && s.action !== "locked" && s.action !== "live" ? `<div class="nums">game <b>${r1(s.score)}</b>${s.bar != null ? ` · bar ${r1(s.bar)}${s.yourBar != null && s.yourBar !== s.bar ? ` (yours ${r1(s.yourBar)})` : ""}` : ""}${s.deadline ? ` · decide by ${esc(tipTime(s.deadline.tip) || day(s.deadline.date))}` : ""}</div>` +
+      (s.pWaitBeats != null && s.deadline ? `<div class="nums">lock certainty <b>${Math.round((1 - s.pWaitBeats) * 100)}%</b> <span class="pos">· waiting ends higher in ${Math.round(s.pWaitBeats * 100)}% of 3,000 simulated weeks</span></div>` : "") : "");
     const td = s.today ? `<div class="nums">today: <b>${esc(s.today.name)}</b> ${esc(tipTime(s.today.tip))}${s.today.keepBar > 0.05 ? ` · keep if ≥ ${r1(s.today.keepBar)}` : ""}${s.today.relief ? ` · else ${esc(s.today.relief.name)}` : ""}</div>` : "";
     let acts2 = "";
     if (s.action === "confirm") acts2 = `<button data-elig="${s.gameDate}|${s.pid}" data-v="1">He was starting</button><button data-elig="${s.gameDate}|${s.pid}" data-v="0">He was on my bench</button>`;
