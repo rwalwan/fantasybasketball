@@ -64,7 +64,7 @@ async function snapshot(env) {
       if (cur) { cur.frozen = true; changed = true; }
       continue;
     }
-    const slot = slotOf[pid] ?? null, i = idxOf[pid] ?? null;   // i: which slot (names repeat); a game locks only there
+    const slot = slotOf[pid] ?? null, i = idxOf[pid] ?? null;   // i: which slot index (names repeat, e.g. two UTIL)
     if (!cur || cur.slot !== slot || (cur.i ?? null) !== i) { snaps[k] = { slot, i, seen: stamp, frozen: false }; changed = true; }
   }
   // Sleeper: a game is ineligible once he "was moved to bench since the game began" (even if moved back); moving

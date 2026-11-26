@@ -6,9 +6,9 @@ before tip-off is frozen as that game's lineup.
 
 State lives in data/state/lineups_<season>_w<week>.json (kept on the `state` branch by the workflow):
   {"<date>|<pid>": {"slot": "G" | null, "i": <slot index> | null, "seen": "<utc iso>", "frozen": bool}}
-(i since Nov 15: a game can only be locked in the slot he played it in, and slot names repeat, e.g. two UTIL;
- "benched": true once he's on the bench after the game began: Sleeper won't let that game be locked again, even if
- he's moved back; moving between starting slots is fine)
+(i = which slot index he was in, since slot names repeat (two UTIL); "benched": true once he's on the bench after the
+ game began: Sleeper won't let that game be locked again, even if he's moved back. Moving between starting slots is
+ fine, and an unlocked game moves with him: it can be locked in any starting slot he fits. docs/SYSTEM.md, section 1.)
 Manual answers for games played before tracking started go in data/state/eligibility_overrides.json:
   {"<date>|<pid>": true | false}
 """
