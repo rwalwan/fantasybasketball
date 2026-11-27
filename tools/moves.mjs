@@ -190,6 +190,14 @@ try {
   probe.schema = { status: sch.status, errors: sch.json?.errors?.map(e => e.message).slice(0, 3),
     query: sch.json?.data?.__schema?.query_type?.fields?.map(f => `${f.name}(${(f.args || []).map(a => a.name).join(",")}): ${f.type?.name || f.type?.of_type?.name || f.type?.kind}`),
     mutation: sch.json?.data?.__schema?.mutation_type?.fields?.map(f => f.name), types: sch.json?.data?.__schema?.types?.map(t => t.name) };
+  // Nov 26 round 3: league_event_logs might hold every lineup change with its time. Ask for all its fields (public).
+  const elt = await gql(`{ __type(name: "LeagueEventLog") { fields { name type { name kind } } } }`);
+  const ef = (elt.json?.data?.__type?.fields || []).map(f => f.name);
+  probe.event_log_fields = elt.json?.data?.__type?.fields ?? elt.json?.errors;
+  if (ef.length) {
+    const ev = await gql(`query { league_event_logs(league_id: "${LEAGUE}", limit: 200) { ${ef.join(" ")} } }`);
+    probe.event_logs = { status: ev.status, errors: ev.json?.errors?.map(e => e.message).slice(0, 5), rows: ev.json?.data?.league_event_logs?.slice(0, 200) ?? null };
+  }
   const sug = await gql(`query { matchup_legs_raw(league_id: "${LEAGUE}", round: ${week}) { roster_id eligible ineligible lock_eligible } }`);
   probe.suggestions = sug.json?.errors?.map(e => e.message).slice(0, 6) ?? sug.head;
   if (process.env.WORKER_URL) probe.worker = await get(`${process.env.WORKER_URL}/legs_probe`).catch(e => String(e));

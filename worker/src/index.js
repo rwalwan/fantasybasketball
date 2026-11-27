@@ -132,6 +132,17 @@ async function legsProbe(env) {
   const j = await r.json().catch(() => null);
   const legs = (j?.data?.matchup_legs || []).filter(l => [1, 3].includes(l.roster_id));
   const out = { at: new Date().toISOString(), week: info.week, http: r.status, errors: (j?.errors || []).map(e => e.message).slice(0, 5), legs };
+  // round 3: the league's event log, logged in (all fields of LeagueEventLog, from introspection)
+  try {
+    const t = await fetch("https://api.sleeper.app/graphql", { method: "POST", headers: { "content-type": "application/json", accept: "application/json", "user-agent": "we-back-lock-desk" },
+      body: JSON.stringify({ query: '{ __type(name: "LeagueEventLog") { fields { name } } }' }) }).then(x => x.json());
+    const ef = (t?.data?.__type?.fields || []).map(f => f.name).join(" ");
+    const e = await fetch("https://api.sleeper.app/graphql", { method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json", authorization: env.SLEEPER_TOKEN, "user-agent": "we-back-lock-desk" },
+      body: JSON.stringify({ query: `query { league_event_logs(league_id: "${LEAGUE}", limit: 200) { ${ef} } }` }) });
+    const ej = await e.json().catch(() => null);
+    out.event_logs = { http: e.status, errors: (ej?.errors || []).map(x => x.message).slice(0, 5), rows: ej?.data?.league_event_logs ?? null };
+  } catch (err) { out.event_logs = { error: String(err.message || err).slice(0, 200) }; }
   await env.KV.put("legs_probe", JSON.stringify(out), { expirationTtl: 3 * 86400 });
   return { http: r.status, legs: legs.length };
 }
