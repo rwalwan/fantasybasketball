@@ -56,6 +56,13 @@ assert.equal(mine[`${wed}|S`].benched, true, "Spencer's Wednesday game: benched 
 assert.ok(!mine[`${wed}|J`].benched, "Jerome never left the lineup");
 assert.equal(opp[`${wed}|E`].benched, true, "the opponent's Edey too");
 
+// A day without games (Thanksgiving): a bench trip still counts against the week's earlier games
+{
+  const snaps = mineSnaps();
+  recordLineup(snaps, { starters: ["J", "0", "B"], players: ["J", "S", "B"], slots: SLOTS, tips: {}, team, date: "2026-11-26", now: new Date("2026-11-26T20:00:00Z") });
+  assert.equal(snaps[`${wed}|S`].benched, true, "benched on an off day");
+}
+
 // The engine then says not lockable (Spencer has a game left Friday, so the slot isn't kept as is)
 const g = (date, st, t) => ({ week: 6, date, home: { team: t }, away: { team: "X" + t }, status: st });
 const sched = [g(mon, "complete", "MEM"), g(wed, "complete", "MEM"), g(fri, "pre_game", "MEM")];

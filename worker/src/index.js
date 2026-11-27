@@ -57,7 +57,8 @@ async function fetchLegs(week) {
 async function snapshot(env) {
   const date = etDate();
   const info = await dayInfo(env, date);
-  if (!Object.keys(info.tips).length) return { date, games: 0 };
+  // no early return on days without games (Thanksgiving, Nov 26): a bench trip on an off day still voids that week's
+  // earlier games, and only a sample can see it
   const league = await kvGet(env, "league", null) || await (async () => {
     const lg = await getJSON(`${S1}/league/${LEAGUE}`);
     const v = { slots: lg.roster_positions.filter(s => s !== "BN" && s !== "IR") };
