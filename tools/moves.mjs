@@ -2,7 +2,7 @@
 // Runs in the scheduled job after `python -m app.run` (needs site/static/*.json). Uses the same engine as
 // the site, so the numbers match what you see there. Reasons are cached so each suggestion is only
 // written once (OpenRouter key stays server-side; never shipped to the browser).
-import { stageOf, calibration } from "./winprob.mjs";
+import { stageOf, calibration, gradeWeeks } from "./winprob.mjs";
 import fs from "node:fs";
 import { Book, WeekPlan, Valuer, eligFromSnaps, mergeSnaps, sleeperLocksFor, mergeMatchups, irMoves, studyBarScale, selectAdds, weekDays, tradeIdeas, waiverMoves, playerValue } from "../site/engine.js";
 
@@ -208,14 +208,7 @@ try {
   // grade finished weeks (entries logged before stages existed are dropped: daily, two different models)
   for (const [k, x] of Object.entries(log.open)) if (!x.stage) delete log.open[k];
   log.graded = log.graded.filter(x => x.stage);
-  for (const w of [...new Set(Object.values(log.open).map(x => x.week))].filter(w => w < week)) {
-    const fin = await get(`${S1}/league/${LEAGUE}/matchups/${w}`);
-    const pts = Object.fromEntries(fin.map(m => [m.roster_id, m.points]));
-    for (const [k, x] of Object.entries(log.open)) if (x.week === w) {
-      if (pts[x.a] != null && pts[x.b] != null && pts[x.a] !== pts[x.b]) log.graded.push({ ...x, a_won: pts[x.a] > pts[x.b] });
-      delete log.open[k];
-    }
-  }
+  await gradeWeeks(log, week, today, w => weekDays(schedule, w).at(-1), w => get(`${S1}/league/${LEAGUE}/matchups/${w}`));
   log.calibration = calibration(log.graded);
   fs.writeFileSync(stateFile("winprob_log.json"), JSON.stringify(log));
   fs.writeFileSync("site/static/winprob.json", JSON.stringify(log.calibration));

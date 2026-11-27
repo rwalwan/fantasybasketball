@@ -208,8 +208,12 @@ Sent once each (deduplicated in `data/state/alerts.json`):
   healthy rate update from it.
 - **Usage**: graded by horizon; a horizon that makes projections worse (100+ games) is switched off (`usage.gate`).
 - **Decisions**: lock/pass calls and lineup moves logged in the `decisions` table of `memory.sqlite` and graded vs the
-  counterfactual (`app/learn.py`); the site reads the summary from `site/static/learning.json`.
-- **Win chance**: one prediction per matchup per stage of the week, graded (`tools/winprob.mjs`, `winprob_log.json`).
+  counterfactual (`app/learn.py`); the site reads the summary from `site/static/learning.json`. A week is graded 2 days
+  after its last game day (settled scores). Sleeper's lock record decides each slot's final and whether a lock call was
+  followed; a followed pass is graded on what the slot really ended with (Nov 27: the feed's latest-game points had
+  graded three of Ryan's week-5 locks "not followed"; `test_nov27_grading.py`).
+- **Win chance**: one prediction per matchup per stage of the week, graded 2 days after the week's last day on the
+  settled scores (`tools/winprob.mjs` `gradeWeeks`, `winprob_log.json`; `test_nov27_winprob_settle.mjs`).
   The logged win chance is a **simpler model than the one on the page** (no human-lock opponent, no matchup-aware calls,
   no rotation, every game treated as lockable), so its grades don't measure the displayed number exactly.
 - **Experts/news**: RSS + polite crawler (`app/sources.py`: robots.txt, rate limits, public pages only); an AI model via

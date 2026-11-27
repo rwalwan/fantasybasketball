@@ -2,8 +2,9 @@
 
 Runs after tools/moves.mjs each cycle:
   record()  keeps the latest pre-deadline version of every lock/pass call and lineup move
-  grade()   once a week is final: compares each call with the slot's final points (Sleeper
-            starters_points) and the counterfactual, and notes whether the call was followed
+  grade()   once a week has settled (2 days after its last game day): compares each call with the slot's final
+            (Sleeper's lock record when we have it, else the settled starters_points) and the counterfactual, and
+            notes whether the call was followed
   export    site/static/learning.json: weekly scorecards, graded calls, running totals
 """
 import datetime as dt
@@ -98,43 +99,74 @@ def grade_lock_call(score, call, later):
     return cf, round(regret, 1)
 
 
-def grade(con, season, current_week, lineups_by_week):
-    """Grade every ungraded decision from finished weeks."""
+SETTLE_DAYS = 2      # a week is graded this many days after its last game day (Sleeper's final score has settled)
+
+
+def grade(con, season, current_week, lineups_by_week, locks_by_week=None, today=None):
+    """Grade every ungraded decision from finished, settled weeks.
+    locks_by_week = {week: Sleeper's lock record file (sleeper_locks_<season>_w<week>.json)}: when its status is ok it
+    decides each slot's final and whether a lock call was followed (Nov 27: the public feed's starters_points showed
+    the latest game for week 5's locked slots, so three locks Ryan made were graded 'not followed')."""
     fix_move_dates(con)
+    today = today or dt.datetime.now(ET).date().isoformat()
     weeks = [w for (w,) in con.execute("SELECT DISTINCT week FROM decisions WHERE regret IS NULL AND week < ?", (current_week,))]
+    if not weeks:
+        return 0
+    sched = sleeper.schedule(season)
+    settled = lambda w: (lambda ds: bool(ds) and (dt.date.fromisoformat(ds[-1]) + dt.timedelta(days=SETTLE_DAYS)).isoformat() <= today)(week_dates(sched, w))
+    weeks = [w for w in weeks if settled(w)]
     if not weeks:
         return 0
     rosters = sleeper.rosters(LEAGUE_ID)
     mine = next(r for r in rosters if r.get("owner_id") == USER_ID)
-    fp, proj, team = {}, {}, {}
-    for pid, d, f, tm, pr in con.execute("SELECT pid, date, fp, team, COALESCE(proj_rw, proj_model) FROM games WHERE season=? ORDER BY date", (season,)):
+    fp, proj, team, by_gid = {}, {}, {}, {}
+    for pid, gid, d, f, tm, pr in con.execute("SELECT pid, gid, date, fp, team, COALESCE(proj_rw, proj_model) FROM games WHERE season=? ORDER BY date", (season,)):
         fp[(pid, d)] = f
+        by_gid[(pid, str(gid))] = (d, f)
         team[pid] = tm
         if pr:
             proj[(pid, d)] = pr
     avg = {}
     for (pid, _d), f in fp.items():
         avg.setdefault(pid, []).append(f)
-    sched = sleeper.schedule(season)
     tg = team_game_dates(sched)
     n = 0
     for w in weeks:
         mu = next(m for m in sleeper.matchups(LEAGUE_ID, w) if m["roster_id"] == mine["roster_id"])
         starters, spts = mu.get("starters") or [], mu.get("starters_points") or []
-        final_by_pid = {p: (spts[i] / 10 if i < len(spts) else None) for i, p in enumerate(starters)}
+        rec = (locks_by_week or {}).get(w) or {}
+        lk = (rec.get("teams") or {}).get(str(mine["roster_id"])) if rec.get("status") == "ok" else None
+        locked = {p: by_gid.get((p, str(g))) for p, g in (lk or {}).items()}      # pid -> (date, fp) of his locked game
+
+        def slot_final(i):
+            p = starters[i] if i < len(starters) else None
+            if locked.get(p):
+                return locked[p][1]
+            return spts[i] / 10 if i < len(spts) and spts[i] is not None else None
+        final_by_pid = {p: slot_final(i) for i, p in enumerate(starters)}
         for (idx, pid, kind, d, score, ev_call, mx_call, extra) in con.execute(
                 "SELECT idx, pid, kind, date, score, ev_call, mx_call, extra FROM decisions WHERE week=? AND regret IS NULL", (w,)).fetchall():
             if kind == "lock-call":
                 final = final_by_pid.get(pid)
                 if final is None:
-                    final = spts[idx] / 10 if idx < len(spts) else None
+                    final = slot_final(idx)
                 # his remaining games in the SAME week (a DNP is a game he can't lock), replayed with the stopping rule
                 days = set(week_dates(sched, w))
                 mean = sum(avg.get(pid, [0])) / max(1, len(avg.get(pid, [])))
                 later = [(fp.get((pid, dd)), proj.get((pid, dd), mean)) for dd in sorted(tg.get(team.get(pid), {}))
                          if dd in days and dd > (d or "")]
                 cf, regret = grade_lock_call(score, mx_call, later)
-                followed = int(final is not None and ((abs(final - score) < 0.05) == (mx_call == "lock")))
+                if lk is not None:
+                    on_it = bool(locked.get(pid)) and locked[pid][0] == d       # locked on the game the call was about
+                    followed = int(on_it == (mx_call == "lock"))
+                else:
+                    followed = int(final is not None and ((abs(final - score) < 0.05) == (mx_call == "lock")))
+                # a pass that was followed: grade it on what the slot really ended with (other players streamed into the
+                # slot count, and a final-game DNP doesn't zero it). Nov 11, Ty Jerome: pass on 37, slot ended at 41,
+                # the replay said 0 and 'cost 37'.
+                sf = slot_final(idx)
+                if mx_call == "pass" and followed and sf is not None:
+                    cf, regret = float(sf), round(score - sf, 1)
                 con.execute("UPDATE decisions SET final=?, cf=?, regret=?, followed=? WHERE week=? AND idx=? AND pid=? AND kind=? AND date=?",
                             (final, cf, round(regret, 1), followed, w, idx, pid, kind, d))
             elif kind == "move":
@@ -186,22 +218,25 @@ def main():
         return
     con = memory.connect()
     now = dt.datetime.now(dt.timezone.utc)
-    if con.execute("SELECT v FROM kv WHERE k='learn_grade_v'").fetchone() != ("2",):
-        # one-time cleanup of the v1 scorecard: drop 'keep' rows (no deadline = no decision), regrade the rest
+    if con.execute("SELECT v FROM kv WHERE k='learn_grade_v'").fetchone() != ("3",):
+        # one-time cleanups: v2 dropped 'keep' rows (no deadline = no decision); v3 (Nov 27) regrades every lock call
+        # with Sleeper's lock record, settled weeks and followed passes graded on the slot's real final
         con.execute("DELETE FROM decisions WHERE kind='lock-call' AND deadline IS NULL")
         con.execute("UPDATE decisions SET final=NULL, cf=NULL, regret=NULL, followed=NULL WHERE kind='lock-call'")
-        con.execute("INSERT OR REPLACE INTO kv VALUES('learn_grade_v','2')")
+        con.execute("INSERT OR REPLACE INTO kv VALUES('learn_grade_v','3')")
         con.commit()
     record(con, plan, now)
     try:
         lg = sleeper.league(LEAGUE_ID)
         season = lg["season"]
         state = os.path.join(ROOT, "data", "state")
-        lineups = {}
+        lineups, locks = {}, {}
         for f in os.listdir(state):
             if f.startswith(f"lineups_{season}_w") and f.endswith(".json"):
                 lineups[int(f.split("_w")[1].split(".")[0])] = json.load(open(os.path.join(state, f)))
-        print("graded decisions:", grade(con, season, plan.get("week"), lineups))
+            if f.startswith(f"sleeper_locks_{season}_w") and f.endswith(".json"):
+                locks[int(f.split("_w")[1].split(".")[0])] = json.load(open(os.path.join(state, f)))
+        print("graded decisions:", grade(con, season, plan.get("week"), lineups, locks))
     except Exception as e:
         print("grading failed:", e, file=sys.stderr)
     out = export(con)

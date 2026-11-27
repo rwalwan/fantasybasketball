@@ -21,3 +21,26 @@ export function calibration(graded) {
   }
   return out;
 }
+
+// Grade logged predictions of finished weeks. A week is graded only once it has SETTLED (SETTLE_DAYS after its last
+// day): right after the week flips, the public feed's matchup points can still sum each starter's latest game rather
+// than the game locked in his slot (Nov 27: week 5's decision grades read the feed that way). Graded weeks from before
+// this rule are regraded once (log.settled_v). lastDay(w) = the week's last date; finals(w) = that week's matchups.
+export const SETTLE_DAYS = 2;
+const plusDays = (d, n) => { const x = new Date(d + "T12:00:00Z"); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+export async function gradeWeeks(log, week, today, lastDay, finals) {
+  const settled = w => { const d = lastDay(w); return !!d && plusDays(d, SETTLE_DAYS) <= today; };
+  if (!log.settled_v) {                                  // one-time: put graded entries back to be graded on settled scores
+    for (const x of log.graded || []) { const { a_won, ...o } = x; log.open[`${o.week}|${o.stage}|${o.mid}`] = o; }
+    log.graded = []; log.settled_v = 1;
+  }
+  for (const w of [...new Set(Object.values(log.open).map(x => x.week))].filter(w => w < week && settled(w))) {
+    const fin = await finals(w);
+    const pts = Object.fromEntries(fin.map(m => [m.roster_id, m.points]));
+    for (const [k, x] of Object.entries(log.open)) if (x.week === w) {
+      if (pts[x.a] != null && pts[x.b] != null && pts[x.a] !== pts[x.b]) log.graded.push({ ...x, a_won: pts[x.a] > pts[x.b] });
+      delete log.open[k];
+    }
+  }
+  return log;
+}
