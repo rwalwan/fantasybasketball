@@ -2,7 +2,9 @@
 
 Data, not guesses (app/data/availability_model.json):
   * Next game, by official designation: Probable 86.6%, Questionable 48.3%, Doubtful 4.2%, Out 0%
-    (first official-report designation vs. minutes played, 2,007 player-games, 2026).
+    (first official-report designation vs. minutes played, 2,007 player-games, 2026), blended with this season's
+    graded games. Once the nightly trainer promotes them (M["first_game"], Nov 27), learned rates by status and games
+    missed replace these for the next game, Out included (Out a day ahead played 42% after 0 missed games).
   * After that, the empirical return hazard: P(plays next game | has missed k straight), from 2021-24 box scores
     of top-150 players: 54% after 1 miss, 32% after 2, 27% after 3, ... about 15% per game after 9+.
   * A reported timeline beats both: if the latest injury news says "out 2-4 weeks", he is out until the early
@@ -28,6 +30,26 @@ OUTISH = {"Out", "IR", "Suspended", "PUP", "NA"}
 # Sleeper's informal labels map to the closest official designation we have data for
 DESIG = {"Probable": "Probable", "Questionable": "Questionable", "GTD": "Questionable", "DTD": "Questionable",
          "Day-To-Day": "Questionable", "Doubtful": "Doubtful"}
+
+
+# Learned next-game rates by (status, games missed so far), promoted by the nightly trainer (app/train_models.py
+# PlayFirst, Nov 27). run.py puts them in M["first_game"]; without them, Out is 0% and the designations use the
+# self-calibrated pooled rates below.
+FIRST_GROUP = {"Out": "Out", **DESIG}
+
+
+def missed_bucket(missed):
+    m = int(missed or 0)
+    return "0" if m <= 0 else "1" if m == 1 else "2-3" if m <= 3 else "4+"
+
+
+def first_game(st, missed, gameday):
+    """Learned P(plays his next game) for a listed player, or None (no learned numbers for this status)."""
+    L, g = M.get("first_game"), FIRST_GROUP.get(st)
+    if not L or not g:
+        return None
+    v = ((L.get("gameday" if gameday else "ahead") or {}).get(g) or {}).get(missed_bucket(missed))
+    return None if v is None else float(v)
 
 
 def healthy_at(n):
@@ -166,10 +188,15 @@ def build(book, meta, team_dates, today, is_final, pids):
                 if rest and any(f < d for f in forced):                          # sat for rest: back at the healthy rate after it
                     q[d] = round(healthy_at(j + 1), 3)
                     continue
-                if j == 0 and st in DESIG:
+                lp = first_game(st, missed, d == today) if j == 0 else None
+                if j == 0 and (st in DESIG or lp is not None):
                     # still carrying the label on game day is a different (higher) rate than the label a day or more
-                    # ahead: review 3, finding 2
-                    p = (M.get("designation_gameday") or M["designation"])[DESIG[st]] if d == today else M["designation"][DESIG[st]]
+                    # ahead: review 3, finding 2. A learned rate by games missed wins when the trainer has promoted one
+                    # (Nov 27: 'Out' a day ahead played 42% after 0 missed games, but was 0% here)
+                    if lp is not None:
+                        p = lp
+                    else:
+                        p = (M.get("designation_gameday") or M["designation"])[DESIG[st]] if d == today else M["designation"][DESIG[st]]
                     q[d] = round(p, 3)
                     S = 1 - p
                     k = max(k, 0) + 1
@@ -181,8 +208,14 @@ def build(book, meta, team_dates, today, is_final, pids):
                 S *= 1 - r                                     # S = still out
                 q[d] = round((1 - S) * healthy_at(j + 1), 3)
                 k += 1
-            basis = (f"{st}: next game {round(M['designation'].get(DESIG.get(st, ''), 0) * 100) if st in DESIG else 0}% by designation, "
-                     f"then the historical return rate after {missed} missed game(s)") if st in DESIG or st in OUTISH else None
+            if st in DESIG or st in OUTISH:
+                lp = first_game(st, missed, bool(upcoming) and upcoming[0] == today)
+                first = lp if lp is not None else M["designation"].get(DESIG.get(st, ""), 0) if st in DESIG else 0
+                basis = (f"{st}: next game {round(first * 100)}% "
+                         + (f"(learned from graded games of players listed {st} after {missed} missed)" if lp is not None else "by designation")
+                         + f", then the historical return rate after {missed} missed game(s)")
+            else:
+                basis = None
         if forced:
             for d in forced:
                 q[d] = 0.0

@@ -3,7 +3,7 @@
 Sent at most once each (deduped in data/state/alerts.json):
   * lock reminder ~1 h before tip when a slot has a lock decision pending
   * a starter ruled Out/Doubtful before his game today
-  * a morning brief once a day (first run after 8 AM PT)
+  * a morning brief once a day (first run after 7 AM PT), with any model the nightly trainer updated or rolled back
 """
 import datetime as dt
 import json
@@ -43,6 +43,24 @@ def tip_pt(tip):
 
 def _ts(t):
     return dt.datetime.fromisoformat(t.replace("Z", "+00:00"))
+
+
+LEARN_WORD = {"promoted": "Learned", "reverted": "Rolled back"}
+
+
+def learned_lines(now, doc=None):
+    """Morning-brief lines for the nightly trainer's promotions and rollbacks in the last 24 hours (app/train.py)."""
+    from . import learned
+    if not learned.enabled():
+        return []
+    doc = doc if doc is not None else learned.load()
+    since = (now - dt.timedelta(hours=24)).isoformat()
+    out = []
+    for e in doc.get("log") or []:
+        if e.get("event") in LEARN_WORD and (e.get("at") or "") >= since[:16]:
+            what = e.get("title") or e.get("model")
+            out.append(f"{LEARN_WORD[e['event']]}: {what}" + (" (watched for 7 days)" if e["event"] == "promoted" else ""))
+    return out
 
 
 def main():
@@ -112,6 +130,7 @@ def main():
         if moves.get("adds"):
             a = moves["adds"][0]
             lines.append(f"Waiver: add {a['name']}, drop {a['dropName']} (${a['bid']})")
+        lines += learned_lines(now)
         once(f"brief|{local.date().isoformat()}", f"Lock Desk — week {plan.get('week')}",
              "\n".join(lines) or "Nothing to do today.", tags="basketball")
 

@@ -467,6 +467,18 @@ function renderOthers() {
     `<div class="row"><span class="pos">How often managers lock, by score vs his own wait value (games the player was in their lineup): ${(o.lock_rate_eligible || []).map(r => `${r.score_vs_bar}: ${Math.round(r.lock_rate * 100)}% (n=${r.n})`).join(" · ")}</span></div>` +
     `<div class="row"><span class="pos">${o.opponent_model_ready ? "Your opponent's outlook uses these real lock rates." : `Opponent model: waiting for enough lineup-checked decisions (${o.eligible_points || 0} so far); until then the opponent is assumed to lock like the engine.`}</span></div>`;
 }
+// Nightly trainer's log (app/train.py via learning.json): what changed, when, and the evidence (Nov 27)
+const LEARN_EVENT = { promoted: ["Updated", "up"], reverted: ["Rolled back", "down"], "kept after watch": ["Confirmed", ""], "kept current": ["Checked, no change", ""], skipped: ["Waiting for data", ""] };
+function renderLearned(ln) {
+  const head = `<div class="row"><span class="pos">Every night each model is refit and tested on recent games it never saw. A new version goes live only if it is clearly better, then the old one is graded alongside it for 7 days and comes back automatically if the new one does worse.</span></div>`;
+  if (!ln) return head + `<div class="row"><span class="pos">The first nightly run hasn't happened yet.</span></div>`;
+  if (ln.enabled === false) return head + `<div class="row"><span class="pos">Learning is switched off (repository variable LEARNING = off): the factory numbers are in use.</span></div>`;
+  const watch = Object.values(ln.models || {}).filter(m => m.status === "watching");
+  return head + watch.map(m => `<div class="row"><span>Watching: <b>${esc(m.title || "")}</b> (live since ${esc(m.since)})</span><span class="pos">until ${esc(m.watch_until)}</span></div>`).join("") +
+    ((ln.log || []).slice(0, 12).map(e => { const [w, cls] = LEARN_EVENT[e.event] || [e.event, ""];
+      return `<div class="row"><span><span class="chip ${cls}">${esc(w)}</span> <b>${esc(e.title || e.model)}</b><br><span class="pos">${esc(e.why)}</span></span><span class="pos">${esc(new Date(e.at).toLocaleDateString())}</span></div>`; }).join("") ||
+     `<div class="row"><span class="pos">No training runs logged yet.</span></div>`);
+}
 function renderInsights(c) {
   renderOthers();
   const ins = live.insights || {}, lr = live.learning || {}, mine = new Set(c.mine.players || []);
@@ -475,6 +487,7 @@ function renderInsights(c) {
     `<div class="row"><span class="pos">Projected final = locked games + the rest of live games' projections + the expected value of each open slot (from the lock plan). Win chance = how often your final beats theirs given both ranges.</span></div>` +
     (live.winprob?.matchups ? `<div class="row"><span class="pos">Win-chance check, every matchup in the league, graded at week's end (${live.winprob.matchups} matchups; one prediction per stage of the week): ${Object.entries(live.winprob.by_stage).map(([s, v]) => `${s}: Brier ${v.brier} (0.25 = coin flip), ${Object.entries(v.favorite_by_bin).map(([k, b]) => `${k} favorite won ${b.won}% (n=${b.n})`).join(", ")}`).join(" · ")}</span></div>` : `<div class="row"><span class="pos">Win-chance check: logging every matchup at the start, middle and end of each week; graded after the week ends.</span></div>`) +
     `<div class="row"><span class="pos">Lock calls compare your win chance if you lock vs wait. When they differ by 2+ points, the matchup decides: protect a lead with safe locks, chase upside when behind.</span></div>` : `<div class="row"><span class="pos">No matchup found.</span></div>`;
+  $("learned").innerHTML = renderLearned(lr.learned);
   $("why").innerHTML = (ins.notes || []).map(n => `<div class="row"><span><b>${esc(n.player)}</b> <span class="pos">${esc(n.date)}</span> — ${esc(n.text)}</span><span class="chip ${n.tag === "signal" ? "up" : ""}">${esc(n.tag)}</span></div>`).join("") ||
     `<div class="row"><span class="pos">Notes appear after games finish, for any game that lands well above or below its projection.</span></div>`;
   $("trends").innerHTML = (ins.trends || []).slice(0, 25).map(t => `<div class="row"><span>${t.dir === "up" ? "▲" : "▼"} <b>${esc(t.player)}</b> <span class="pos">${esc(t.team)}</span> — ${esc(t.why)} · ${r1(t.fp4)} FP/G lately</span><span class="pos">${t.mine ? "your player" : t.rostered ? "rostered" : "free agent"}</span></div>`).join("") ||

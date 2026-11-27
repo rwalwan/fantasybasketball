@@ -1,0 +1,63 @@
+name: Train models
+
+# Nightly: refit each learned model, promote a new version only if it wins on games it never saw, watch promoted
+# versions for 7 days and revert if they do worse (app/train.py). 10:37 UTC = 2:37 AM PST / 3:37 AM PDT: after the
+# last West Coast game is final, before the morning brief. Set the repository variable LEARNING to "off" to stop it
+# (the job then also ignores learned numbers).
+on:
+  schedule:
+    - cron: "37 10 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  actions: read
+
+# Its own group: it reads saved state but never writes it (only the learning branch), so it can run beside the
+# 15-minute job without either overwriting the other.
+concurrency:
+  group: train
+  cancel-in-progress: false
+
+jobs:
+  train:
+    if: vars.LEARNING != 'off'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use the newest code that passed Tests
+        run: tools/tested_code.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Fetch saved state
+        run: tools/state.sh restore
+
+      - name: Fetch training history (learning branch)
+        run: tools/learning.sh restore
+        env:
+          REMOTE: https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+
+      - name: Cache Sleeper data
+        uses: actions/cache@v4
+        with:
+          path: data/cache
+          key: sleeper-train-${{ github.run_id }}
+          restore-keys: |
+            sleeper-train-
+            sleeper-
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt pandas pyarrow
+
+      - name: Train, test on unseen games, promote or keep
+        run: python -m app.train
+
+      - name: Save training history
+        run: tools/learning.sh save

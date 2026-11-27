@@ -56,7 +56,8 @@ something measured in Sleeper's data, and the source is noted.
 | `site/` | GitHub Pages; recomputes **in the browser every minute** | The app Ryan uses (installable PWA). Loads `static/*.json` + live Sleeper + Worker + state branch |
 | `worker/` | Cloudflare Worker, cron **every minute** | Lineup samples four times a minute for Ryan **and his opponent** (lock eligibility, `worker/src/lineup.js`), Sleeper's lock record, stores site answers, kicks the update workflow every 15 min |
 | `app/league_run.py` | **Other Lock-In leagues** workflow, daily 15:07 UTC (7:07 AM PST, 8:07 PDT) | Finds other Lock-In leagues, snapshots them, studies real managers' locks (bar calibration, opponent lock model) |
-| `research/` | By hand | Fits the constants in `app/data/*.json` from 2021-24 box scores |
+| `research/` | By hand | Fits the constants in `app/data/*.json` from 2021-24 box scores (the factory numbers) |
+| `app/train.py` | **Train models** workflow, nightly 10:37 UTC (2:37 AM PST) | Refits each learned model, promotes a new version only if it's clearly better on held-out days, watches it 7 days, reverts if worse (section 5) |
 | `tests/` | **Tests** workflow on pushes to main and PRs | `tests/run_all.sh`; the update job runs the newest code that passed (`tools/tested_code.sh`; with no passing run at all it runs HEAD). The Worker deploy is **not** gated on Tests; `worker/src/lineup.js` is tested (`test_nov26_bench_trip.mjs`), the rest of `worker/src/index.js` is not |
 
 **One engine.** All decision logic is in `site/engine.js`, which runs both in the browser and in Node (`tools/moves.mjs`).
@@ -67,7 +68,9 @@ grading decisions (`app/learn.py`). `engine.js` also holds hand copies of some f
 
 **Workflows** (`.github/workflows/`): `update.yml` (every 15 min + manual; also kicked by the Worker because GitHub
 throttles schedules), `tests.yml` (push), `worker.yml` (push touching `worker/**`), `leagues.yml` (daily),
-`llm-eval.yml` (manual AI model comparison). Update, leagues and llm-eval share the `lock-desk` concurrency group.
+`llm-eval.yml` (manual AI model comparison), `train.yml` (nightly trainer). Update, leagues and llm-eval share the
+`lock-desk` concurrency group; train has its own (`train`): it reads the state branch but writes only the `learning`
+branch, so it can't overwrite or be overwritten by the 15-minute job.
 A crash in `python -m app.run` stops the run before the Pages deploy (the site keeps its previous version); the later
 steps (moves, learn, alerts) run through `tools/step.sh`, which records a failure in `step_health.json` and carries on.
 
@@ -120,8 +123,14 @@ Worker (every minute): Sleeper lineup ─> KV lineups_<season>_w<week>   Sleeper
     until 300 of this season's games are graded, then this season's rate. Games tipping today use separate game-day
     rates (`healthy_gameday`, `designation_gameday`), because by then the designation is final.
   - Healthy bench players (< 20 min/game) who sat recent team games get a participation factor on `q`.
-  - Sleeper designation: calibrated rates for Probable / Questionable(GTD/DTD) / Doubtful / Out, blending this season's
-    graded results with a published table.
+  - Sleeper designation: calibrated rates for Probable / Questionable(GTD/DTD) / Doubtful, blending this season's
+    graded results with a published table. "Out" was a fixed 0% (the doc said calibrated; the code never did that).
+  - **Learned next-game rate** (Nov 27, `first_game` in the availability model): once the nightly trainer has promoted
+    one, a listed player's next game uses a rate by status (Out, GTD/DTD/Questionable, Probable, Doubtful) and games
+    missed so far (0, 1, 2-3, 4+), one set for a day or more ahead and one for game day. It replaces the designation
+    rate and Out's 0% for that game; IR/Suspended keep 0%. Evidence: Out a day ahead played 42% after 0 missed (31 of 73)
+    and 35% after 1 (19 of 55); DTD 65% after 0 missed vs 19% after 1+. Tests: `test_nov27_out_play.py`,
+    `test_nov27_first_game.mjs` (the browser's status-only chain uses it too).
   - After k straight missed games: the return hazard (fitted 2021-24).
   - A news timeline ("out 2-4 weeks") with a minimum overrides these. Outlets vote; the latest report per outlet within 48 h counts.
   - **A single-game "ruled out" report** (the newest report for him says out for 1-3 games) sets those games to 0%
@@ -202,6 +211,32 @@ Sent once each (deduplicated in `data/state/alerts.json`):
 - a **morning brief**, once per Pacific day, 7-11 AM PT (written in `alerts.py`).
 
 ## 5. Learning loops
+
+Two kinds. **Every run** (15 min): rates that are plain averages of graded results update themselves (below).
+**Nightly trainer** (`app/train.py`, `app/train_models.py`, Train models workflow): fitted models that could make
+things worse if refit blindly go through a gate.
+
+**The nightly gate** (Nov 27; `test_nov27_learning.py` is the spec):
+1. **Watch.** A model promoted in the last 7 days is graded against the version it replaced on every game graded since.
+   Clearly worse (95% interval of the per-game loss difference above 0, 3+ days) = reverted at once; at the end of the
+   watch, worse at all = reverted, then a 7-day cooldown. No new promotion while watching.
+2. **Gate.** A candidate is fitted on rows before the exam window and moved from the current version by at most the
+   model's step cap. Exam = the last 14 days (the newer half of the days while history is shorter than 28; rows of a
+   kind that started later are split on their own, `s` key). Promoted only if the paired loss difference's 95% interval
+   (2,000 resamples of whole days) is entirely below 0, every number is inside the model's hard limits, and there are
+   enough rows. What goes live is the same capped step toward a fit on all rows, checked against the limits again.
+3. **Log.** Every outcome goes to `learned.json`'s log: the Insights tab shows it ("What the models learned"); the
+   morning brief names promotions and rollbacks from the last 24 hours.
+
+Learned numbers never change code, only fitted numbers. **Factory numbers** (`app/data/*.json` and the every-run
+self-calibration) apply when there is no learned file, no entry for a model, or the repository variable `LEARNING` is
+`off` (the trainer then skips and the job ignores learned numbers).
+
+| Learned model | What | Data | Loss | Limits, step |
+|---|---|---|---|---|
+| `play_first` | next-game play rate by status x games missed, ahead and game day (section 4.1) | graded next-game predictions (`avail_graded.jsonl`); each rate shrunk 20 games toward its status's pooled rate, which is shrunk toward today's rates | log loss (clipped 1-99%) | rates in [0, 1], Out <= 90%; 0.25 per promotion |
+
+Every-run loops:
 - **Projections**: every source's pre-tip projection is logged and graded once the game is final (`app/experts.py`,
   `projlog_*.json`, `expert_scores*.json`); blend weights refit each run.
 - **Availability**: each next-game play chance is logged and graded (`availability_log.json`); designation rates and the
@@ -242,6 +277,14 @@ Sent once each (deduplicated in `data/state/alerts.json`):
 | `projlog_done_<season>.json`, `ctx_prior_<season>.json`, `diag_run.json`, `diag_prior.json`, `llm_eval.json` | Graded projections kept a few days, last season's opponent-vs-position table, run diagnostics, AI model comparison |
 | `availability_err.txt`, `*.corrupt` | Present only after a failure: the availability traceback; a damaged file moved aside by `state.sh` |
 
+**`learning` branch** (real git history, one commit per nightly run; written only by the Train models workflow through
+`tools/learning.sh`; never force-pushed):
+
+| File | Holds |
+|---|---|
+| `learned.json` | The learned numbers (`models`: params, the version they replaced, since, watch status) and the trainer's log. The 15-minute job copies it to `data/state/learned.json` (`tools/learning.sh pull`; a failed fetch keeps the last copy) |
+| `avail_graded.jsonl` | Every graded next-game play prediction, once each (the state log keeps only the newest 3,000) |
+
 **`site/static/`** (generated each run, not in git): `players`, `gamelog`, `priors`, `priors_min`, `participation`,
 `quantiles`, `volatility`, `league`, `tips`, `availability`, `usage`, `context`, `experts`, `news`, `claims`, `insights`,
 `league_study`, `moves`, `plan`, `learning`, `winprob`, `health`.
@@ -257,7 +300,7 @@ writes/day, so it writes only on change. `/state` returns `lineups` and `oppLine
 Never in the repo. Names only:
 - **GitHub Actions secrets**: `NTFY_TOPIC` (alerts), `OPENROUTER_API_KEY` (AI extraction/reasons),
   `CLOUDFLARE_API_TOKEN` (Worker deploy). **Variables**: `WORKER_URL`, `OPENROUTER_MODEL`, `OPENROUTER_MODEL_ADVICE`,
-  `OPENROUTER_MODEL_NEWS`.
+  `OPENROUTER_MODEL_NEWS`, `LEARNING` (optional; `off` stops the nightly trainer and makes the job use factory numbers).
 - **Worker secrets**: `WRITE_KEY` (the site's key for saving answers; the site keeps it in localStorage from Ryan's
   setup link), `GH_TOKEN` (lets the minute cron start the update workflow), `SLEEPER_TOKEN` (Ryan's Sleeper login, for
   the lock record).
@@ -285,6 +328,7 @@ Each of these can be re-checked. If new evidence overturns one, change it and up
 | Trades in expected wins, 2.2 wins per unit of weekly score | Nov 15: final margins of 1,155 Lock-In matchups in 72 leagues (0.020-0.024 across band widths) | `test_nov15_trades.mjs` |
 | Rotate lockable scores into the tightest slot | Nov 26: +1.4 to +1.75 pts/week, 95% CIs above 0 on three seeds (900 simulated weeks); cost measured that day at ~85 ms vs ~6 ms per plan | `node tools/rotate_study.mjs` |
 | Lineups sampled four times a minute from `matchup_legs_raw`, both teams, plus a one-tap "won't lock" answer | Nov 26: once-a-minute REST samples missed Spencer's bench trip, 15-minute samples missed Edey's; Sleeper publishes no eligibility field (section 1, rule 3) | `test_nov26_bench_trip.mjs`; Spencer/Edey in `plan_debug.json` |
+| Learned numbers go live only through the nightly gate (held-out days, 95% interval, limits, capped step, 7-day watch with automatic revert) | Nov 27: on Nov 13-25 first-sight records, the play-rate refit beat the live rates by 0.14 log loss per game (95% interval 0.05-0.23, 624 held-out games); Out a day ahead had been 0% while 42% played | `test_nov27_learning.py`; the Insights tab log; `learned.json` on the `learning` branch |
 | Only tested code runs in the 15-min job (not the Worker) | a broken commit once ran in the 15-min job (review 2, 7b) | `tools/tested_code.sh`, `test_r2_7_tested_code.py` |
 
 ## 9. Known limits and open questions

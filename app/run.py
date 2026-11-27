@@ -11,7 +11,7 @@ import requests
 from . import espn, sleeper
 from . import experts
 from . import news as newsmod
-from . import memory, insights, availability
+from . import memory, insights, availability, learned
 from . import usage as usagemod
 from .engine import free_agent_watch, team_game_dates, week_dates
 from . import volatility
@@ -146,6 +146,11 @@ def main():
         watch_av = {p for r in rosters for p in (r.get("players") or [])} | \
             {p for p, m in meta.items() if m.get("team") and m.get("injury_status") and (p in book.prior or book.games.get(p))}
         print("designation play rates (own season + published):", availability.calibrate_designations())
+        # learned next-game rates by status and games missed (nightly trainer, app/train_models.py PlayFirst)
+        fg = learned.get("play_first")
+        if fg:
+            availability.M["first_game"] = fg
+            print("learned next-game rates (play_first):", json.dumps(fg["ahead"]))
         rate, basis = availability.next_game_healthy(today)
         availability.set_next_game(rate, basis)
         gd = availability.gameday_healthy()              # no designation at the last run before tip: today's games only

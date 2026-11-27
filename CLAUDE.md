@@ -100,6 +100,9 @@ gh run view <run-id> --log | grep -i "availability\|news\|error"        # what t
 - `node tools/rotate_study.mjs [weeks] [seed] [plan_debug.json]` is the template for a paired A/B on the same weeks.
   Report a mean difference with a 95% interval and more than one seed. Don't ship a rule change on a single number.
 - `research/*.py` refits the fitted constants in `app/data/*.json` from 2021-24 box scores (`research/data/*.parquet`).
+  Those are the factory numbers; the nightly trainer (`app/train.py`) keeps learned versions current on its own. To
+  add a learned model, subclass `Model` in `app/train_models.py` (data, fit, loss, limits, step) and test it like
+  `tests/test_nov27_out_play.py`. Read the trainer's log (`git show origin/learning:learned.json`) before refitting by hand.
 
 ## Where to look
 
@@ -115,6 +118,7 @@ gh run view <run-id> --log | grep -i "availability\|news\|error"        # what t
 | Sleeper's own lock record | `worker/src/index.js` (`sleeperLocks`), engine `sleeperLocksFor` / `lockState` |
 | Other-league study (bar calibration, opponent lock rates) | `app/leagues.py`, `app/league_study.py`, `app/league_run.py` |
 | Job order, what gets written | `app/run.py`, `.github/workflows/update.yml` |
+| Nightly learning (refit, gate, watch, revert) | `app/train.py` (gate), `app/train_models.py` (models), `app/learned.py` (what the job reads), `tools/learning.sh`, `.github/workflows/train.yml`; history on the `learning` branch |
 
 `review/` holds an outside review from Nov 10 (`REVIEW_BRIEF.md`, `REVIEW_3.md`) and data exported for it. It's
 history: useful context, not the current spec.

@@ -18,6 +18,8 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
+    env:
+      LEARNING: ${{ vars.LEARNING }}       # "off" = ignore learned numbers (app/learned.py)
     steps:
       - uses: actions/checkout@v4
 
@@ -28,6 +30,9 @@ jobs:
 
       - name: Fetch saved state (fails the run rather than continuing on empty state)
         run: tools/state.sh restore
+
+      - name: Learned numbers from the nightly trainer (learning branch)
+        run: if [ -x tools/learning.sh ]; then tools/learning.sh pull; fi    # absent in code older than Nov 27
 
       - name: Cache Sleeper data (finished weeks never change)
         uses: actions/cache@v4

@@ -212,15 +212,24 @@ export function healthyAt(M, n) {
     return c.q[i - 1] + (c.q[i] - c.q[i - 1]) * (n - c.ahead[i - 1]) / (c.ahead[i] - c.ahead[i - 1]);
   return c.q.at(-1);
 }
+// learned next-game rate for a listed player by games missed (nightly trainer, app/train_models.py PlayFirst, Nov 27):
+// in the job's availability model as M.first_game; null = none learned for this status (factory rule below)
+const FIRST_GROUP = { ...DESIG, Out: "Out" };
+const missedBucket = m => (m = m | 0) <= 0 ? "0" : m === 1 ? "1" : m <= 3 ? "2-3" : "4+";
+export function firstGame(M, st, missed, gameday = false) {
+  const g = FIRST_GROUP[st], v = g && M?.first_game?.[gameday ? "gameday" : "ahead"]?.[g]?.[missedBucket(missed)];
+  return v == null ? null : v;
+}
 function hazardK(M, k) { return k <= 8 ? M.by_k[k - 1] : k <= 12 ? M.k9_12 : k <= 20 ? M.k13_20 : (M.k21p ?? M.k13_20); }
 // k0 = games already missed (from the job's last run); without it a long absence restarted as a fresh one
 function statusChain(M, st, j, k0 = 0) {
   let S = 1, k = k0;
   for (let i = 0; i <= j; i++) {
     let r;
-    if (i === 0) r = DESIG[st] ? M.designation[DESIG[st]] : OUT.has(st) ? 0 : 1;
+    const lf = i === 0 ? firstGame(M, st, k0) : null;
+    if (i === 0) r = lf ?? (DESIG[st] ? M.designation[DESIG[st]] : OUT.has(st) ? 0 : 1);
     else r = hazardK(M, Math.max(1, k));
-    if (i === 0 && DESIG[st] && j === 0) return r;
+    if (i === 0 && (DESIG[st] || lf != null) && j === 0) return r;
     S *= 1 - r; k++;
   }
   return (1 - S) * healthyAt(M, j + 1);

@@ -13,7 +13,7 @@ import os
 import sys
 from zoneinfo import ZoneInfo
 
-from . import memory, sleeper
+from . import learned, memory, sleeper
 from .availability import healthy_at
 from .engine import team_game_dates, week_dates
 from .lockin import expected_max
@@ -241,6 +241,7 @@ def main():
         print("grading failed:", e, file=sys.stderr)
     out = export(con)
     out["outlook"] = plan.get("outlook")
+    out["learned"] = learned.summary()          # what the nightly trainer promoted, kept or reverted (app/train.py)
     with open(os.path.join(ROOT, "site", "static", "learning.json"), "w") as f:
         json.dump(out, f, separators=(",", ":"))
     con.close()
