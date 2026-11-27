@@ -1,4 +1,4 @@
-import { Book, WeekPlan, Valuer, WINS_PER_SCORE, eligFromSnaps, mergeSnaps, sleeperLocksFor, mergeMatchups, irMoves, studyBarScale, usesFaab, waiverMoves, weekDays, teamGames, fits, range80 } from "./engine.js";
+import { Book, WeekPlan, Valuer, WINS_PER_SCORE, eligFromSnaps, mergeSnaps, sleeperLocksFor, lockedTotal, mergeMatchups, irMoves, studyBarScale, usesFaab, waiverMoves, weekDays, teamGames, fits, range80 } from "./engine.js";
 
 // ---- config -----------------------------------------------------------------------------------
 const LEAGUE = "1400915575915491328", USER = "1388708038000533504";
@@ -159,7 +159,7 @@ function render() {
   // Sleeper's servers can return different copies of the same matchup (Nov 1): say so instead of picking one silently
   const copies = m => [m?.points, ...(m?.alt || []).map(a => a.points)].filter(v => v != null).map(v => r1(v / 10));
   const split = my.disagree || opp?.disagree ? `<span class="pos" style="display:block;color:var(--risk)">⚠ Sleeper's servers disagree right now: you ${[...new Set(copies(my))].join(" / ")}, them ${[...new Set(copies(opp))].join(" / ")}. Locks you marked are held at the game you locked.</span>` : "";
-  $("score").innerHTML = `<b>${r1((my.points || 0) / 10)}</b> – ${r1((opp?.points || 0) / 10)}<span>score now vs ${esc(base.users[oppOwner] || "opponent")} ${usesFaab(base.league.settings, live.rosters) ? ` · FAAB $${base.league.settings.waiver_budget - (mine.settings?.waiver_budget_used || 0)}` : ""}</span>${split}`;
+  $("score").innerHTML = `<b>${lockedTotal(plan).toFixed(1)}</b> – ${lockedTotal(c.oppPlan).toFixed(1)}<span>locked so far vs ${esc(base.users[oppOwner] || "opponent")} ${usesFaab(base.league.settings, live.rosters) ? ` · FAAB $${base.league.settings.waiver_budget - (mine.settings?.waiver_budget_used || 0)}` : ""}</span>${split}`;
   $("metatext").textContent = `${base.league.name} · week ${base.week} · live ${live.at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
 
   // ONE source: plan.actions (top summary), plan.slots (cards + table). Phone alerts read the same lists.
@@ -310,9 +310,9 @@ function renderMatchup(c, oppOwner) {
   const fa = facts(A), fb = facts(B), wp = A.outlook.winProb;
   const pctS = p => p == null ? "–" : p < 0.01 ? "<1%" : p > 0.99 ? ">99%" : Math.round(p * 100) + "%";
   const fr = (k, a, b) => `<span>${a}</span><span class="k">${k}</span><span class="r">${b}</span>`;
-  let html = `<div class="h2h-sum"><div class="side"><div class="who">${esc(me)} · now</div><div class="big">${r1((c.my.points || 0) / 10)}</div></div>` +
+  let html = `<div class="h2h-sum"><div class="side"><div class="who">${esc(me)} · now</div><div class="big">${lockedTotal(A).toFixed(1)}</div></div>` +
     `<div class="mid"><span class="wp">${pctS(wp)}</span><br>win chance</div>` +
-    `<div class="side r"><div class="who">${esc(them)} · now</div><div class="big">${r1((c.opp?.points || 0) / 10)}</div></div>` +
+    `<div class="side r"><div class="who">${esc(them)} · now</div><div class="big">${lockedTotal(B).toFixed(1)}</div></div>` +
     (wp != null ? `<div class="wpbar" title="Your win chance"><i style="width:${Math.round(wp * 100)}%"></i></div>` : "") +
     `<div class="facts">${fr("projected final", r1(A.outlook.mean), r1(B.outlook.mean))}${fr("slots locked", `${fa.locked}/${fa.n}`, `${fb.locked}/${fb.n}`)}` +
     `${fr("banked points", r1(fa.banked), r1(fb.banked))}${fr("live now", fa.live, fb.live)}${fr("games left (roster)", fa.left, fb.left)}${fr("playing today", fa.todayN, fb.todayN)}</div></div>`;

@@ -259,6 +259,10 @@ export function studyBarScale(study) {
 // he was picked up was offered as a lock): not lockable. No record on a date before tracking: unknown (null).
 // The backend's copy of Sleeper's lock record -> this team's {player: locked game id}, or null when it can't be trusted
 // (no token, token rejected, or nothing fetched yet), in which case the engine falls back to marks and lineup records.
+// The score as Sleeper's app shows it mid-week: the locked slots only, each at the game it's locked on. The public
+// feed's matchup points don't match it (Nov 27, week 6: feed 387.5 vs 439.5, app 169.0 vs 428.5): its slot points show
+// a starter's latest game even when an earlier one is locked, and it counts unlocked slots too.
+export const lockedTotal = plan => Math.round((plan?.slots || []).filter(s => s.st === "locked").reduce((a, s) => a + (s.game?.fp || 0), 0) * 10) / 10;
 export function sleeperLocksFor(sl, rosterId) {
   if (!sl || sl.status !== "ok" || !sl.teams) return null;
   return sl.teams[String(rosterId)] || {};

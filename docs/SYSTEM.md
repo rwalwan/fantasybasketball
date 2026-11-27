@@ -41,6 +41,10 @@ something measured in Sleeper's data, and the source is noted.
 7. **Sleeper's own lock record** (which game each starter is locked on) is only in the app's GraphQL API
    (`get_matchup_legs` → `starters_games: {player_id: game_id}`), which needs a logged-in token. The public REST API
    only shows slot points. The website doesn't show matchup lock data; only the app does. (Ryan, Nov 16.)
+   **Mid-week, the public feed's slot points show a starter's latest game even when an earlier one is locked**, and
+   its matchup `points` count unlocked slots too. Sleeper's app shows only the locked slots, each at its locked game
+   (week 6, Nov 26: feed 387.5 vs 439.5, app 169.0 vs 428.5; Durant locked on 63.5, feed showing 48.5). So the page's
+   score is `lockedTotal(plan)` (engine), not the feed. Test: `test_nov27_score_now.mjs`.
 
 ## 2. The pieces
 
@@ -164,7 +168,7 @@ For his remaining games, the value of arriving unlocked at game j is
 6. **Actions**: one time-ordered list (`plan.actions`) that the site's top summary and the phone alerts both read.
 
 ### 4.4 Matchup tab
-`site/app.js` `renderMatchup`: both lineups slot by slot. For each slot it shows the lock state, the game the score
+`site/app.js` `renderMatchup`: both lineups slot by slot. The score at the top (and in the page header) is each side's locked total, the number Sleeper's app shows. For each slot it shows the lock state, the game the score
 came from and where the lock came from (Sleeper / your mark / estimated), plus games left, the next game, and the
 projected edge per slot. Fields come from `plan.slots` (`st`, `game`, `lockSource`, `kept`, `left`).
 
@@ -286,7 +290,7 @@ Each of these can be re-checked. If new evidence overturns one, change it and up
 - Only 1-3 game "out" reports override Sleeper. Longer absences need a news timeline with a minimum.
 - Win chance is a normal approximation; it has few graded matchups so far (`winprob_log.json`).
 - The bar calibration is measured on single-player bars (the study can't see other teams' benches) and applied to the full rotation bar.
-- The lock record depends on Ryan's Sleeper token, which can expire.
+- The lock record depends on Ryan's Sleeper token, which can expire. Without it, the inferred-lock checks (section 4.3, steps 3 and 5) read the feed's slot points, which mid-week show the latest game rather than the locked one (section 1, rule 7), so they can miss locks.
 - The job's plan (`plan_debug.json`, alerts) and the site can briefly differ (section 3, "Site vs job").
 - The logged win chance uses a simpler model than the displayed one (section 5).
 - Lineup records are samples (15 s apart): a bench trip shorter than that is invisible unless Ryan taps "Sleeper won't
