@@ -111,7 +111,7 @@ gh run view <run-id> --log | grep -i "availability\|news\|error"        # what t
 | Waivers, trades, IR | `site/engine.js` (`Valuer`, `tradeIdeas`, `waiverMoves`, `irMoves`) + `tools/moves.mjs` |
 | Will he play (injury designations, news timelines) | `app/availability.py`, `app/news.py` |
 | Projections | `app/model.py`, `app/experts.py`, `app/memory.py` (context), `app/usage.py`, `app/volatility.py` |
-| Lock eligibility records | `worker/src/index.js` (minute snapshots), `app/lineups.py`, engine `eligFromSnaps` / `lockState` |
+| Lock eligibility records | `worker/src/lineup.js` (samples four times a minute, both teams), `worker/src/index.js`, `app/lineups.py`, engine `eligFromSnaps` / `lockState`, the site's "won't lock" button (`app.js`) |
 | Sleeper's own lock record | `worker/src/index.js` (`sleeperLocks`), engine `sleeperLocksFor` / `lockState` |
 | Other-league study (bar calibration, opponent lock rates) | `app/leagues.py`, `app/league_study.py`, `app/league_run.py` |
 | Job order, what gets written | `app/run.py`, `.github/workflows/update.yml` |

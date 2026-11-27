@@ -1,11 +1,14 @@
 // Lock Desk backend — Cloudflare Worker + KV (free plan).
 //
-// 1) Every minute: record who is in each of Ryan's starting slots for every game that hasn't tipped,
-//    and freeze that record at tip-off. This is what makes a game lock-eligible in Lock-In mode.
+// 1) Four times a minute: record who is in each starting slot of Ryan's team AND his opponent's for every game that
+//    hasn't tipped, freeze that record at tip-off, and note any trip to the bench after tip (worker/src/lineup.js).
+//    This is what makes a game lock-eligible in Lock-In mode.
 // 2) Stores the answers and lock marks made on the site so phone and laptop agree.
 //
-// Kept deliberately light (free-plan CPU budget): one small Sleeper call per minute; ESPN tip times
+// Kept deliberately light (free-plan CPU budget): one small Sleeper call per sample; ESPN tip times
 // and the player->team map are fetched once a day and cached in KV.
+
+import { sampleLineups } from "./lineup.js";
 
 const LEAGUE = "1400915575915491328", USER = "1388708038000533504";
 const S1 = "https://api.sleeper.app/v1";
@@ -37,47 +40,42 @@ async function dayInfo(env, date) {
   return info;
 }
 
+// Nov 26: lineups come from Sleeper's own scoring lineup (matchup_legs_raw: public, a POST, so never a stale CDN copy),
+// sampled four times a minute for both teams. The once-a-minute REST read missed Cam Spencer's bench trip (and the
+// opponent's lineup was only seen by the 15-minute job). REST, cache-busted, is the fallback if the GraphQL call fails.
+async function fetchLegs(week) {
+  try {
+    const r = await fetch("https://api.sleeper.app/graphql", { method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json", "user-agent": "we-back-lock-desk" },
+      body: JSON.stringify({ query: `query { matchup_legs_raw(league_id: "${LEAGUE}", round: ${Number(week)}) { roster_id matchup_id starters players } }` }) });
+    const legs = (await r.json().catch(() => null))?.data?.matchup_legs_raw;
+    if (r.ok && Array.isArray(legs) && legs.length) return legs;
+  } catch {}
+  return getJSON(`${S1}/league/${LEAGUE}/matchups/${week}?_=${Date.now()}`);
+}
+
 async function snapshot(env) {
-  const now = new Date(), date = etDate(now);
+  const date = etDate();
   const info = await dayInfo(env, date);
   if (!Object.keys(info.tips).length) return { date, games: 0 };
-  const [rosters, matchups] = await Promise.all([getJSON(`${S1}/league/${LEAGUE}/rosters`),
-                                                 getJSON(`${S1}/league/${LEAGUE}/matchups/${info.week}`)]);
-  const mine = rosters.find(r => r.owner_id === USER);
-  const my = matchups.find(m => m.roster_id === mine.roster_id);
   const league = await kvGet(env, "league", null) || await (async () => {
     const lg = await getJSON(`${S1}/league/${LEAGUE}`);
     const v = { slots: lg.roster_positions.filter(s => s !== "BN" && s !== "IR") };
     await env.KV.put("league", JSON.stringify(v), { expirationTtl: 86400 }); return v; })();
-  const slotOf = {}, idxOf = {}; (my.starters || []).forEach((p, i) => { if (p && p !== "0") { slotOf[p] = league.slots[i]; idxOf[p] = i; } });
-
-  const key = `lineups_${info.season}_w${info.week}`;
-  const snaps = await kvGet(env, key, {});
-  let changed = false;
-  const stamp = now.toISOString().slice(0, 16) + "Z";
-  for (const pid of mine.players || []) {
-    const tip = info.tips[info.team[pid]];
-    if (!tip) continue;                                   // no game today
-    const k = `${date}|${pid}`, cur = snaps[k];
-    if (cur?.frozen) continue;
-    if (new Date(tip) <= now) {                           // tipped: freeze last pre-tip record
-      if (cur) { cur.frozen = true; changed = true; }
-      continue;
-    }
-    const slot = slotOf[pid] ?? null, i = idxOf[pid] ?? null;   // i: which slot index (names repeat, e.g. two UTIL)
-    if (!cur || cur.slot !== slot || (cur.i ?? null) !== i) { snaps[k] = { slot, i, seen: stamp, frozen: false }; changed = true; }
+  let me = await kvGet(env, "my_roster", null);
+  if (!me) {
+    const rosters = await getJSON(`${S1}/league/${LEAGUE}/rosters`);
+    me = { roster_id: rosters.find(r => r.owner_id === USER).roster_id };
+    await env.KV.put("my_roster", JSON.stringify(me), { expirationTtl: 7 * 86400 });
   }
-  // Sleeper: a game is ineligible once he "was moved to bench since the game began" (even if moved back); moving
-  // between starting slots is fine. Mark frozen starting-slot records of players who are on the bench now.
-  const roster = new Set(mine.players || my.players || []);
-  for (const [k, rec] of Object.entries(snaps)) {
-    if (!rec.frozen || rec.slot == null || rec.benched) continue;
-    const pid = k.split("|")[1];
-    if (roster.has(pid) && slotOf[pid] == null) { rec.benched = true; changed = true; }
-  }
-  // KV free plan = 1,000 writes/day. Only write when a lineup actually changes (~10-40 writes on a game day).
-  if (changed) await env.KV.put(key, JSON.stringify(snaps));
-  return { date, changed };
+  const keyMine = `lineups_${info.season}_w${info.week}`, keyOpp = `opp_lineups_${info.season}_w${info.week}`;
+  const [mine, opp] = await Promise.all([kvGet(env, keyMine, {}), kvGet(env, keyOpp, {})]);
+  // KV free plan = 1,000 writes/day: a record set is written only after a sample that changed it (lineup moves, tips).
+  const res = await sampleLineups({ fetchLegs: () => fetchLegs(info.week), rosterId: me.roster_id, slots: league.slots,
+                                    tips: info.tips, team: info.team, date, mine, opp,
+                                    save: async c => { if (c.mine) await env.KV.put(keyMine, JSON.stringify(mine));
+                                                       if (c.opp) await env.KV.put(keyOpp, JSON.stringify(opp)); } });
+  return { date, ...res };
 }
 
 // GitHub throttles scheduled workflows on free repos (runs can be hours apart), so the Worker's reliable
@@ -119,34 +117,6 @@ async function sleeperLocks(env) {
   return { status, weeks: out };
 }
 
-// TEMPORARY probe (Nov 26): where does Sleeper keep "this game can't be locked"? The public matchup_legs_raw returns
-// null for starters_by_date / players_by_date / player_map; ask the logged-in query for them (every 15 min, our league
-// only) and keep the latest answer in KV for the job to copy to the state branch. Remove once the field is found.
-async function legsProbe(env) {
-  if (!env.SLEEPER_TOKEN) return { status: "no token" };
-  const info = await dayInfo(env, etDate());
-  const q = "query get_matchup_legs($leagueId: String!, $round: Int!) { matchup_legs(league_id: $leagueId, round: $round) { roster_id starters starters_games subs bans picks starters_by_date players_by_date player_map } }";
-  const r = await fetch("https://api.sleeper.app/graphql", { method: "POST",
-    headers: { "content-type": "application/json", accept: "application/json", authorization: env.SLEEPER_TOKEN, "user-agent": "we-back-lock-desk" },
-    body: JSON.stringify({ operationName: "get_matchup_legs", query: q, variables: { leagueId: LEAGUE, round: Number(info.week) } }) });
-  const j = await r.json().catch(() => null);
-  const legs = (j?.data?.matchup_legs || []).filter(l => [1, 3].includes(l.roster_id));
-  const out = { at: new Date().toISOString(), week: info.week, http: r.status, errors: (j?.errors || []).map(e => e.message).slice(0, 5), legs };
-  // round 3: the league's event log, logged in (all fields of LeagueEventLog, from introspection)
-  try {
-    const t = await fetch("https://api.sleeper.app/graphql", { method: "POST", headers: { "content-type": "application/json", accept: "application/json", "user-agent": "we-back-lock-desk" },
-      body: JSON.stringify({ query: '{ __type(name: "LeagueEventLog") { fields { name } } }' }) }).then(x => x.json());
-    const ef = (t?.data?.__type?.fields || []).map(f => f.name).join(" ");
-    const e = await fetch("https://api.sleeper.app/graphql", { method: "POST",
-      headers: { "content-type": "application/json", accept: "application/json", authorization: env.SLEEPER_TOKEN, "user-agent": "we-back-lock-desk" },
-      body: JSON.stringify({ query: `query { league_event_logs(league_id: "${LEAGUE}", limit: 200) { ${ef} } }` }) });
-    const ej = await e.json().catch(() => null);
-    out.event_logs = { http: e.status, errors: (ej?.errors || []).map(x => x.message).slice(0, 5), rows: ej?.data?.league_event_logs ?? null };
-  } catch (err) { out.event_logs = { error: String(err.message || err).slice(0, 200) }; }
-  await env.KV.put("legs_probe", JSON.stringify(out), { expirationTtl: 3 * 86400 });
-  return { http: r.status, legs: legs.length };
-}
-
 async function kickWorkflow(env) {
   let result;
   if (!env.GH_TOKEN) result = { ok: false, status: "no GH_TOKEN secret on the worker" };
@@ -170,7 +140,6 @@ export default {
     ctx.waitUntil(snapshot(env).catch(e => console.log("snapshot failed", e.message)));
     ctx.waitUntil(sleeperLocks(env).catch(e => console.log("sleeper locks failed", e.message)));
     if (new Date(event.scheduledTime).getUTCMinutes() % 15 === 0) ctx.waitUntil(kickWorkflow(env).catch(() => {}));
-    if (new Date(event.scheduledTime).getUTCMinutes() % 15 === 5) ctx.waitUntil(legsProbe(env).catch(e => console.log("legs probe failed", e.message)));
   },
 
   async fetch(req, env) {
@@ -178,13 +147,13 @@ export default {
     if (req.method === "OPTIONS") return json({});
     if (url.pathname === "/state") {
       const season = url.searchParams.get("season"), week = url.searchParams.get("week");
-      const [elig, locks, lineups] = await Promise.all([kvGet(env, "elig", {}), kvGet(env, `locks_w${week}`, {}),
-        kvGet(env, `lineups_${season}_w${week}`, {})]);
+      const [elig, locks, lineups, oppLineups] = await Promise.all([kvGet(env, "elig", {}), kvGet(env, `locks_w${week}`, {}),
+        kvGet(env, `lineups_${season}_w${week}`, {}), kvGet(env, `opp_lineups_${season}_w${week}`, {})]);
       const kick = await kvGet(env, "kick", null);
       // Sleeper's lock record: usable only while the token works (status ok); the site and job fall back otherwise
       const [sl, slStatus] = await Promise.all([kvGet(env, `sleeper_locks_${season}_w${week}`, null), kvGet(env, "sleeper_locks_status", null)]);
       const sleeperLocks = sl ? { ...sl, status: slStatus?.status || sl.status, since: slStatus?.since || null } : (slStatus ? { teams: null, ...slStatus } : null);
-      return json({ ok: true, elig, locks, lineups, kick, sleeperLocks, now: new Date().toISOString() });
+      return json({ ok: true, elig, locks, lineups, oppLineups, kick, sleeperLocks, now: new Date().toISOString() });
     }
     if (url.pathname === "/answer" && req.method === "POST") {
       if (req.headers.get("x-key") !== env.WRITE_KEY) return json({ error: "bad key" }, 401);
@@ -201,7 +170,6 @@ export default {
       if (req.headers.get("x-key") !== env.WRITE_KEY) return json({ error: "bad key" }, 401);
       return json({ snapshot: await snapshot(env), sleeperLocks: await sleeperLocks(env) });
     }
-    if (url.pathname === "/legs_probe") return json(await kvGet(env, "legs_probe", null));   // TEMPORARY (Nov 26)
     if (url.pathname === "/kick" && req.headers.get("x-key") === env.WRITE_KEY) return json(await kickWorkflow(env));
     return json({ service: "lock-desk", ok: true });
   },

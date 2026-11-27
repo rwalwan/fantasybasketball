@@ -22,7 +22,11 @@ something measured in Sleeper's data, and the source is noted.
    **not been moved to the bench since the game began**. Moving him to the bench, even briefly and even if he's moved
    back, makes that game unlockable. Moving between starting slots is fine. (Ryan's Sleeper screenshot, Nov 15:
    Okongwu played from UTIL, was benched, then put at C, and Sleeper showed "ineligible".)
-   Tests: `test_nov15_slot_lock.mjs`, `test_nov15_lineup_benched.py`.
+   Tests: `test_nov15_slot_lock.mjs`, `test_nov15_lineup_benched.py`, `test_nov26_bench_trip.mjs`.
+   **Sleeper doesn't publish this answer** (checked Nov 26: every `MatchupLeg` field logged in and out, including
+   `subs`, `bans`, `starters_by_date` and `players_by_date`, which come back null; all 241 GraphQL queries; and
+   `league_event_logs`, which holds only commissioner edits). So Lock Desk rebuilds it from lineup samples, and a bench
+   trip between two samples is invisible (Nov 26: Cam Spencer's Wed game, the opponent's Zach Edey).
 4. **An unlocked score moves with its player.** A finished, unlocked, lockable game can be moved with the player to any
    other starting slot he fits and locked there. (Ryan, Nov 26.) This is what rotation (section 4.5) exploits.
    Test: `test_nov26_rotate.mjs`.
@@ -46,10 +50,10 @@ something measured in Sleeper's data, and the source is noted.
 | `tools/moves.mjs` | Same job, after `app.run` | Runs **the same engine as the site** (`site/engine.js`) to write the plan, waiver adds, trades, IR moves, AI reasons, win-chance log |
 | `app/learn.py`, `app/alerts.py` | Same job | Logs and grades decisions; sends phone alerts (ntfy) from the engine's own action list |
 | `site/` | GitHub Pages; recomputes **in the browser every minute** | The app Ryan uses (installable PWA). Loads `static/*.json` + live Sleeper + Worker + state branch |
-| `worker/` | Cloudflare Worker, cron **every minute** | Lineup snapshots (lock eligibility), Sleeper's lock record, stores site answers, kicks the update workflow every 15 min |
+| `worker/` | Cloudflare Worker, cron **every minute** | Lineup samples four times a minute for Ryan **and his opponent** (lock eligibility, `worker/src/lineup.js`), Sleeper's lock record, stores site answers, kicks the update workflow every 15 min |
 | `app/league_run.py` | **Other Lock-In leagues** workflow, daily 15:07 UTC (7:07 AM PST, 8:07 PDT) | Finds other Lock-In leagues, snapshots them, studies real managers' locks (bar calibration, opponent lock model) |
 | `research/` | By hand | Fits the constants in `app/data/*.json` from 2021-24 box scores |
-| `tests/` | **Tests** workflow on pushes to main and PRs | `tests/run_all.sh`; the update job runs the newest code that passed (`tools/tested_code.sh`; with no passing run at all it runs HEAD). The Worker deploy is **not** gated on Tests, and no test covers `worker/src/index.js` |
+| `tests/` | **Tests** workflow on pushes to main and PRs | `tests/run_all.sh`; the update job runs the newest code that passed (`tools/tested_code.sh`; with no passing run at all it runs HEAD). The Worker deploy is **not** gated on Tests; `worker/src/lineup.js` is tested (`test_nov26_bench_trip.mjs`), the rest of `worker/src/index.js` is not |
 
 **One engine.** All decision logic is in `site/engine.js`, which runs both in the browser and in Node (`tools/moves.mjs`).
 Don't add Node-only APIs to it, and don't re-implement engine logic in Python (`test_r2_f9_one_engine.py`).
@@ -86,8 +90,12 @@ Worker (every minute): Sleeper lineup ─> KV lineups_<season>_w<week>   Sleeper
 - **Ryan's answers** ("I locked this", "was he starting?") are saved to Worker KV (`locks_w<week>`, `elig`) and to his
   browser's localStorage, which wins on that device. Nothing in the job writes `locks_w*.json` or
   `eligibility_overrides.json` on the state branch; they're read if present.
-- **Lineup records:** Ryan's come from the Worker every minute and the job every 15 min; the opponent's come only from
-  the job (every 15 min), so the opponent's "benched since tip" is coarser.
+- **Lineup records:** both teams' come from the Worker four times a minute (at 0, 15, 30 and 45 s) and from the job
+  every 15 min. The Worker reads Sleeper's own scoring lineup (`matchup_legs_raw`: public GraphQL, a POST, so never a
+  stale CDN copy; cache-busted REST is the fallback) and writes a record set to KV only after a sample that changed it.
+  The job merges the Worker's records into its own (`run.py`; "benched" sticks from either); `moves.mjs` and the site
+  merge them with `mergeSnaps`. A bench trip shorter than 15 s can still be missed: Ryan's one-tap answer covers it
+  (section 4.3).
 - **Site vs job:** the site and `tools/moves.mjs` run the same engine, but not on identical inputs. The site passes
   `isTipped` to `eligFromSnaps` (a record not yet frozen after tip counts as final), uses localStorage answers and the
   current minute; `moves.mjs` does none of those. So `plan_debug.json` can briefly differ from Ryan's screen (e.g.
@@ -134,7 +142,10 @@ For his remaining games, the value of arriving unlocked at game j is
    3. **Live**: if the game is in progress, but his slot shows an earlier game's score instead of the live points, that earlier game is locked.
    4. **Wiped**: the slot shows 0 after a DNP in the lineup.
    5. **Inferred lock** from slot points matching an earlier countable game.
-   6. **Bench / moved** (not lockable). If he has no games left, the score shown still counts (`kept`).
+   6. **Bench / moved** (not lockable). If he has no games left, the score shown still counts (`kept`). Ryan's
+      eligibility answer for a game (`elig`, `"date|pid"`) beats the lineup record: each lock/pass slot card has a
+      **"Sleeper won't let me lock this"** button (answer `false`), and an **Undo** button takes it back (`true`)
+      (Nov 26, `test_nov26_bench_trip.mjs`).
    7. **Open** (lockable) or **confirm** (no lineup record: ask Ryan).
    Also possible: **live** (game in progress, after step 3) and **none** (no game played yet, or no slot points).
 2. **Rest-of-week assignment**: max-weight assignment (`maxAssign`) of players to open slots, where
@@ -208,7 +219,8 @@ Sent once each (deduplicated in `data/state/alerts.json`):
 | File | Holds |
 |---|---|
 | `plan_debug.json` | This week's plan from `moves.mjs`: `slots`, `actions`, `rotation`, `outlook`, `bar_debug`, `week_schedule`, `today_options`, **`starters_debug`** and **`opp_debug`** (per slot: lock state, every Sleeper copy of the slot score, manual mark, lineup record; start here for lock bugs), raw rosters/matchups, trade debug |
-| `lineups_<season>_w<week>.json`, `opp_lineups_*` | Lineup record per `"date|pid"`: `{slot, i, seen, frozen, benched}` (Ryan's and the opponent's) |
+| `lineups_<season>_w<week>.json`, `opp_lineups_*` | Lineup record per `"date|pid"`: `{slot, i, seen, frozen, benched}` (Ryan's and the opponent's, the job's merged with the Worker's) |
+| `legs_probe.json` | Left over from the Nov 26 search for Sleeper's eligibility field; nothing reads it |
 | `sleeper_locks_<season>_w<week>.json` | Sleeper's lock record per roster (copied from the Worker) |
 | `eligibility_overrides.json`, `locks_w<week>.json` | Old copies of Ryan's answers, read if present; live answers are in Worker KV (section 3) |
 | `availability_now.json`, `availability_log.json` | Current play chances with their basis; logged predictions + calibration |
@@ -229,8 +241,9 @@ Sent once each (deduplicated in `data/state/alerts.json`):
 **`app/data/`** (fitted constants, refit with `research/`): `availability_model.json`, `baseline_model.json`,
 `usage_model.json`, `volatility_model.json`, `game_ratio_quantiles.json`.
 
-**Worker KV**: `lineups_<season>_w<week>`, `sleeper_locks_<season>_w<week>`, `sleeper_locks_status`, `elig`,
-`locks_w<week>`, `kick`, `day_<date>`, `league`. Free plan: 1,000 writes/day, so it writes only on change.
+**Worker KV**: `lineups_<season>_w<week>`, `opp_lineups_<season>_w<week>`, `sleeper_locks_<season>_w<week>`,
+`sleeper_locks_status`, `elig`, `locks_w<week>`, `kick`, `day_<date>`, `league`, `my_roster`. Free plan: 1,000
+writes/day, so it writes only on change. `/state` returns `lineups` and `oppLineups`.
 
 ## 7. Secrets and configuration
 Never in the repo. Names only:
@@ -263,6 +276,7 @@ Each of these can be re-checked. If new evidence overturns one, change it and up
 | Sleeper's lock record is authoritative when available | it's the app's own record; inference misread locks before (Oct 29, Nov 1, Nov 15) | `test_nov16_sleeper_locks.mjs` |
 | Trades in expected wins, 2.2 wins per unit of weekly score | Nov 15: final margins of 1,155 Lock-In matchups in 72 leagues (0.020-0.024 across band widths) | `test_nov15_trades.mjs` |
 | Rotate lockable scores into the tightest slot | Nov 26: +1.4 to +1.75 pts/week, 95% CIs above 0 on three seeds (900 simulated weeks); cost measured that day at ~85 ms vs ~6 ms per plan | `node tools/rotate_study.mjs` |
+| Lineups sampled four times a minute from `matchup_legs_raw`, both teams, plus a one-tap "won't lock" answer | Nov 26: once-a-minute REST samples missed Spencer's bench trip, 15-minute samples missed Edey's; Sleeper publishes no eligibility field (section 1, rule 3) | `test_nov26_bench_trip.mjs`; Spencer/Edey in `plan_debug.json` |
 | Only tested code runs in the 15-min job (not the Worker) | a broken commit once ran in the 15-min job (review 2, 7b) | `tools/tested_code.sh`, `test_r2_7_tested_code.py` |
 
 ## 9. Known limits and open questions
@@ -275,5 +289,8 @@ Each of these can be re-checked. If new evidence overturns one, change it and up
 - The lock record depends on Ryan's Sleeper token, which can expire.
 - The job's plan (`plan_debug.json`, alerts) and the site can briefly differ (section 3, "Site vs job").
 - The logged win chance uses a simpler model than the displayed one (section 5).
-- The opponent's lineup record is 15-minute resolution.
+- Lineup records are samples (15 s apart): a bench trip shorter than that is invisible unless Ryan taps "Sleeper won't
+  let me lock this". The opponent has no such button.
+- `matchup_legs_raw` (public, no login) also returns `starters_games`, the same lock record the Worker reads with
+  Ryan's token (checked Nov 26), so the token may not be needed for the lock record.
 - League and user ids are constants in `app/run.py`, `tools/moves.mjs`, `site/app.js` and `worker/src/index.js`.

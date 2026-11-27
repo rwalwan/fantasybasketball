@@ -88,10 +88,12 @@ async function loadLive() {
     get(`static/winprob.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => null)]);
   // backend (minute-level lineup records, shared answers) wins over the 15-minute GitHub state branch
   const snaps = mergeSnaps(snapsGh, backend.lineups);
+  // the opponent's too (Nov 26: the Worker samples both lineups four times a minute; the state branch has the job's 15-minute copy)
+  const oppSnapsAll = mergeSnaps(oppSnaps, backend.oppLineups);
   const overrides = { ...overridesGh, ...(backend.elig || {}) };
   const locks = { ...locksGh, ...(backend.locks || {}) };
   base.schedule = schedule;
-  live = { rosters, matchups, stats, proj, trending, snaps, oppSnaps, overrides, locks, tips, news, claims, moves, context, insights, learning, avail, usage, others, health, winprob, backend: !!backend.ok, sleeperLocks: backend.sleeperLocks || null, at: new Date() };
+  live = { rosters, matchups, stats, proj, trending, snaps, oppSnaps: oppSnapsAll, overrides, locks, tips, news, claims, moves, context, insights, learning, avail, usage, others, health, winprob, backend: !!backend.ok, sleeperLocks: backend.sleeperLocks || null, at: new Date() };
   void tipDays;
 }
 
@@ -195,6 +197,7 @@ function render() {
   $("lockstyle").innerHTML = `<div class="box"><div class="row"><span><b>Lock style</b>: ${esc(STYLE(lockBias))}${lockBias ? ` <span class="pos">· bars × ${(1 + lockBias).toFixed(2)}</span>` : ""}</span></div>` +
     (plan.barScale !== 1 ? `<div class="row"><span class="pos">Bars include a ×${plan.barScale.toFixed(2)} calibration from ${(live.others?.starter_weeks || 0).toLocaleString()} real starter-weeks in other Lock-In leagues (that rule scored ${live.others?.best_scale?.vs_current}% of projection more).</span></div>` : "") +
     `<div class="row"><span class="pos">safer</span><input type="range" id="biasr" min="-0.2" max="0.2" step="0.05" value="${lockBias}" style="flex:1;margin:0 8px"><span class="pos">gamble</span></div></div>` + wi;
+  const eligAnswers = { ...live.overrides, ...local.get("elig") };
   $("slots").innerHTML = plan.slots.map(s => {
     const mvd = s.movedFrom ? `<div class="nums" style="color:var(--pass)">↔ <b>Move him here from ${esc(s.movedFrom)} first</b> <span class="pos">· his game stays lockable, and ${esc(s.movedFrom)} stays open for more players</span></div>` : "";
     const nums = mvd + (s.score != null && s.action !== "locked" && s.action !== "live" ? `<div class="nums">game <b>${r1(s.score)}</b>${s.bar != null ? ` · bar ${r1(s.bar)}${s.yourBar != null && s.yourBar !== s.bar ? ` (yours ${r1(s.yourBar)})` : ""}` : ""}${s.deadline ? ` · decide by ${esc(tipTime(s.deadline.tip) || day(s.deadline.date))}` : ""}</div>` +
@@ -203,7 +206,12 @@ function render() {
     let acts2 = "";
     if (s.action === "confirm") acts2 = `<button data-elig="${s.gameDate}|${s.pid}" data-v="1">He was starting</button><button data-elig="${s.gameDate}|${s.pid}" data-v="0">He was on my bench</button>`;
     if (["lock", "pass", "confirm", "keep"].includes(s.action)) acts2 += `<button data-lock="${s.pid}" data-date="${esc(s.gameDate || "")}">I locked this</button>`;
+    // Nov 26: a bench trip between two lineup samples (Cam Spencer) left a game Sleeper won't lock looking lockable.
+    // One tap tells Lock Desk so (an eligibility answer for that game); the undo button below takes it back.
+    if (["lock", "pass"].includes(s.action) && s.gameDate) acts2 += `<button data-elig="${s.gameDate}|${s.pid}" data-v="0">Sleeper won't let me lock this</button>`;
     if (s.action === "locked") acts2 = `<button data-unlock="${s.pid}">Not locked</button>`;
+    const marked = s.pid && s.action !== "locked" ? Object.entries(eligAnswers).filter(([k, v]) => v === false && k.endsWith(`|${s.pid}`) && weekDays(base.schedule, base.week).includes(k.split("|")[0])).map(([k]) => k.split("|")[0]) : [];
+    for (const d of marked) acts2 += `<button data-elig="${d}|${s.pid}" data-v="1">Undo: Sleeper does let me lock his ${esc(day(d))} game</button>`;
     if (["lock", "pass"].includes(s.action) && s.deadline) acts2 += s.whatIf ? `<button data-whatif="${s.pid}" data-v="">Back to the plan</button>`
       : `<button data-whatif="${s.pid}" data-v="${s.action === "lock" ? "pass" : "lock"}">What if I ${s.action === "lock" ? "don't lock" : "lock"}?</button>`;
     return `<div class="slot ${s.action}"><div class="top"><span><span class="pos">${esc(s.slot)}</span> <span class="nm">${esc(s.name)}</span>${s.status ? `<span class="st">${esc(s.status)}</span>` : ""}</span><span class="tag">${LABEL[s.action] || s.action}</span></div><p>${esc(s.detail)}</p>${nums}${td}${acts2 ? `<div class="acts">${acts2}</div>` : ""}</div>`;

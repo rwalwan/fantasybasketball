@@ -31,6 +31,8 @@ const backend = process.env.WORKER_URL ? await get(`${process.env.WORKER_URL}/st
 const locks = { ...readState(`locks_w${week}.json`, {}), ...(backend.locks || {}) };
 const ov = { ...readState("eligibility_overrides.json", {}), ...(backend.elig || {}) };
 const snaps = mergeSnaps(readState(`lineups_${season}_w${week}.json`, {}), backend.lineups);
+// the opponent's lineup record: the job's (15 min) merged with the Worker's (four samples a minute since Nov 26)
+const oppSnaps = mergeSnaps(readState(`opp_lineups_${season}_w${week}.json`, {}), backend.oppLineups);
 const tipsRaw = st("tips");
 
 const ctxMap = (() => { try { return st("context"); } catch { return {}; } })();
@@ -50,7 +52,7 @@ const wp = new WeekPlan({ Q: st("quantiles"), book, schedule, week, today, roste
 const opp = matchups.find(m => m.matchup_id === my.matchup_id && m.roster_id !== mine.roster_id);
 const oppRoster = opp && rosters.find(r => r.roster_id === opp.roster_id);
 const oppWp = oppRoster ? new WeekPlan({ Q: st("quantiles"), book, schedule, week, today, rosterPositions: league.roster_positions,
-  roster: oppRoster, matchup: opp, rosters, tips: tipsRaw, locks: {}, elig: eligFromSnaps(readState(`opp_lineups_${season}_w${week}.json`, {})), sleeperLocks: slFor(oppRoster.roster_id) }) : null;
+  roster: oppRoster, matchup: opp, rosters, tips: tipsRaw, locks: {}, elig: eligFromSnaps(oppSnaps), sleeperLocks: slFor(oppRoster.roster_id) }) : null;
 const oppPlan = oppWp ? oppWp
   .build({ humanLocks: (s => s.opponent_model_ready ? s.lock_rate_eligible : null)(readState("league_study.json", {})), barScale: studyBarScale(readState("league_study.json", {})) }) : null;
 const plan = wp.build({ opp: oppPlan ? { mean: oppPlan.outlook.mean, var: oppPlan.outlook.var } : null, barScale: studyBarScale(readState("league_study.json", {})), rotate: true });
@@ -75,7 +77,7 @@ const tradeCtx = (() => {
       const m = matchups.find(x => x.roster_id === r.roster_id); if (!m) continue;
       if (r.roster_id === mine.roster_id) { weekOf[r.roster_id] = { wp, mean: plan.outlook.mean, var: plan.outlook.var, opp: oppOf(r.roster_id) }; continue; }
       const twp = new WeekPlan({ Q: st("quantiles"), book, schedule, week, today, rosterPositions: league.roster_positions,
-        roster: r, matchup: m, rosters, tips: tipsRaw, locks: {}, elig: r.roster_id === oppRoster?.roster_id ? eligFromSnaps(readState(`opp_lineups_${season}_w${week}.json`, {})) : () => true, sleeperLocks: slFor(r.roster_id) });
+        roster: r, matchup: m, rosters, tips: tipsRaw, locks: {}, elig: r.roster_id === oppRoster?.roster_id ? eligFromSnaps(oppSnaps) : () => true, sleeperLocks: slFor(r.roster_id) });
       const o = r.roster_id === oppRoster?.roster_id ? oppPlan.outlook : twp.build().outlook;
       weekOf[r.roster_id] = { wp: twp, mean: o.mean, var: o.var, opp: oppOf(r.roster_id) };
     }
@@ -160,50 +162,6 @@ fs.writeFileSync(stateFile("plan_debug.json"), JSON.stringify({ at: new Date().t
     starters: (opp.starters || []).map((p, i) => ({ i, pid: p, name: book.name(p), slot: oppWp.slotPoints(p) ?? null, copies: oppWp.slotCandidates(p),
       state: oppWp.lockState(p), rec: oppWp.elig.slot?.(p, oppWp.lockState(p).g?.date) ?? null, played: oppWp.played(p).map(g => [g.date, g.fp]), left: oppWp.upcoming(p).length })) } : null,
   grid: plan.grid.map(r => ({ name: r.name, pos: r.pos, starter: r.starter, locked: r.locked, status: r.status, cells: r.cells })) }, null, 1));
-// TEMPORARY probe (Nov 26): where does Sleeper keep "this game can't be locked"? The app showed Cam Spencer (2752) and
-// the opponent's Zach Edey (2718) as not lockable for Mon and Wed after a bench trip our minute snapshots missed. Ask
-// the public GraphQL (no login) for every MatchupLeg field and save our two teams' legs to legs_probe.json.
-// Remove once the field is found.
-try {
-  const gql = async (query, variables = {}) => {
-    const r = await fetch("https://api.sleeper.app/graphql", { method: "POST", headers: { "content-type": "application/json", accept: "application/json", "user-agent": "we-back-lock-desk" },
-      body: JSON.stringify({ query, variables }) });
-    const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch {}
-    return { status: r.status, json: j, head: j ? undefined : t.slice(0, 400) };
-  };
-  const ids = new Set([mine.roster_id, opp?.roster_id]);
-  const keep = new Set([...(mine.players || []), ...(oppRoster?.players || [])]);
-  const trimLeg = l => l && ({ ...l, player_map: l.player_map ? Object.fromEntries(Object.entries(l.player_map).filter(([p]) => keep.has(p))
-    .map(([p, v]) => [p, JSON.stringify(v).length > 2500 ? JSON.stringify(v).slice(0, 2500) : v])) : l.player_map });
-  const F = "round leg points picks players league_id roster_id custom_points proj_points max_points matchup_id starters starters_games bans subs player_map starters_by_date players_by_date";
-  const probe = { at: new Date().toISOString(), week };
-  for (const name of ["matchup_legs_raw"]) {
-    const r = await gql(`query { ${name}(league_id: "${LEAGUE}", round: ${week}) { ${F} } }`);
-    const legs = r.json?.data?.[name];
-    probe[name] = { status: r.status, errors: r.json?.errors?.map(e => e.message).slice(0, 5), head: r.head,
-      legs: Array.isArray(legs) ? legs.filter(l => ids.has(l.roster_id)).map(trimLeg) : null };
-  }
-  const intro = await gql(`{ __type(name: "MatchupLeg") { fields { name type { name kind } } } }`);
-  probe.introspection = { status: intro.status, data: intro.json?.data ?? null, errors: intro.json?.errors?.map(e => e.message).slice(0, 3) };
-  // the whole query/mutation list and every type name: is there a lineup-history or eligibility query?
-  const sch = await gql(`{ __schema { query_type { fields { name args { name } type { name kind of_type { name } } } } mutation_type { fields { name } } types { name } } }`);
-  probe.schema = { status: sch.status, errors: sch.json?.errors?.map(e => e.message).slice(0, 3),
-    query: sch.json?.data?.__schema?.query_type?.fields?.map(f => `${f.name}(${(f.args || []).map(a => a.name).join(",")}): ${f.type?.name || f.type?.of_type?.name || f.type?.kind}`),
-    mutation: sch.json?.data?.__schema?.mutation_type?.fields?.map(f => f.name), types: sch.json?.data?.__schema?.types?.map(t => t.name) };
-  // Nov 26 round 3: league_event_logs might hold every lineup change with its time. Ask for all its fields (public).
-  const elt = await gql(`{ __type(name: "LeagueEventLog") { fields { name type { name kind } } } }`);
-  const ef = (elt.json?.data?.__type?.fields || []).map(f => f.name);
-  probe.event_log_fields = elt.json?.data?.__type?.fields ?? elt.json?.errors;
-  if (ef.length) {
-    const ev = await gql(`query { league_event_logs(league_id: "${LEAGUE}", limit: 200) { ${ef.join(" ")} } }`);
-    probe.event_logs = { status: ev.status, errors: ev.json?.errors?.map(e => e.message).slice(0, 5), rows: ev.json?.data?.league_event_logs?.slice(0, 200) ?? null };
-  }
-  const sug = await gql(`query { matchup_legs_raw(league_id: "${LEAGUE}", round: ${week}) { roster_id eligible ineligible lock_eligible } }`);
-  probe.suggestions = sug.json?.errors?.map(e => e.message).slice(0, 6) ?? sug.head;
-  if (process.env.WORKER_URL) probe.worker = await get(`${process.env.WORKER_URL}/legs_probe`).catch(e => String(e));
-  fs.writeFileSync(stateFile("legs_probe.json"), JSON.stringify(probe, null, 1));
-  console.log("legs probe:", probe.matchup_legs_raw.status, probe.matchup_legs.status);
-} catch (e) { console.log("legs probe failed:", e.message); }
 console.log(`moves: ${out.adds.length} adds, ${out.trades.length} trades, ${items.length} new reasons requested`);
 void playerValue;
 

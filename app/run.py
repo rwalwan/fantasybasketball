@@ -124,10 +124,17 @@ def main():
     tracker.record(slots, my_m.get("starters") or [], mine.get("players") or [], book.team,
                    lambda team: sorted(d for d in tg.get(team, {}) if d in days), tips)
 
-    # the opponent's lineup too (every run), so their bench games aren't treated as lockable (review finding 11)
+    # the opponent's lineup too (every run), so their bench games aren't treated as lockable (review finding 11).
+    # Since Nov 26 the Worker samples it four times a minute as well (it missed Zach Edey's bench trip at 15 minutes):
+    # its records win, and "benched" sticks from either.
     if opp_m:
         opp_roster = next((r for r in rosters if r["roster_id"] == opp_m["roster_id"]), {})
-        LineupTracker(season, week, prefix="opp_lineups").record(
+        opp_tracker = LineupTracker(season, week, prefix="opp_lineups")
+        for k, v in (backend.get("oppLineups") or {}).items():
+            old = opp_tracker.snaps.get(k) or {}
+            benched = old.get("benched") or v.get("benched")
+            opp_tracker.snaps[k] = {**old, **v, **({"benched": True} if benched else {})}
+        opp_tracker.record(
             slots, opp_m.get("starters") or [], opp_roster.get("players") or [], book.team,
             lambda team: sorted(d for d in tg.get(team, {}) if d in days), tips)
 
