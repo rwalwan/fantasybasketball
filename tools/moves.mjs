@@ -187,6 +187,7 @@ try {
   probe.introspection = { status: intro.status, data: intro.json?.data ?? null, errors: intro.json?.errors?.map(e => e.message).slice(0, 3) };
   const sug = await gql(`query { matchup_legs_raw(league_id: "${LEAGUE}", round: ${week}) { roster_id eligible ineligible lock_eligible } }`);
   probe.suggestions = sug.json?.errors?.map(e => e.message).slice(0, 6) ?? sug.head;
+  if (process.env.WORKER_URL) probe.worker = await get(`${process.env.WORKER_URL}/legs_probe`).catch(e => String(e));
   fs.writeFileSync(stateFile("legs_probe.json"), JSON.stringify(probe, null, 1));
   console.log("legs probe:", probe.matchup_legs_raw.status, probe.matchup_legs.status);
 } catch (e) { console.log("legs probe failed:", e.message); }

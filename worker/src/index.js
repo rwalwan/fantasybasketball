@@ -119,6 +119,23 @@ async function sleeperLocks(env) {
   return { status, weeks: out };
 }
 
+// TEMPORARY probe (Nov 26): where does Sleeper keep "this game can't be locked"? The public matchup_legs_raw returns
+// null for starters_by_date / players_by_date / player_map; ask the logged-in query for them (every 15 min, our league
+// only) and keep the latest answer in KV for the job to copy to the state branch. Remove once the field is found.
+async function legsProbe(env) {
+  if (!env.SLEEPER_TOKEN) return { status: "no token" };
+  const info = await dayInfo(env, etDate());
+  const q = "query get_matchup_legs($leagueId: String!, $round: Int!) { matchup_legs(league_id: $leagueId, round: $round) { roster_id starters starters_games subs bans picks starters_by_date players_by_date player_map } }";
+  const r = await fetch("https://api.sleeper.app/graphql", { method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json", authorization: env.SLEEPER_TOKEN, "user-agent": "we-back-lock-desk" },
+    body: JSON.stringify({ operationName: "get_matchup_legs", query: q, variables: { leagueId: LEAGUE, round: Number(info.week) } }) });
+  const j = await r.json().catch(() => null);
+  const legs = (j?.data?.matchup_legs || []).filter(l => [1, 3].includes(l.roster_id));
+  const out = { at: new Date().toISOString(), week: info.week, http: r.status, errors: (j?.errors || []).map(e => e.message).slice(0, 5), legs };
+  await env.KV.put("legs_probe", JSON.stringify(out), { expirationTtl: 3 * 86400 });
+  return { http: r.status, legs: legs.length };
+}
+
 async function kickWorkflow(env) {
   let result;
   if (!env.GH_TOKEN) result = { ok: false, status: "no GH_TOKEN secret on the worker" };
@@ -142,6 +159,7 @@ export default {
     ctx.waitUntil(snapshot(env).catch(e => console.log("snapshot failed", e.message)));
     ctx.waitUntil(sleeperLocks(env).catch(e => console.log("sleeper locks failed", e.message)));
     if (new Date(event.scheduledTime).getUTCMinutes() % 15 === 0) ctx.waitUntil(kickWorkflow(env).catch(() => {}));
+    if (new Date(event.scheduledTime).getUTCMinutes() % 15 === 5) ctx.waitUntil(legsProbe(env).catch(e => console.log("legs probe failed", e.message)));
   },
 
   async fetch(req, env) {
@@ -172,6 +190,7 @@ export default {
       if (req.headers.get("x-key") !== env.WRITE_KEY) return json({ error: "bad key" }, 401);
       return json({ snapshot: await snapshot(env), sleeperLocks: await sleeperLocks(env) });
     }
+    if (url.pathname === "/legs_probe") return json(await kvGet(env, "legs_probe", null));   // TEMPORARY (Nov 26)
     if (url.pathname === "/kick" && req.headers.get("x-key") === env.WRITE_KEY) return json(await kickWorkflow(env));
     return json({ service: "lock-desk", ok: true });
   },
