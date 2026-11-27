@@ -251,7 +251,7 @@ function render() {
   renderResearch(c);
   renderInsights(c);
   const sl = live.sleeperLocks;
-  const slNote = sl?.status === "ok" ? " Locks for both teams come straight from Sleeper (checked every minute)."
+  const slNote = sl?.status === "ok" ? ` Locks for both teams come straight from Sleeper (checked every minute${sl.source === "public" ? "; from Sleeper's public record, because your Sleeper login on the backend isn't working" : ""}).`
     : sl ? ` Sleeper lock feed unavailable (${sl.status}): locks come from your marks and lineup records, and the opponent's are estimated.` : "";
   $("foot").textContent = `Plan's expected total from open slots: ${r1(plan.expectedTotal || 0)}.${slNote} Recomputed every minute from Sleeper (scores, schedule, injuries). A game is lockable only if he was starting when it tipped; lineups are recorded by the scheduled job (every 15 min) and by this page while it's open. ${live.backend ? "Answers sync to your backend, and lineups are recorded every minute." : "Answers are saved in this browser only (backend not connected)."}`;
   $("dot").classList.toggle("stale", Date.now() - live.at > 5 * 60000);

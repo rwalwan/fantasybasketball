@@ -38,9 +38,11 @@ something measured in Sleeper's data, and the source is noted.
    (Sleeper). A slot locked before the trade stays locked for the team that locked it, so a starter with a score in hand
    can be locked first and then traded. Trades go through after the league's review period (2 days, from league
    settings). Test: `test_nov15_trades.mjs`.
-7. **Sleeper's own lock record** (which game each starter is locked on) is only in the app's GraphQL API
-   (`get_matchup_legs` → `starters_games: {player_id: game_id}`), which needs a logged-in token. The public REST API
-   only shows slot points. The website doesn't show matchup lock data; only the app does. (Ryan, Nov 16.)
+7. **Sleeper's own lock record** (which game each starter is locked on) is in Sleeper's GraphQL API:
+   `starters_games: {player_id: game_id}` on the app's `get_matchup_legs` (needs a logged-in token) and on the public
+   `matchup_legs_raw` (no login). Nov 27: the two matched for all 12 teams in weeks 5 and 6 (112 of 112 locks); the
+   job keeps comparing them (`lock_source_check.json`). The Worker reads the logged-in one and falls back to the public
+   one when the token is missing or rejected. The public REST API only shows slot points. The website doesn't show matchup lock data; only the app does. (Ryan, Nov 16.)
    **Mid-week, the public feed's slot points show a starter's latest game even when an earlier one is locked**, and
    its matchup `points` count unlocked slots too. Sleeper's app shows only the locked slots, each at its locked game
    (week 6, Nov 26: feed 387.5 vs 439.5, app 169.0 vs 428.5; Durant locked on 63.5, feed showing 48.5). So the page's
@@ -306,7 +308,8 @@ Never in the repo. Names only:
   setup link), `GH_TOKEN` (lets the minute cron start the update workflow), `SLEEPER_TOKEN` (Ryan's Sleeper login, for
   the lock record).
 - The site's ⚙ Backend dialog shows Ryan's setup link, which contains `WRITE_KEY`: never ask him to paste or screenshot it.
-- If the Sleeper token stops working, the feed status leaves `ok` and the engine falls back to manual marks and
+- If the Sleeper token stops working, the Worker reads the public lock record instead (`source: "public"`, with
+  `login_error`), so the feed status stays `ok`; only if both fail does the engine fall back to manual marks and
   inferred locks. The site's footer says which source is active. Ryan has to get a fresh token from the Sleeper app
   himself and set it with `wrangler secret put SLEEPER_TOKEN`. Never handle the token value.
 
@@ -326,6 +329,7 @@ Each of these can be re-checked. If new evidence overturns one, change it and up
 | GTD/DTD play far more than the published 48% | as of Nov 10: GTD 78.5% (n=158), DTD 91% (n=35); now blended | `availability_log.json` calibration |
 | News "ruled out" beats a lagging Sleeper label | Nov 16 Queta: ruled out 5:16 pm ET, Sleeper GTD for 2+ h | `test_nov16_news_out.py` |
 | Sleeper's lock record is authoritative when available | it's the app's own record; inference misread locks before (Oct 29, Nov 1, Nov 15) | `test_nov16_sleeper_locks.mjs` |
+| Public `matchup_legs_raw` lock record as the fallback when the token fails | Nov 27: identical to the logged-in record, 112 of 112 locks, all teams, weeks 5-6 | `lock_source_check.json` `summary` |
 | Trades in expected wins, 2.2 wins per unit of weekly score | Nov 15: final margins of 1,155 Lock-In matchups in 72 leagues (0.020-0.024 across band widths) | `test_nov15_trades.mjs` |
 | Rotate lockable scores into the tightest slot | Nov 26: +1.4 to +1.75 pts/week, 95% CIs above 0 on three seeds (900 simulated weeks); cost measured that day at ~85 ms vs ~6 ms per plan | `node tools/rotate_study.mjs` |
 | Lineups sampled four times a minute from `matchup_legs_raw`, both teams, plus a one-tap "won't lock" answer | Nov 26: once-a-minute REST samples missed Spencer's bench trip, 15-minute samples missed Edey's; Sleeper publishes no eligibility field (section 1, rule 3) | `test_nov26_bench_trip.mjs`; Spencer/Edey in `plan_debug.json` |
@@ -339,11 +343,9 @@ Each of these can be re-checked. If new evidence overturns one, change it and up
 - Only 1-3 game "out" reports override Sleeper. Longer absences need a news timeline with a minimum.
 - Win chance is a normal approximation; it has few graded matchups so far (`winprob_log.json`).
 - The bar calibration is measured on single-player bars (the study can't see other teams' benches) and applied to the full rotation bar.
-- The lock record depends on Ryan's Sleeper token, which can expire. Without it, the inferred-lock checks (section 4.3, steps 3 and 5) read the feed's slot points, which mid-week show the latest game rather than the locked one (section 1, rule 7), so they can miss locks.
+- The lock record comes from Ryan's Sleeper token, or the public record if the token fails. If both fail, the inferred-lock checks (section 4.3, steps 3 and 5) read the feed's slot points, which mid-week show the latest game rather than the locked one (section 1, rule 7), so they can miss locks.
 - The job's plan (`plan_debug.json`, alerts) and the site can briefly differ (section 3, "Site vs job").
 - The logged win chance uses a simpler model than the displayed one (section 5).
 - Lineup records are samples (15 s apart): a bench trip shorter than that is invisible unless Ryan taps "Sleeper won't
   let me lock this". The opponent has no such button.
-- `matchup_legs_raw` (public, no login) also returns `starters_games`, the same lock record the Worker reads with
-  Ryan's token (checked Nov 26), so the token may not be needed for the lock record.
 - League and user ids are constants in `app/run.py`, `tools/moves.mjs`, `site/app.js` and `worker/src/index.js`.

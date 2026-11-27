@@ -95,16 +95,32 @@ async function legsFor(env, round) {
   if (!r.ok || !Array.isArray(legs)) throw new Error(j?.errors?.[0]?.message || `HTTP ${r.status}`);
   return legs;
 }
+// Nov 27: the same record is in the public matchup_legs_raw query (no login). Checked against the logged-in record for
+// all 12 teams, weeks 5 and 6: 112 of 112 locks identical (lock_source_check.json keeps checking every 15 minutes).
+// So when the token is missing or rejected, the public record is used instead of falling back to guessing locks from
+// slot points (which mid-week show the latest game, not the locked one).
+async function publicLegsFor(round) {
+  const r = await fetch("https://api.sleeper.app/graphql", { method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json", "user-agent": "we-back-lock-desk" },
+    body: JSON.stringify({ query: `query { matchup_legs_raw(league_id: "${LEAGUE}", round: ${Number(round)}) { roster_id matchup_id starters starters_games } }` }) });
+  const legs = (await r.json().catch(() => null))?.data?.matchup_legs_raw;
+  if (!r.ok || !Array.isArray(legs)) throw new Error(`public record: HTTP ${r.status}`);
+  return legs;
+}
 // Sleeper's state week can lag the matchup week the site and job use (Nov 16: the site asked for week 5 while the
 // record was filed under Sleeper's week), so the weeks either side are read too; each is stored under its own week.
 async function sleeperLocks(env) {
   const info = await dayInfo(env, etDate());
   const w0 = Number(info.week), out = {};
-  let status = "ok";
-  if (!env.SLEEPER_TOKEN) status = "no SLEEPER_TOKEN secret on the worker";
-  else for (const w of [w0 - 1, w0, w0 + 1].filter(w => w >= 1)) {
+  let status = "ok", source = env.SLEEPER_TOKEN ? "login" : "public", loginErr = env.SLEEPER_TOKEN ? null : "no SLEEPER_TOKEN secret on the worker";
+  for (const w of [w0 - 1, w0, w0 + 1].filter(w => w >= 1)) {
     try {
-      const legs = await legsFor(env, w);
+      let legs;
+      if (source === "login") {
+        try { legs = await legsFor(env, w); }
+        catch (e) { loginErr = String(e.message || e).slice(0, 80); source = "public"; }
+      }
+      if (source === "public") legs = await publicLegsFor(w);
       if (!legs.length) continue;                                    // no matchups that week
       const teams = Object.fromEntries(legs.map(l => [String(l.roster_id), l.starters_games || {}]));
       const key = `sleeper_locks_${info.season}_w${w}`, prev = await kvGet(env, key, null);
@@ -113,9 +129,11 @@ async function sleeperLocks(env) {
       out[w] = Object.keys(teams).length;
     } catch (e) { status = String(e.message || e).slice(0, 120); break; }
   }
+  // status stays "ok" (the engine's switch) while either source works; source and the login error are reported beside it
   const st = await kvGet(env, "sleeper_locks_status", null);
-  if (!st || st.status !== status) await env.KV.put("sleeper_locks_status", JSON.stringify({ status, since: new Date().toISOString() }));
-  return { status, weeks: out };
+  if (!st || st.status !== status || st.source !== source || st.login_error !== loginErr)
+    await env.KV.put("sleeper_locks_status", JSON.stringify({ status, source, login_error: loginErr, since: new Date().toISOString() }));
+  return { status, source, login_error: loginErr, weeks: out };
 }
 
 async function kickWorkflow(env) {
@@ -153,7 +171,7 @@ export default {
       const kick = await kvGet(env, "kick", null);
       // Sleeper's lock record: usable only while the token works (status ok); the site and job fall back otherwise
       const [sl, slStatus] = await Promise.all([kvGet(env, `sleeper_locks_${season}_w${week}`, null), kvGet(env, "sleeper_locks_status", null)]);
-      const sleeperLocks = sl ? { ...sl, status: slStatus?.status || sl.status, since: slStatus?.since || null } : (slStatus ? { teams: null, ...slStatus } : null);
+      const sleeperLocks = sl ? { ...sl, status: slStatus?.status || sl.status, source: slStatus?.source || "login", since: slStatus?.since || null } : (slStatus ? { teams: null, ...slStatus } : null);
       return json({ ok: true, elig, locks, lineups, oppLineups, kick, sleeperLocks, now: new Date().toISOString() });
     }
     if (url.pathname === "/answer" && req.method === "POST") {
