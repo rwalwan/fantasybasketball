@@ -131,14 +131,14 @@
    ]
   },
   {
-   "at": "2026-11-27T05:48+00:00",
+   "at": "2026-11-27T19:37+00:00",
    "model": "return_rate",
    "title": "Return rates after missed games (how soon an injured player comes back)",
    "event": "skipped",
    "why": "not enough graded data yet (124 rows to fit, 125 to test over 6 days)"
   },
   {
-   "at": "2026-11-27T05:48+00:00",
+   "at": "2026-11-27T19:37+00:00",
    "model": "baseline",
    "title": "Season-start projection (how fast this season's games outweigh last season's)",
    "event": "kept current",
@@ -152,14 +152,14 @@
    ]
   },
   {
-   "at": "2026-11-27T05:48+00:00",
+   "at": "2026-11-27T19:37+00:00",
    "model": "spread",
    "title": "Boom-or-bust spread per player (how much of a player's own spread is real)",
    "event": "kept current",
    "why": "a refit on 3458 player checkpoints came out at the current numbers"
   },
   {
-   "at": "2026-11-27T05:48+00:00",
+   "at": "2026-11-27T19:37+00:00",
    "model": "wins_per_point",
    "title": "Wins per point (how much a weekly point is worth in trades), from other leagues' final scores",
    "event": "kept current",
@@ -173,12 +173,12 @@
    ]
   },
   {
-   "at": "2026-11-27T05:48+00:00",
+   "at": "2026-11-27T19:37+00:00",
    "model": "win_chance",
    "title": "Win chance calibration (are the projected ranges too wide or too narrow?)",
    "event": "skipped",
    "why": "not enough graded data yet (42 rows to fit, 24 to test over 4 days)"
   }
  ],
- "updated": "2026-11-27T05:48+00:00"
+ "updated": "2026-11-27T19:37+00:00"
 }
