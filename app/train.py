@@ -89,8 +89,8 @@ class Model:
 
     row_word = "games"
 
-    def exam_words(self, hold, nd):  # plain words for the exam set
-        return f"last {nd} days"
+    def exam_words(self, hold, nd):  # plain words for the exam set (nd = days, or clusters when rows carry "c")
+        return f"last {len({r['day'] for r in hold})} days"
 
 
 def split(rows, t):
@@ -174,13 +174,17 @@ def run_model(model, ctx, doc, today):
     train, hold = model.split(rows, t)
     hold_days = len({r.get("c", r["day"]) for r in hold})
     if len(train) < model.min_train or len(hold) < model.min_hold or hold_days < MIN_HOLD_DAYS:
-        why = f"not enough graded data yet ({len(train)} rows to fit, {len(hold)} to test over {hold_days} days)"
+        why = (f"not enough graded data yet ({len(train)} rows to fit, {len(hold)} to test over "
+               f"{len({r['day'] for r in hold})} days)")
         _log(doc, model, "skipped", why)
         return "skipped"
     cand = model.step(champ, model.fit(train, champ))
     bad = model.bounds(cand)
     if bad:
         _log(doc, model, "kept current", f"the fitted numbers broke a safety limit: {bad}")
+        return "kept current"
+    if cand == champ:
+        _log(doc, model, "kept current", f"a refit on {len(train)} {model.row_word} came out at the current numbers")
         return "kept current"
     d = model.loss(cand, hold) - model.loss(champ, hold)
     mean, lo, hi, nd = day_boot(d, [r.get("c", r["day"]) for r in hold])

@@ -418,6 +418,9 @@ class WinsPerPoint(Model):
     min_hold = 150
     row_word = "matchups"
 
+    def exam_words(self, hold, nd):
+        return f"the newest {len({r['day'] for r in hold})} weeks, {nd} leagues"
+
     def rows(self, ctx):
         import sqlite3
         path = os.path.join(ctx["state"], "leagues.sqlite")
@@ -491,6 +494,9 @@ class WinChance(Model):
     min_train = 60
     min_hold = 40
     row_word = "matchup predictions"
+
+    def exam_words(self, hold, nd):
+        return f"last {len({r['day'] for r in hold})} days, {nd} matchups"
     GRID = [round(float(x), 2) for x in np.arange(0.5, 2.001, 0.05)]
 
     def rows(self, ctx):

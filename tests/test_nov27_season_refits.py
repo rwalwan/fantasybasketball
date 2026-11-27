@@ -199,3 +199,12 @@ finally:
     learned.STATE, run.ROOT = old_state, old_root
     model.BASE.clear(); model.BASE.update(keep_b); volatility.M.clear(); volatility.M.update(keep_v)
 print("ok: the job applies learned baseline/spread and writes learned.json for the page; LEARNING=off ignores them")
+
+# a refit that lands on the current numbers says so (the first live run printed "up 0.000 (0.000 to 0.000)")
+ctx_s = ctx_with(spread_world(own=True))
+same = sp.fit(sp.split(sp.rows(ctx_s), None)[0], None)
+doc = {"models": {"spread": {"params": same, "previous": None, "since": "2026-11-01", "status": "kept", "watch_until": None}},
+       "log": []}
+assert T.run_model(sp, ctx_s, doc, "2026-11-28") == "kept current"
+assert "came out at the current numbers" in doc["log"][-1]["why"], doc["log"][-1]
+print("ok: a refit equal to the current numbers is logged in plain words")
