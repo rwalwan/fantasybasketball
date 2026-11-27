@@ -186,10 +186,10 @@ try {
   const intro = await gql(`{ __type(name: "MatchupLeg") { fields { name type { name kind } } } }`);
   probe.introspection = { status: intro.status, data: intro.json?.data ?? null, errors: intro.json?.errors?.map(e => e.message).slice(0, 3) };
   // the whole query/mutation list and every type name: is there a lineup-history or eligibility query?
-  const sch = await gql(`{ __schema { queryType { fields { name args { name } type { name kind ofType { name } } } } mutationType { fields { name } } types { name } } }`);
+  const sch = await gql(`{ __schema { query_type { fields { name args { name } type { name kind of_type { name } } } } mutation_type { fields { name } } types { name } } }`);
   probe.schema = { status: sch.status, errors: sch.json?.errors?.map(e => e.message).slice(0, 3),
-    query: sch.json?.data?.__schema?.queryType?.fields?.map(f => `${f.name}(${(f.args || []).map(a => a.name).join(",")}): ${f.type?.name || f.type?.ofType?.name || f.type?.kind}`),
-    mutation: sch.json?.data?.__schema?.mutationType?.fields?.map(f => f.name), types: sch.json?.data?.__schema?.types?.map(t => t.name) };
+    query: sch.json?.data?.__schema?.query_type?.fields?.map(f => `${f.name}(${(f.args || []).map(a => a.name).join(",")}): ${f.type?.name || f.type?.of_type?.name || f.type?.kind}`),
+    mutation: sch.json?.data?.__schema?.mutation_type?.fields?.map(f => f.name), types: sch.json?.data?.__schema?.types?.map(t => t.name) };
   const sug = await gql(`query { matchup_legs_raw(league_id: "${LEAGUE}", round: ${week}) { roster_id eligible ineligible lock_eligible } }`);
   probe.suggestions = sug.json?.errors?.map(e => e.message).slice(0, 6) ?? sug.head;
   if (process.env.WORKER_URL) probe.worker = await get(`${process.env.WORKER_URL}/legs_probe`).catch(e => String(e));
