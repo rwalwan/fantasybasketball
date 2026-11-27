@@ -175,9 +175,9 @@ try {
   const keep = new Set([...(mine.players || []), ...(oppRoster?.players || [])]);
   const trimLeg = l => l && ({ ...l, player_map: l.player_map ? Object.fromEntries(Object.entries(l.player_map).filter(([p]) => keep.has(p))
     .map(([p, v]) => [p, JSON.stringify(v).length > 2500 ? JSON.stringify(v).slice(0, 2500) : v])) : l.player_map });
-  const F = "round leg points picks players league_id roster_id custom_points proj_points max_points matchup_id starters starters_games bans subs player_map";
+  const F = "round leg points picks players league_id roster_id custom_points proj_points max_points matchup_id starters starters_games bans subs player_map starters_by_date players_by_date";
   const probe = { at: new Date().toISOString(), week };
-  for (const name of ["matchup_legs_raw", "matchup_legs"]) {
+  for (const name of ["matchup_legs_raw"]) {
     const r = await gql(`query { ${name}(league_id: "${LEAGUE}", round: ${week}) { ${F} } }`);
     const legs = r.json?.data?.[name];
     probe[name] = { status: r.status, errors: r.json?.errors?.map(e => e.message).slice(0, 5), head: r.head,
