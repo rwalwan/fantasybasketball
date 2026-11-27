@@ -263,6 +263,7 @@ Every-run loops:
 |---|---|
 | `plan_debug.json` | This week's plan from `moves.mjs`: `slots`, `actions`, `rotation`, `outlook`, `bar_debug`, `week_schedule`, `today_options`, **`starters_debug`** and **`opp_debug`** (per slot: lock state, every Sleeper copy of the slot score, manual mark, lineup record; start here for lock bugs), raw rosters/matchups, trade debug |
 | `lineups_<season>_w<week>.json`, `opp_lineups_*` | Lineup record per `"date|pid"`: `{slot, i, seen, frozen, benched}` (Ryan's and the opponent's, the job's merged with the Worker's) |
+| `lock_source_check.json` | Every run: the public `matchup_legs_raw` lock record compared with the logged-in one, this week and last, all teams (`tools/locksrc.mjs`; Nov 27) |
 | `legs_probe.json` | Left over from the Nov 26 search for Sleeper's eligibility field; nothing reads it |
 | `sleeper_locks_<season>_w<week>.json` | Sleeper's lock record per roster (copied from the Worker) |
 | `eligibility_overrides.json`, `locks_w<week>.json` | Old copies of Ryan's answers, read if present; live answers are in Worker KV (section 3) |

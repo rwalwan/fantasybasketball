@@ -3,6 +3,7 @@
 // the site, so the numbers match what you see there. Reasons are cached so each suggestion is only
 // written once (OpenRouter key stays server-side; never shipped to the browser).
 import { stageOf, calibration, gradeWeeks } from "./winprob.mjs";
+import { publicLocks, compareLocks } from "./locksrc.mjs";
 import fs from "node:fs";
 import { Book, WeekPlan, Valuer, eligFromSnaps, mergeSnaps, sleeperLocksFor, mergeMatchups, irMoves, studyBarScale, selectAdds, weekDays, tradeIdeas, waiverMoves, playerValue } from "../site/engine.js";
 
@@ -46,6 +47,23 @@ const slots = league.roster_positions.filter(s => s !== "BN" && s !== "IR");
 const SL = backend.sleeperLocks || null, slFor = rid => sleeperLocksFor(SL, rid);
 console.log(`sleeper locks: ${SL ? SL.status : "none"} ${JSON.stringify(SL)?.slice(0, 400)}`);
 if (SL?.status === "ok" && SL.teams) fs.writeFileSync(stateFile(`sleeper_locks_${season}_w${week}.json`), JSON.stringify(SL, null, 1));
+// Cross-check (Nov 27): the public matchup_legs_raw lock record vs the logged-in one, this week (the Worker's live copy)
+// and last week (its saved file), every team. History in lock_source_check.json, so we can see over days whether the
+// public record can stand in when the token expires.
+try {
+  const hist = readState("lock_source_check.json", { runs: [] }), row = { at: new Date().toISOString(), weeks: {} };
+  for (const [w, logged] of [[week, SL?.status === "ok" ? SL.teams : null], [week - 1, readState(`sleeper_locks_${season}_w${week - 1}.json`, null)?.teams]]) {
+    if (w < 1) continue;
+    const pub = await publicLocks(fetch, LEAGUE, w);
+    row.weeks[w] = logged ? compareLocks(logged, pub) : { teams: Object.keys(pub).length, locks: Object.values(pub).reduce((a, x) => a + Object.keys(x).length, 0), logged: false };
+  }
+  hist.runs = [...hist.runs, row].slice(-400);
+  const all = hist.runs.flatMap(r => Object.values(r.weeks)).filter(x => x.logged !== false);
+  hist.summary = { runs: hist.runs.length, compared: all.length, locks: all.reduce((a, x) => a + x.locks, 0), same: all.reduce((a, x) => a + x.same, 0),
+                   runs_with_diffs: hist.runs.filter(r => Object.values(r.weeks).some(x => x.diffs?.length)).length };
+  fs.writeFileSync(stateFile("lock_source_check.json"), JSON.stringify(hist));
+  console.log("lock source check:", JSON.stringify(hist.summary), JSON.stringify(row.weeks).slice(0, 400));
+} catch (e) { console.log("lock source check failed:", e.message); }
 const wp = new WeekPlan({ Q: st("quantiles"), book, schedule, week, today, rosterPositions: league.roster_positions,
   roster: mine, matchup: my, rosters, tips: tipsRaw, locks,
   elig: eligFromSnaps(snaps, ov), sleeperLocks: slFor(mine.roster_id) });
