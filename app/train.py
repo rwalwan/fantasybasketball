@@ -40,7 +40,8 @@ LOG_KEEP = 300
 
 def day_boot(diff, days, B=BOOT, seed=7):
     """Mean of per-row differences and its 95% interval, resampling whole days (games on one night share news,
-    rest decisions and injury waves, so rows are not independent). -> (mean, lo, hi, n_days)"""
+    rest decisions and injury waves, so rows are not independent), or whole clusters when rows carry a "c" key (a
+    player-season, a league). -> (mean, lo, hi, n_clusters)"""
     diff = np.asarray(diff, float)
     uniq = sorted(set(days))
     if not uniq:
@@ -83,6 +84,14 @@ class Model:
     def describe(self, old, new):   # plain words: what changed
         return ""
 
+    def split(self, rows, t):       # (fit rows, exam rows); default: the newest days are the exam
+        return split(rows, t)
+
+    row_word = "games"
+
+    def exam_words(self, hold, nd):  # plain words for the exam set
+        return f"last {nd} days"
+
 
 def split(rows, t):
     """(train, exam). The exam is the last HOLD_DAYS days, or the newer half of the days while history is shorter
@@ -101,22 +110,30 @@ def split(rows, t):
 
 
 def _err(mean, lo, hi):
-    """Plain words for a loss difference (new minus current; below 0 = better): 'prediction error down 0.140 per
-    game (95% interval 0.049 to 0.228)'."""
-    word = "down" if mean < 0 else "up"
-    a, b = sorted((abs(lo), abs(hi))) if (lo < 0) == (hi < 0) else (lo, hi)
-    span = f"{a:.3f} to {b:.3f}" if (lo < 0) == (hi < 0) else f"{-hi:+.3f} to {-lo:+.3f}"
-    return f"prediction error {word} {abs(mean):.3f} per game (95% interval {span})"
+    """Plain words for a loss difference (new minus current; below 0 = better), its interval in the same direction as
+    the word: 'average prediction error down 0.140 (95% interval 0.049 to 0.228)', 'up 0.019 (95% interval -0.004 to
+    +0.043)'."""
+    word, (a, b) = ("down", (-hi, -lo)) if mean < 0 else ("up", (lo, hi))
+    span = f"{a:.3f} to {b:.3f}" if a >= 0 else f"{a:+.3f} to {b:+.3f}"
+    return f"average prediction error {word} {abs(mean):.3f} (95% interval {span})"
 
 
 def _now():
     return dt.datetime.now(dt.timezone.utc).isoformat(timespec="minutes")
 
 
+QUIET = ("kept current", "skipped")
+
+
 def _log(doc, model, event, why, **kw):
-    doc.setdefault("log", []).append({"at": _now(), "model": model.name, "title": model.title, "event": event,
+    log = doc.setdefault("log", [])
+    # a nightly "no change" repeats itself: keep only the newest one in a row per model, so the log shows changes
+    last = next((e for e in reversed(log) if e.get("model") == model.name), None)
+    if event in QUIET and last is not None and last.get("event") == event:
+        log.remove(last)
+    log.append({"at": _now(), "model": model.name, "title": model.title, "event": event,
                                       "why": why, **kw})
-    del doc["log"][:-LOG_KEEP]
+    del log[:-LOG_KEEP]
 
 
 def run_model(model, ctx, doc, today):
@@ -130,13 +147,13 @@ def run_model(model, ctx, doc, today):
         post = [r for r in rows if r["day"] >= entry["since"]]
         if post:
             d = model.loss(entry["params"], post) - model.loss(entry["previous"], post)
-            mean, lo, hi, nd = day_boot(d, [r["day"] for r in post])
+            mean, lo, hi, nd = day_boot(d, [r.get("c", r["day"]) for r in post])
         else:
             mean = lo = hi = 0.0
             nd = 0
         over = today >= entry["watch_until"]
         if (nd >= 3 and lo > 0) or (over and len(post) >= model.min_hold and mean > 0):
-            why = (f"the new version did worse on {len(post)} games graded since {entry['since']} "
+            why = (f"the new version did worse on {len(post)} {model.row_word} graded since {entry['since']} "
                    f"({_err(mean, lo, hi)}); back to the previous version")
             ms[model.name] = {"params": entry["previous"], "previous": None, "since": today, "status": "kept",
                               "watch_until": None, "cooldown_until": (t + dt.timedelta(days=WATCH_DAYS)).isoformat(),
@@ -147,15 +164,15 @@ def run_model(model, ctx, doc, today):
             return "watching"
         entry.update(status="kept", previous=entry["previous"], watch_until=None)
         _log(doc, model, "kept after watch",
-             f"graded on {len(post)} games since {entry['since']}: not worse than the version it replaced"
+             f"graded on {len(post)} {model.row_word} since {entry['since']}: not worse than the version it replaced"
              + (f" ({_err(mean, lo, hi)})" if post else " (no games graded yet)"), n=len(post))
         return "kept after watch"
     if entry and entry.get("cooldown_until") and today < entry["cooldown_until"]:
         return "cooldown"
 
     champ = entry["params"] if entry else model.factory(ctx)
-    train, hold = split(rows, t)
-    hold_days = len({r["day"] for r in hold})
+    train, hold = model.split(rows, t)
+    hold_days = len({r.get("c", r["day"]) for r in hold})
     if len(train) < model.min_train or len(hold) < model.min_hold or hold_days < MIN_HOLD_DAYS:
         why = f"not enough graded data yet ({len(train)} rows to fit, {len(hold)} to test over {hold_days} days)"
         _log(doc, model, "skipped", why)
@@ -166,10 +183,11 @@ def run_model(model, ctx, doc, today):
         _log(doc, model, "kept current", f"the fitted numbers broke a safety limit: {bad}")
         return "kept current"
     d = model.loss(cand, hold) - model.loss(champ, hold)
-    mean, lo, hi, nd = day_boot(d, [r["day"] for r in hold])
+    mean, lo, hi, nd = day_boot(d, [r.get("c", r["day"]) for r in hold])
     stats = dict(n=len(hold), days=nd, gain=round(-mean, 5), ci=[round(-hi, 5), round(-lo, 5)])
     if not hi < 0:
-        _log(doc, model, "kept current", f"a refit was not clearly better on the last {nd} days ({len(hold)} games): "
+        _log(doc, model, "kept current", f"a refit was not clearly better on {len(hold)} {model.row_word} it never saw "
+             f"({model.exam_words(hold, nd)}): "
              f"{_err(mean, lo, hi)}", **stats)
         return "kept current"
     live = model.step(champ, model.fit(rows, champ))
@@ -179,7 +197,8 @@ def run_model(model, ctx, doc, today):
         return "kept current"
     ms[model.name] = {"params": live, "previous": champ, "since": today, "status": "watching", "title": model.title,
                       "watch_until": (t + dt.timedelta(days=WATCH_DAYS)).isoformat()}
-    _log(doc, model, "promoted", f"better on {len(hold)} games it never saw (last {nd} days): {_err(mean, lo, hi)}. "
+    _log(doc, model, "promoted", f"better on {len(hold)} {model.row_word} it never saw ({model.exam_words(hold, nd)}): "
+         f"{_err(mean, lo, hi)}. "
          f"{model.describe(champ, live)}".strip(), **stats)
     return "promoted"
 

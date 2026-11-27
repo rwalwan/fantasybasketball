@@ -99,7 +99,11 @@ export const B2B_FACTOR = 0.93, PRIOR_GAMES = 8;   // b2b/non-b2b play-rate rati
 export const BASELINE = { R: 200, M: 4, c: 10, part: [0.130, 0.366, 0.474, 0.607, 0.748, 0.929] };
 
 export class Book {
-  constructor({ scoring, players, priors, gamelog, weights, ctx, avail, usage, vol, priorMin, part }) {
+  constructor({ scoring, players, priors, gamelog, weights, ctx, avail, usage, vol, priorMin, part, baseline, winTemp }) {
+    // R, M, c the nightly trainer promoted (static/learned.json, app/train_models.py Baseline); factory BASELINE otherwise
+    this.bl = { ...BASELINE, ...(baseline || {}) };
+    // win-chance temperature the nightly trainer promoted (app/train_models.py WinChance): z x winTemp; 1 = as computed
+    this.winTemp = winTemp || 1;
     this.priorMin = priorMin || {};      // pid -> [last season min/game, games] (per-minute baseline, research/baseline_fit.py)
     this.part = part || {};              // pid -> play-rate factor from recent participation (healthy players who sat)
     this.vol = vol || {};                // pid -> r: his own game-to-game spread vs his tier's (app/volatility.py)
@@ -158,9 +162,9 @@ export class Book {
     // (Nov 2: Julian Reese - 13 games at 31 min on a tanking team last season, now a bench player - showed 37.4)
     const pm = this.priorMin[p], mins = g.reduce((a, x) => a + (x.min || 0), 0);
     if (pm && this.prior[p] != null && pm[0] > 0 && g.length && mins > 0) {
-      const w = pm[1] / (pm[1] + BASELINE.c), rateLast = this.prior[p] / pm[0];
-      const rate = (g.reduce((a, x) => a + x.fp, 0) + BASELINE.R * w * rateLast) / (mins + BASELINE.R * w);
-      const mpg = (mins + BASELINE.M * w * pm[0]) / (g.length + BASELINE.M * w);
+      const B = this.bl, w = pm[1] / (pm[1] + B.c), rateLast = this.prior[p] / pm[0];
+      const rate = (g.reduce((a, x) => a + x.fp, 0) + B.R * w * rateLast) / (mins + B.R * w);
+      const mpg = (mins + B.M * w * pm[0]) / (g.length + B.M * w);
       return rate * mpg;
     }
     let prior = this.prior[p];
@@ -672,7 +676,7 @@ export class WeekPlan {
       evOf[i] = ev; sdOf[i] = sd; M += ev; V += sd * sd;
     });
     const Phi = z => 0.5 * (1 + Math.tanh(0.7978845608 * (z + 0.044715 * z ** 3)));
-    const pWin = (m, v) => opts.opp ? Phi((m - opts.opp.mean) / Math.sqrt(v + opts.opp.var + 1)) : null;
+    const pWin = (m, v) => opts.opp ? Phi(this.b.winTemp * (m - opts.opp.mean) / Math.sqrt(v + opts.opp.var + 1)) : null;
     const mx = {};
     if (opts.opp) for (const x of open) {
       const g = lockable[x.i]; if (!g || !cont[x.p]?.u.length || forceCall(x)) continue;   // a what-if stays as you set it
@@ -1162,7 +1166,8 @@ const PhiN = z => 0.5 * (1 + Math.tanh(0.7978845608 * (z + 0.044715 * z ** 3)));
 export function tradeIdeas(valuer, book, mine, others, limit = 15, ctx = null) {
   if (valuer.week > valuer.deadline) return [];             // past the league's trade deadline
   const T = ps => ps.reduce((a, p) => a + valuer.tradeValue(p), 0);
-  const S = ctx?.S || 500, wpp = WINS_PER_SCORE / S, ros = d => d * valuer.discSum * wpp;
+  // ctx.wps: wins per unit of weekly score learned from other leagues' final margins (app/train_models.py WinsPerPoint)
+  const S = ctx?.S || 500, wpp = (ctx?.wps || WINS_PER_SCORE) / S, ros = d => d * valuer.discSum * wpp;
   const myB = valuer.team(mine.players, true), ideas = [];
   const wk = ctx?.weekOf || {}, me = wk[mine.roster_id];
   const base = {};                                           // this week's expected total of the open slots, per team
@@ -1172,7 +1177,7 @@ export function tradeIdeas(valuer, book, mine, others, limit = 15, ctx = null) {
   };
   const pWin = (rid, dSelf = 0, dOpp = 0) => {               // win chance this week after a change in expected points
     const t = wk[rid], o = t && wk[t.opp]; if (!t || !o) return null;
-    return PhiN((t.mean + dSelf - o.mean - dOpp) / Math.sqrt(t.var + o.var + 1));
+    return PhiN((book.winTemp || 1) * (t.mean + dSelf - o.mean - dOpp) / Math.sqrt(t.var + o.var + 1));
   };
   for (const r of [mine, ...others]) if (wk[r.roster_id]) base[r.roster_id] = wt(r.roster_id, r.players, []);
   // pools for 2- and 3-player sides: the 10 players on each side worth most to a trade (market value), plus anyone

@@ -39,6 +39,7 @@ def main():
     my_m = next(m for m in mus if m["roster_id"] == mine["roster_id"])
     opp_m = next((m for m in mus if m["matchup_id"] == my_m["matchup_id"] and m["roster_id"] != mine["roster_id"]), None)
 
+    apply_learned()
     book = PlayerBook(lg["scoring_settings"], meta)
     days = week_dates(sched, week)
     tips = espn.tip_times([d for d in days if d >= (dt.date.fromisoformat(today) - dt.timedelta(days=1)).isoformat()])
@@ -151,6 +152,11 @@ def main():
         if fg:
             availability.M["first_game"] = fg
             print("learned next-game rates (play_first):", json.dumps(fg["ahead"]))
+        rr = learned.get("return_rate")             # learned return rates after k missed games (ReturnRate)
+        if rr:
+            from .train_models import hz_to_model
+            availability.M.update(hz_to_model(rr))
+            print("learned return rates (return_rate):", json.dumps(rr))
         rate, basis = availability.next_game_healthy(today)
         availability.set_next_game(rate, basis)
         gd = availability.gameday_healthy()              # no designation at the last run before tip: today's games only
@@ -281,6 +287,34 @@ def main():
 
 
 SCHED_CACHE = {}
+
+
+def apply_learned():
+    """Season-level numbers the nightly trainer promoted (app/train_models.py Baseline, Spread): put them in the
+    modules that use them, and write site/static/learned.json for the browser and tools/moves.mjs. No learned file or
+    LEARNING=off: the factory numbers (app/data) stay and learned.json says so."""
+    from . import model
+    out = {}
+    bl = learned.get("baseline")
+    if bl:
+        model.BASE.update(R_minutes=bl["R"], M_games=bl["M"], c_size=bl["c"])
+        out["baseline"] = {"R": bl["R"], "M": bl["M"], "c": bl["c"]}
+        print("learned baseline:", out["baseline"])
+    sp = learned.get("spread")
+    if sp:
+        volatility.M.update(a_prev=sp["a"], k_games=sp["k"], m_typical=sp["m"])
+        print("learned spread:", sp)
+    wp = learned.get("wins_per_point")
+    if wp:
+        out["wins_per_score"] = wp["wps"]
+        print("learned wins per point of weekly score:", wp["wps"])
+    wt = learned.get("win_chance")
+    if wt:
+        out["win_temp"] = wt["t"]
+        print("learned win-chance temperature:", wt["t"])
+    os.makedirs(os.path.join(ROOT, "site", "static"), exist_ok=True)
+    with open(os.path.join(ROOT, "site", "static", "learned.json"), "w") as f:
+        json.dump(out, f, separators=(",", ":"))
 
 
 def export_static(book, season, week, meta, lg):

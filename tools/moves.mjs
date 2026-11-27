@@ -37,9 +37,10 @@ const oppSnaps = mergeSnaps(readState(`opp_lineups_${season}_w${week}.json`, {})
 const tipsRaw = st("tips");
 
 const ctxMap = (() => { try { return st("context"); } catch { return {}; } })();
+const learnedNums = (() => { try { return st("learned"); } catch { return {}; } })();   // nightly trainer (app/run.py apply_learned)
 const book = new Book({ scoring: league.scoring_settings, players: st("players"), priors: st("priors"), gamelog: st("gamelog").games,
   weights: st("experts").weights, ctx: ctxMap, usage: (() => { try { return st("usage"); } catch { return {}; } })(), vol: (() => { try { return st("volatility"); } catch { return {}; } })(),
-  priorMin: (() => { try { return st("priors_min"); } catch { return {}; } })(), part: (() => { try { return st("participation"); } catch { return {}; } })(), avail: (() => { try { return st("availability"); } catch (e) { console.log("availability not loaded:", e.message); return null; } })() });
+  baseline: learnedNums.baseline, winTemp: learnedNums.win_temp, priorMin: (() => { try { return st("priors_min"); } catch { return {}; } })(), part: (() => { try { return st("participation"); } catch { return {}; } })(), avail: (() => { try { return st("availability"); } catch (e) { console.log("availability not loaded:", e.message); return null; } })() });
 book.addStats(stats); book.addProjections(proj);
 const mine = rosters.find(r => r.owner_id === USER), my = matchups.find(m => m.roster_id === mine.roster_id);
 const slots = league.roster_positions.filter(s => s !== "BN" && s !== "IR");
@@ -103,7 +104,7 @@ const tradeCtx = (() => {
     const rd = +(league.settings?.trade_review_days || 0);
     const from = rd > 0 ? new Date(Date.parse(today + "T12:00:00Z") + rd * 864e5).toISOString().slice(0, 10) : null;
     const vals = rosters.map(r => valuer.team(r.players || [])).sort((a, b) => a - b);
-    return { weekOf, from, reviewDays: rd, S: vals[Math.floor(vals.length / 2)] || 500 };
+    return { weekOf, from, reviewDays: rd, S: vals[Math.floor(vals.length / 2)] || 500, wps: learnedNums.wins_per_score };
   } catch (e) { console.log("trade week context failed:", e.message); return null; }
 })();
 const tradeT0 = Date.now();

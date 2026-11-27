@@ -52,15 +52,16 @@ async function saveAnswer(kind, key, value) {
 // ---- data ---------------------------------------------------------------------------------------
 let base = null, live = null, tab = "locks";
 async function loadBase() {
-  const [experts, Q, league, players, priors, gamelog, schedule, lg, vol, priorMin, part] = await Promise.all([
+  const [experts, Q, league, players, priors, gamelog, schedule, lg, vol, priorMin, part, learnedNums] = await Promise.all([
     get("static/experts.json").catch(() => ({ weights: null, sources: [] })), get("static/quantiles.json"), get(`${S1}/league/${LEAGUE}`), get("static/players.json"), get("static/priors.json"),
     get("static/gamelog.json"), get(`${S2}/schedule/nba/regular/${new Date().getFullYear() - (new Date().getMonth() < 7 ? 1 : 0)}`),
     get(`${S1}/league/${LEAGUE}/users`), get("static/volatility.json").catch(() => ({})),
-    get("static/priors_min.json").catch(() => ({})), get("static/participation.json").catch(() => ({}))]);
+    get("static/priors_min.json").catch(() => ({})), get("static/participation.json").catch(() => ({})),
+    get("static/learned.json").catch(() => ({}))]);
   const today = etToday();
   const weeks = schedule.filter(g => g.week).map(g => [g.date, g.week]).sort();
   const week = (weeks.filter(([d]) => d <= today).at(-1) || weeks[0])[1];
-  base = { experts, Q: Q.quantiles, QS: Q, league, players, priors, gamelog, schedule, users: Object.fromEntries(lg.map(u => [u.user_id, u.display_name])), week, vol, priorMin, part };
+  base = { experts, Q: Q.quantiles, QS: Q, league, players, priors, gamelog, schedule, users: Object.fromEntries(lg.map(u => [u.user_id, u.display_name])), week, vol, priorMin, part, learnedNums };
 }
 async function loadLive() {
   const { week, league } = base, season = league.season;
@@ -113,7 +114,8 @@ let lockBias = prefGet("lockBias", 0), whatIf = {};
 const STYLE = v => v <= -0.15 ? "Safest: lock early" : v < 0 ? "Safer: lock more" : v === 0 ? "Balanced (the engine's call)" : v < 0.15 ? "Gamble: wait for more" : "Big gamble: wait for a big game";
 function compute() {
   const book = new Book({ scoring: base.league.scoring_settings, players: base.players, priors: base.priors,
-                          gamelog: base.gamelog.games, weights: base.experts.weights, ctx: live.context || {}, avail: live.avail, usage: live.usage, vol: base.vol, priorMin: base.priorMin, part: base.part });
+                          gamelog: base.gamelog.games, weights: base.experts.weights, ctx: live.context || {}, avail: live.avail, usage: live.usage, vol: base.vol, priorMin: base.priorMin, part: base.part,
+                          baseline: base.learnedNums?.baseline, winTemp: base.learnedNums?.win_temp });
   bookRef = book;
   book.addStats(live.stats); book.addProjections(live.proj);
   const mine = live.rosters.find(r => r.owner_id === USER);

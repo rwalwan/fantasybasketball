@@ -174,7 +174,7 @@ For his remaining games, the value of arriving unlocked at game j is
    each slot starts; the **keep-line** for a starter = what the rest of the week loses if this slot is done and he's gone.
    **Same-day relief**: if the starter's game misses its keep-line, slide in a player whose game tips 2.5 h+ later.
 5. **Outlook**: each slot's expected final and spread → projected final; **win chance** = normal approximation of
-   my total vs the opponent's. The **opponent's plan** uses the same engine but locks the way real managers do
+   my total vs the opponent's (its z-score times the learned `win_chance` temperature, 1 until one is promoted). The **opponent's plan** uses the same engine but locks the way real managers do
    (`humanLockRate` from the other-league study), not the engine's way.
 6. **Actions**: one time-ordered list (`plan.actions`) that the site's top summary and the phone alerts both read.
 
@@ -196,7 +196,7 @@ plan or trade checks, because it costs about 85 ms per plan versus 6 ms.
   weeks full), with missing roster spots filled by the best free agent.
 - **Trades are valued in expected wins:** this week = change in win probability (each team's outlook, with the trade
   taking effect after the review period; locked slots stay); rest of season = Δ(lock-in value per week) ×
-  `valuer.discSum` (the discounted count of remaining weeks) × `WINS_PER_SCORE` (2.2) / S, where S is the median team
+  `valuer.discSum` (the discounted count of remaining weeks) × `WINS_PER_SCORE` (2.2, or the learned `wins_per_point`, section 5) / S, where S is the median team
   value across the league's rosters (`tradeCtx` in `moves.mjs`, default 500). A deal is offered only if it adds wins for Ryan, doesn't cost the partner
   wins by the same model, and gives the partner back at least ~90% of the market value he gives up. Shapes from 1-for-1
   to 3-for-2, with caps so ideas don't repeat the same players.
@@ -224,8 +224,10 @@ things worse if refit blindly go through a gate.
    watch, worse at all = reverted, then a 7-day cooldown. No new promotion while watching.
 2. **Gate.** A candidate is fitted on rows before the exam window and moved from the current version by at most the
    model's step cap. Exam = the last 14 days (the newer half of the days while history is shorter than 28; rows of a
-   kind that started later are split on their own, `s` key). Promoted only if the paired loss difference's 95% interval
-   (2,000 resamples of whole days) is entirely below 0, every number is inside the model's hard limits, and there are
+   kind that started later are split on their own, `s` key); for the season models the exam is the newest season with
+   enough rows and the fit uses only older seasons. Promoted only if the paired loss difference's 95% interval
+   (2,000 resamples of whole days, or of whole clusters where rows share one: a player-season, a league, a matchup) is
+   entirely below 0, every number is inside the model's hard limits, and there are
    enough rows. What goes live is the same capped step toward a fit on all rows, checked against the limits again.
 3. **Log.** Every outcome goes to `learned.json`'s log: the Insights tab shows it ("What the models learned"); the
    morning brief names promotions and rollbacks from the last 24 hours.
@@ -237,6 +239,18 @@ self-calibration) apply when there is no learned file, no entry for a model, or 
 | Learned model | What | Data | Loss | Limits, step |
 |---|---|---|---|---|
 | `play_first` | next-game play rate by status x games missed, ahead and game day (section 4.1) | graded next-game predictions (`avail_graded.jsonl`); each rate shrunk 20 games toward its status's pooled rate, which is shrunk toward today's rates | log loss (clipped 1-99%) | rates in [0, 1], Out <= 90%; 0.25 per promotion |
+| `return_rate` | chance to play after k missed games in a row (`by_k`, `k9_12`, `k13_20`, `k21p`; every game after the next one in an absence) | first-sight graded predictions with 1+ missed, no timeline, no news zero; each rate shrunk 30 games toward the current one | log loss | 2-80%; 0.10 per promotion |
+| `baseline` | season-start blend R, M, c (`app/model.py` `BASE`, engine `Book.baseline`) | box scores of every season available (`app/seasons.py`: 2021-23 research parquet, the last two seasons from Sleeper kept as `seasons/*.json.gz`, this season from `memory.sqlite`); checkpoints after 1, 2, 3, 5, 10 games, target = mean of his later games; newer seasons weigh more (x0.7 per season back); grid fit | absolute error (FP/G) | R 50-1000, M 0.5-12, c 0-60; R ±100, M ±2, c ±10 |
+| `spread` | per-player spread shrinkage a, k, m (`app/volatility.py`) | same seasons; players with 35+ games and mean 15+, checkpoints 0-40 games, target = spread of the rest of his season | squared error of r | a 0-1, k 5-400, m 0.8-1.1; a ±0.1, k ±40, m ±0.04 |
+| `wins_per_point` | trade value of a weekly point (engine `WINS_PER_SCORE`, 2.2) | final weeks of verified leagues in `leagues.sqlite`: chance that a matchup ends within 4% of the league-week's median score = 2 x 0.04 x wps; shrunk 200 matchups toward the current value | log loss | 1.2-4.0; ±0.3 |
+| `win_chance` | temperature t on the win-chance z-score (page outlook and trade check: Φ(t·z)) | graded win-chance log (`winprob_log.json`), raw predictions (the log is never tempered); grid 0.5-2.0 | log loss | 0.5-2.0; ±0.25 |
+
+The job applies them at the start of each run (`app/run.py`: `play_first`, `return_rate` into the availability model;
+`apply_learned` puts `baseline` and `spread` into `model.BASE` / `volatility.M`, and writes `site/static/learned.json` =
+`{baseline, wins_per_score, win_temp}` for the page and `tools/moves.mjs`). Known limits: `win_chance` learns from the
+logged win chance, which is a simpler model than the page's (see "Win chance" below), so it corrects the width of the ranges both share,
+not the page's extra logic. The usage model (`app/usage.py`) stays on its every-run gate below: its fit needs
+teammate-absence context that isn't archived per game yet.
 
 Every-run loops:
 - **Projections**: every source's pre-tip projection is logged and graded once the game is final (`app/experts.py`,
@@ -287,10 +301,11 @@ Every-run loops:
 |---|---|
 | `learned.json` | The learned numbers (`models`: params, the version they replaced, since, watch status) and the trainer's log. The 15-minute job copies it to `data/state/learned.json` (`tools/learning.sh pull`; a failed fetch keeps the last copy) |
 | `avail_graded.jsonl` | Every graded next-game play prediction, once each (the state log keeps only the newest 3,000) |
+| `seasons/<year>.json.gz` | Box scores of the two seasons before this one from Sleeper's per-game stats, scored in this league's format (`{pid: [[date, fp, min], ...]}`), fetched once by the trainer and kept (only when the season is complete, 10,000+ games) |
 
 **`site/static/`** (generated each run, not in git): `players`, `gamelog`, `priors`, `priors_min`, `participation`,
 `quantiles`, `volatility`, `league`, `tips`, `availability`, `usage`, `context`, `experts`, `news`, `claims`, `insights`,
-`league_study`, `moves`, `plan`, `learning`, `winprob`, `health`.
+`league_study`, `moves`, `plan`, `learning`, `winprob`, `health`, `learned` (learned numbers for the engine, section 5).
 
 **`app/data/`** (fitted constants, refit with `research/`): `availability_model.json`, `baseline_model.json`,
 `usage_model.json`, `volatility_model.json`, `game_ratio_quantiles.json`.
