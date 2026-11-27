@@ -160,6 +160,36 @@ fs.writeFileSync(stateFile("plan_debug.json"), JSON.stringify({ at: new Date().t
     starters: (opp.starters || []).map((p, i) => ({ i, pid: p, name: book.name(p), slot: oppWp.slotPoints(p) ?? null, copies: oppWp.slotCandidates(p),
       state: oppWp.lockState(p), rec: oppWp.elig.slot?.(p, oppWp.lockState(p).g?.date) ?? null, played: oppWp.played(p).map(g => [g.date, g.fp]), left: oppWp.upcoming(p).length })) } : null,
   grid: plan.grid.map(r => ({ name: r.name, pos: r.pos, starter: r.starter, locked: r.locked, status: r.status, cells: r.cells })) }, null, 1));
+// TEMPORARY probe (Nov 26): where does Sleeper keep "this game can't be locked"? The app showed Cam Spencer (2752) and
+// the opponent's Zach Edey (2718) as not lockable for Mon and Wed after a bench trip our minute snapshots missed. Ask
+// the public GraphQL (no login) for every MatchupLeg field and save our two teams' legs to legs_probe.json.
+// Remove once the field is found.
+try {
+  const gql = async (query, variables = {}) => {
+    const r = await fetch("https://api.sleeper.app/graphql", { method: "POST", headers: { "content-type": "application/json", accept: "application/json", "user-agent": "we-back-lock-desk" },
+      body: JSON.stringify({ query, variables }) });
+    const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch {}
+    return { status: r.status, json: j, head: j ? undefined : t.slice(0, 400) };
+  };
+  const ids = new Set([mine.roster_id, opp?.roster_id]);
+  const keep = new Set([...(mine.players || []), ...(oppRoster?.players || [])]);
+  const trimLeg = l => l && ({ ...l, player_map: l.player_map ? Object.fromEntries(Object.entries(l.player_map).filter(([p]) => keep.has(p))
+    .map(([p, v]) => [p, JSON.stringify(v).length > 2500 ? JSON.stringify(v).slice(0, 2500) : v])) : l.player_map });
+  const F = "round leg points picks players league_id roster_id custom_points proj_points max_points matchup_id starters starters_games bans subs player_map";
+  const probe = { at: new Date().toISOString(), week };
+  for (const name of ["matchup_legs_raw", "matchup_legs"]) {
+    const r = await gql(`query { ${name}(league_id: "${LEAGUE}", round: ${week}) { ${F} } }`);
+    const legs = r.json?.data?.[name];
+    probe[name] = { status: r.status, errors: r.json?.errors?.map(e => e.message).slice(0, 5), head: r.head,
+      legs: Array.isArray(legs) ? legs.filter(l => ids.has(l.roster_id)).map(trimLeg) : null };
+  }
+  const intro = await gql(`{ __type(name: "MatchupLeg") { fields { name type { name kind } } } }`);
+  probe.introspection = { status: intro.status, data: intro.json?.data ?? null, errors: intro.json?.errors?.map(e => e.message).slice(0, 3) };
+  const sug = await gql(`query { matchup_legs_raw(league_id: "${LEAGUE}", round: ${week}) { roster_id eligible ineligible lock_eligible } }`);
+  probe.suggestions = sug.json?.errors?.map(e => e.message).slice(0, 6) ?? sug.head;
+  fs.writeFileSync(stateFile("legs_probe.json"), JSON.stringify(probe, null, 1));
+  console.log("legs probe:", probe.matchup_legs_raw.status, probe.matchup_legs.status);
+} catch (e) { console.log("legs probe failed:", e.message); }
 console.log(`moves: ${out.adds.length} adds, ${out.trades.length} trades, ${items.length} new reasons requested`);
 void playerValue;
 
