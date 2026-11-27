@@ -156,6 +156,10 @@ fs.writeFileSync(stateFile("plan_debug.json"), JSON.stringify({ at: new Date().t
   // score totals from each Sleeper host, and the opponent slot by slot (Nov 15: his projected final came out below his
   // current score)
   points: { me: [my.points, ...(my.alt || []).map(a => a.points)], opp: opp ? [opp.points, ...(opp.alt || []).map(a => a.points)] : null },
+  // the Worker's own lineup records as /state served them (Nov 26: it samples both teams four times a minute)
+  worker_records: Object.fromEntries([["mine", backend.lineups], ["opp", backend.oppLineups]].map(([k, v]) => [k, v ? {
+    n: Object.keys(v).length, today: Object.keys(v).filter(x => x.startsWith(today)).length, benched: Object.keys(v).filter(x => v[x]?.benched).length,
+    latest: Object.values(v).map(r => r?.seen || "").sort().at(-1) || null } : null])),
   raw_rosters: { me: mine, opp: oppRoster || null },
   raw_matchups: { me: Object.fromEntries(Object.entries(my).filter(([k]) => k !== "alt" && k !== "players_points")), opp: opp ? Object.fromEntries(Object.entries(opp).filter(([k]) => k !== "alt" && k !== "players_points")) : null },
   opp_debug: oppWp ? { outlook: oppPlan.outlook, slots: oppPlan.slots.map(x => ({ slot: x.slot, name: x.name, action: x.action, score: x.score ?? null, detail: x.detail })),
