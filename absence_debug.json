@@ -1,0 +1,231 @@
+{
+ "player_games": 5039,
+ "this_week_top": [
+  {
+   "name": "Adem Bona",
+   "date": "2026-11-28",
+   "factor": 1.429,
+   "why": [
+    "LeBron James out: +2 min (+2 min when he sits, 2 games this season)",
+    "Jaylen Brown out: +2 min (+2 min when he sits, 2 games this season)"
+   ]
+  },
+  {
+   "name": "Jabari Walker",
+   "date": "2026-11-28",
+   "factor": 1.408,
+   "why": [
+    "Jaylen Brown out: +2 min (+3 min when he sits, 3 games this season)",
+    "Joel Embiid out: +2 min (+2 min when he sits, 4 games this season)"
+   ]
+  },
+  {
+   "name": "Kris Murray",
+   "date": "2026-11-29",
+   "factor": 1.391,
+   "why": [
+    "Cameron Boozer out: +3 min (+4 min when he sits, 4 games this season)",
+    "Jerami Grant out: +3 min (+4 min when he sits, 5 games this season)"
+   ]
+  },
+  {
+   "name": "Anfernee Simons",
+   "date": "2026-11-28",
+   "factor": 1.342,
+   "why": [
+    "Jaylen Brown out: +3 min (+4 min when he sits, 4 games this season)",
+    "Dean Wade out: +2 min (+3 min when he sits, 5 games this season)",
+    "LeBron James out: +2 min (+2 min when he sits, 4 games this season)"
+   ]
+  },
+  {
+   "name": "Olivier-Maxence Prosper",
+   "date": "2026-11-29",
+   "factor": 1.315,
+   "why": [
+    "Jerami Grant out: +2 min (+3 min when he sits, 5 games this season)",
+    "Cameron Boozer out: +2 min (+3 min when he sits, 4 games this season)"
+   ]
+  },
+  {
+   "name": "Kentavious Caldwell-Pope",
+   "date": "2026-11-28",
+   "factor": 1.293,
+   "why": [
+    "Jaylen Brown out: +2 min (+3 min when he sits, 4 games this season)",
+    "Dean Wade out: +2 min (+2 min when he sits, 5 games this season)",
+    "LeBron James out: +2 min (+2 min when he sits, 4 games this season)"
+   ]
+  },
+  {
+   "name": "Jordan Clarkson",
+   "date": "2026-11-29",
+   "factor": 1.282,
+   "why": [
+    "OG Anunoby may sit: +2 min (+3 min when he sits, 0 games this season)"
+   ]
+  },
+  {
+   "name": "Taylor Hendricks",
+   "date": "2026-11-29",
+   "factor": 1.265,
+   "why": [
+    "Jerami Grant out: +2 min (+3 min when he sits, 5 games this season)",
+    "Cameron Boozer out: +2 min (+3 min when he sits, 4 games this season)"
+   ]
+  },
+  {
+   "name": "Trayce Jackson-Davis",
+   "date": "2026-11-29",
+   "factor": 1.254,
+   "why": [
+    "RJ Barrett out: +2 min (+2 min when he sits, 3 games this season)"
+   ]
+  },
+  {
+   "name": "Allen Graves",
+   "date": "2026-11-29",
+   "factor": 1.241,
+   "why": [
+    "RJ Barrett out: +3 min (+4 min when he sits, 4 games this season)"
+   ]
+  },
+  {
+   "name": "Jaylin Sellers",
+   "date": "2026-11-28",
+   "factor": 1.225,
+   "why": [
+    "Caleb Wilson out: +2 min (+3 min when he sits, 1 game this season)"
+   ]
+  },
+  {
+   "name": "Jahmai Mashack",
+   "date": "2026-11-29",
+   "factor": 1.225,
+   "why": [
+    "Cameron Boozer out: +3 min (+3 min when he sits, 2 games this season)"
+   ]
+  },
+  {
+   "name": "Dean Wade",
+   "date": "2026-11-28",
+   "factor": 1.223,
+   "why": [
+    "Jaylen Brown out: +3 min (+3 min when he sits, 1 game this season)",
+    "LeBron James out: +2 min (+2 min when he sits, 4 games this season)"
+   ]
+  },
+  {
+   "name": "Ousmane Dieng",
+   "date": "2026-11-28",
+   "factor": 1.218,
+   "why": [
+    "Kyle Kuzma out: +3 min (+3 min when he sits, 0 games this season)",
+    "Jaime Jaquez Jr. out: +3 min (+3 min when he sits, 0 games this season)",
+    "Cormac Ryan back: -2 min"
+   ]
+  },
+  {
+   "name": "VJ Edgecombe",
+   "date": "2026-11-28",
+   "factor": 1.207,
+   "why": [
+    "LeBron James out: +2 min (+3 min when he sits, 4 games this season)",
+    "Joel Embiid out: +2 min (+3 min when he sits, 4 games this season)"
+   ]
+  },
+  {
+   "name": "Gary Trent Jr.",
+   "date": "2026-11-28",
+   "factor": 1.199,
+   "why": [
+    "Jaime Jaquez Jr. out: +3 min (+3 min when he sits, 0 games this season)",
+    "Cormac Ryan back: -2 min",
+    "Kyle Kuzma out: +2 min (+3 min when he sits, 1 game this season)"
+   ]
+  },
+  {
+   "name": "Tyrese Maxey",
+   "date": "2026-11-28",
+   "factor": 1.177,
+   "why": [
+    "LeBron James out: +2 min (+3 min when he sits, 4 games this season)",
+    "Joel Embiid out: +2 min (+3 min when he sits, 5 games this season)"
+   ]
+  },
+  {
+   "name": "Caris LeVert",
+   "date": "2026-11-28",
+   "factor": 1.17,
+   "why": [
+    "Jaime Jaquez Jr. out: +3 min (+3 min when he sits, 0 games this season)",
+    "Cormac Ryan back: -2 min",
+    "Kyle Kuzma out: +2 min (+3 min when he sits, 1 game this season)"
+   ]
+  },
+  {
+   "name": "Jericho Sims",
+   "date": "2026-11-28",
+   "factor": 1.169,
+   "why": [
+    "Jaime Jaquez Jr. out: +3 min (+3 min when he sits, 0 games this season)",
+    "Kyle Kuzma out: +2 min (+3 min when he sits, 1 game this season)",
+    "Cormac Ryan back: -2 min"
+   ]
+  },
+  {
+   "name": "Ryan Rollins",
+   "date": "2026-11-28",
+   "factor": 1.159,
+   "why": [
+    "Tyler Herro out: +3 min (+3 min when he sits, 1 game this season)",
+    "Kasparas Jaku\u010dionis out: +2 min (+2 min when he sits, 2 games this season)",
+    "Jaime Jaquez Jr. out: +2 min (+2 min when he sits, 0 games this season)"
+   ]
+  },
+  {
+   "name": "Joel Embiid",
+   "date": "2026-11-28",
+   "factor": 1.155,
+   "why": [
+    "LeBron James out: +3 min (+3 min when he sits, 3 games this season)"
+   ]
+  },
+  {
+   "name": "Cam Spencer",
+   "date": "2026-11-29",
+   "factor": 1.15,
+   "why": [
+    "Cameron Boozer out: +3 min (+3 min when he sits, 4 games this season)"
+   ]
+  },
+  {
+   "name": "Jamison Battle",
+   "date": "2026-11-29",
+   "factor": 1.144,
+   "why": [
+    "RJ Barrett out: +2 min (+2 min when he sits, 4 games this season)"
+   ]
+  },
+  {
+   "name": "AJ Green",
+   "date": "2026-11-28",
+   "factor": 1.139,
+   "why": [
+    "Kyle Kuzma out: +3 min (+3 min when he sits, 0 games this season)",
+    "Jaime Jaquez Jr. out: +3 min (+3 min when he sits, 0 games this season)",
+    "Cormac Ryan back: -2 min"
+   ]
+  },
+  {
+   "name": "Nate Ament",
+   "date": "2026-11-28",
+   "factor": 1.136,
+   "why": [
+    "Kyle Kuzma out: +3 min (+3 min when he sits, 1 game this season)",
+    "Jaime Jaquez Jr. out: +3 min (+3 min when he sits, 0 games this season)",
+    "Cormac Ryan back: -2 min"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,137 @@
+{
+ "listed": 106,
+ "worker_items": 11,
+ "current": 23,
+ "raised": [
+  {
+   "pid": "2521",
+   "name": "Quenton Jackson",
+   "team": "IND",
+   "from": null,
+   "to": "Out",
+   "comment": "Jackson has been ruled out for Saturday's game against the Bulls due to personal reasons.",
+   "at": "2026-11-28T19:12Z"
+  },
+  {
+   "pid": "4759",
+   "name": "Kasparas Jakucionis",
+   "team": "MIL",
+   "from": "GTD",
+   "to": "Out",
+   "comment": "Jakucionis (ankle) is out for Saturday's game against the Thunder.",
+   "at": "2026-11-28T19:45Z"
+  },
+  {
+   "pid": "2583",
+   "name": "Jaime Jaquez Jr.",
+   "team": "MIL",
+   "from": null,
+   "to": "Out",
+   "comment": "Jaquez has been ruled out for Saturday's game against Oklahoma City due to a right ankle impingement.",
+   "at": "2026-11-28T19:42Z"
+  },
+  {
+   "pid": "2086",
+   "name": "Tyler Herro",
+   "team": "MIL",
+   "from": null,
+   "to": "Out",
+   "comment": "Herro (foot) has been ruled out for Saturday's game against the Thunder.",
+   "at": "2026-11-28T19:37Z"
+  },
+  {
+   "pid": "1799",
+   "name": "Kyle Kuzma",
+   "team": "MIL",
+   "from": null,
+   "to": "Out",
+   "comment": "Kuzma has been ruled out for Saturday's game against the Thunder due to left foot soreness.",
+   "at": "2026-11-28T19:36Z"
+  },
+  {
+   "pid": "2590",
+   "name": "Anthony Black",
+   "team": "ORL",
+   "from": "GTD",
+   "to": "Out",
+   "comment": "Black (back soreness) has been ruled out for Saturday's game at Washington, Jason Beede of the Orlando Sentinel reports.",
+   "at": "2026-11-28T20:31Z"
+  },
+  {
+   "pid": "2008",
+   "name": "Dean Wade",
+   "team": "PHI",
+   "from": "GTD",
+   "to": "Out",
+   "comment": "Wade (hamstring) has been ruled out for Saturday's game against Houston.",
+   "at": "2026-11-28T19:23Z"
+  },
+  {
+   "pid": "2492",
+   "name": "Dominick Barlow",
+   "team": "PHI",
+   "from": null,
+   "to": "Out",
+   "comment": "Barlow is out for Saturday's game against the Rockets due to lower-back injury management.",
+   "at": "2026-11-28T19:17Z"
+  }
+ ],
+ "worker_changes": [
+  {
+   "k": "ORL|anthony black",
+   "name": "Anthony Black",
+   "team": "ORL",
+   "from": "Day-To-Day",
+   "to": "Out",
+   "at": "2026-11-28T20:40Z"
+  },
+  {
+   "k": "ORL|anthony black",
+   "name": "Anthony Black",
+   "team": "ORL",
+   "from": "Out",
+   "to": "Day-To-Day",
+   "at": "2026-11-28T20:39Z"
+  },
+  {
+   "k": "ORL|anthony black",
+   "name": "Anthony Black",
+   "team": "ORL",
+   "from": "Day-To-Day",
+   "to": "Out",
+   "at": "2026-11-28T20:38Z"
+  },
+  {
+   "k": "ORL|anthony black",
+   "name": "Anthony Black",
+   "team": "ORL",
+   "from": "Out",
+   "to": "Day-To-Day",
+   "at": "2026-11-28T20:35Z"
+  },
+  {
+   "k": "WAS|anthony davis",
+   "name": "Anthony Davis",
+   "team": "WAS",
+   "from": "Day-To-Day",
+   "to": "Day-To-Day",
+   "at": "2026-11-28T20:35Z"
+  },
+  {
+   "k": "ORL|anthony black",
+   "name": "Anthony Black",
+   "team": "ORL",
+   "from": "Day-To-Day",
+   "to": "Out",
+   "at": "2026-11-28T20:33Z"
+  },
+  {
+   "k": "WAS|anthony davis",
+   "name": "Anthony Davis",
+   "team": "WAS",
+   "from": null,
+   "to": "Day-To-Day",
+   "at": "2026-11-28T20:19Z"
+  }
+ ]
+}
