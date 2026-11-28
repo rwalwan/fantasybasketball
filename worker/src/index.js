@@ -4,16 +4,19 @@
 //    hasn't tipped, freeze that record at tip-off, and note any trip to the bench after tip (worker/src/lineup.js).
 //    This is what makes a game lock-eligible in Lock-In mode.
 // 2) Stores the answers and lock marks made on the site so phone and laptop agree.
+// 3) Sleeper's own lock record; 4) the last-minute injury watch (both below).
 //
 // Kept deliberately light (free-plan CPU budget): one small Sleeper call per sample; ESPN tip times
 // and the player->team map are fetched once a day and cached in KV.
 
 import { sampleLineups } from "./lineup.js";
+import { watchInjuries } from "./injuries.js";
 
 const LEAGUE = "1400915575915491328", USER = "1388708038000533504";
 const S1 = "https://api.sleeper.app/v1";
 const SITE = "https://rwalwan.github.io/fantasybasketball";
 const ESPN = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=";
+const ESPN_INJ = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/injuries";
 const ESPN_TEAM = { NY: "NYK", GS: "GSW", SA: "SAS", NO: "NOP", UTAH: "UTA", WSH: "WAS" };
 
 const json = (obj, status = 200) => new Response(JSON.stringify(obj), {
@@ -27,7 +30,7 @@ const kvGet = async (env, k, dflt) => (await env.KV.get(k, "json")) ?? dflt;
 async function dayInfo(env, date) {
   const key = `day_${date}`;
   let info = await kvGet(env, key, null);
-  if (info) return info;
+  if (info?.names) return info;                     // (a day cached before Nov 28 has no names: build it again once)
   const [state, players, sb] = await Promise.all([getJSON(`${S1}/state/nba`), getJSON(`${SITE}/static/players.json`),
                                                   getJSON(ESPN + date.replace(/-/g, ""))]);
   const tips = {};
@@ -35,7 +38,8 @@ async function dayInfo(env, date) {
     const a = c.team?.abbreviation; tips[ESPN_TEAM[a] || a] = e.date;
   }
   const team = Object.fromEntries(Object.entries(players).map(([pid, v]) => [pid, v[1]]));
-  info = { week: state.week, season: state.season, tips, team };
+  const names = Object.fromEntries(Object.entries(players).map(([pid, v]) => [pid, v[0]]));   // injury watch: name -> pid
+  info = { week: state.week, season: state.season, tips, team, names };
   await env.KV.put(key, JSON.stringify(info), { expirationTtl: 3 * 86400 });
   return info;
 }
@@ -136,6 +140,16 @@ async function sleeperLocks(env) {
   return { status, source, login_error: loginErr, weeks: out };
 }
 
+// 4) Every minute in the two hours before a tip: ESPN's injury report for the teams about to play (worker/src/injuries.js).
+//    A status change is saved (KV injuries_<date>, only on a change) and starts the update job at once (Nov 28).
+async function injuryWatch(env) {
+  const date = etDate(), info = await dayInfo(env, date), key = `injuries_${date}`;
+  const players = Object.fromEntries(Object.entries(info.team || {}).map(([pid, t]) => [pid, [info.names?.[pid] || "", t]]));
+  return watchInjuries({ fetchInjuries: () => getJSON(ESPN_INJ), tips: info.tips, now: new Date(), players,
+    prev: await kvGet(env, key, {}), save: v => env.KV.put(key, JSON.stringify(v), { expirationTtl: 3 * 86400 }),
+    kick: () => kickWorkflow(env) });
+}
+
 async function kickWorkflow(env) {
   let result;
   if (!env.GH_TOKEN) result = { ok: false, status: "no GH_TOKEN secret on the worker" };
@@ -158,6 +172,7 @@ export default {
   async scheduled(event, env, ctx) {
     ctx.waitUntil(snapshot(env).catch(e => console.log("snapshot failed", e.message)));
     ctx.waitUntil(sleeperLocks(env).catch(e => console.log("sleeper locks failed", e.message)));
+    ctx.waitUntil(injuryWatch(env).catch(e => console.log("injury watch failed", e.message)));
     if (new Date(event.scheduledTime).getUTCMinutes() % 15 === 0) ctx.waitUntil(kickWorkflow(env).catch(() => {}));
   },
 
@@ -168,11 +183,11 @@ export default {
       const season = url.searchParams.get("season"), week = url.searchParams.get("week");
       const [elig, locks, lineups, oppLineups] = await Promise.all([kvGet(env, "elig", {}), kvGet(env, `locks_w${week}`, {}),
         kvGet(env, `lineups_${season}_w${week}`, {}), kvGet(env, `opp_lineups_${season}_w${week}`, {})]);
-      const kick = await kvGet(env, "kick", null);
+      const [kick, injuries] = await Promise.all([kvGet(env, "kick", null), kvGet(env, `injuries_${etDate()}`, null)]);
       // Sleeper's lock record: usable only while the token works (status ok); the site and job fall back otherwise
       const [sl, slStatus] = await Promise.all([kvGet(env, `sleeper_locks_${season}_w${week}`, null), kvGet(env, "sleeper_locks_status", null)]);
       const sleeperLocks = sl ? { ...sl, status: slStatus?.status || sl.status, source: slStatus?.source || "login", since: slStatus?.since || null } : (slStatus ? { teams: null, ...slStatus } : null);
-      return json({ ok: true, elig, locks, lineups, oppLineups, kick, sleeperLocks, now: new Date().toISOString() });
+      return json({ ok: true, elig, locks, lineups, oppLineups, kick, sleeperLocks, injuries, now: new Date().toISOString() });
     }
     if (url.pathname === "/answer" && req.method === "POST") {
       if (req.headers.get("x-key") !== env.WRITE_KEY) return json({ error: "bad key" }, 401);
@@ -187,7 +202,7 @@ export default {
     }
     if (url.pathname === "/run") {                                    // manual trigger / health check: key required
       if (req.headers.get("x-key") !== env.WRITE_KEY) return json({ error: "bad key" }, 401);
-      return json({ snapshot: await snapshot(env), sleeperLocks: await sleeperLocks(env) });
+      return json({ snapshot: await snapshot(env), sleeperLocks: await sleeperLocks(env), injuries: await injuryWatch(env) });
     }
     if (url.pathname === "/kick" && req.headers.get("x-key") === env.WRITE_KEY) return json(await kickWorkflow(env));
     return json({ service: "lock-desk", ok: true });

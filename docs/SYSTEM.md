@@ -56,7 +56,7 @@ something measured in Sleeper's data, and the source is noted.
 | `tools/moves.mjs` | Same job, after `app.run` | Runs **the same engine as the site** (`site/engine.js`) to write the plan, waiver adds, trades, IR moves, AI reasons, win-chance log |
 | `app/learn.py`, `app/alerts.py` | Same job | Logs and grades decisions; sends phone alerts (ntfy) from the engine's own action list |
 | `site/` | GitHub Pages; recomputes **in the browser every minute** | The app Ryan uses (installable PWA). Loads `static/*.json` + live Sleeper + Worker + state branch |
-| `worker/` | Cloudflare Worker, cron **every minute** | Lineup samples four times a minute for Ryan **and his opponent** (lock eligibility, `worker/src/lineup.js`), Sleeper's lock record, stores site answers, kicks the update workflow every 15 min |
+| `worker/` | Cloudflare Worker, cron **every minute** | Lineup samples four times a minute for Ryan **and his opponent** (lock eligibility, `worker/src/lineup.js`), Sleeper's lock record, stores site answers, kicks the update workflow every 15 min. **Injury watch** (Nov 28, `worker/src/injuries.js`): in the 2 h before each tip, reads ESPN's injury report every minute for the teams about to play and kicks the update job on a status change |
 | `app/league_run.py` | **Other Lock-In leagues** workflow, daily 15:07 UTC (7:07 AM PST, 8:07 PDT) | Finds other Lock-In leagues, snapshots them, studies real managers' locks (bar calibration, opponent lock model) |
 | `research/` | By hand | Fits the constants in `app/data/*.json` from 2021-24 box scores (the factory numbers) |
 | `app/train.py` | **Train models** workflow, nightly 10:37 UTC (2:37 AM PST) | Refits each learned model, promotes a new version only if it's clearly better on held-out days, watches it 7 days, reverts if worse (section 5) |
@@ -85,6 +85,7 @@ RSS / news ──┘        └──> data/state/* ──> state branch ─┤
                                                           └─> tools/moves.mjs ─> plan.json, moves.json ─> alerts.py (ntfy)
 Worker (every minute): Sleeper lineup ─> KV lineups_<season>_w<week>   Sleeper GraphQL ─> KV sleeper_locks_*
                        site answers (lock marks, eligibility) ─> KV     /state endpoint ─> site + job
+                       ESPN injury report (2 h before tips) ─> KV injuries_<date> ─> kick update job on a change
 ```
 
 - The site reads `static/*.json` (from the last job), **live** Sleeper data (rosters, matchups, stats, projections), the
@@ -142,6 +143,36 @@ Worker (every minute): Sleeper lineup ─> KV lineups_<season>_w<week>   Sleeper
     a report about a finished game simply has no upcoming game left to affect. Rest days return to the healthy rate
     after (Nov 16, Queta; `test_nov16_news_out.py`). Only rostered players and injured players with a team are modeled.
   - The engine uses the job's curve only while the live Sleeper status still matches the status it was built for.
+  - **Team injury reports** (Nov 28): ESPN's public injury report, read by the Worker every minute in the 2 hours
+    before each tip (only the teams about to play; saved to KV `injuries_<date>` only on a change; the first read of a
+    team's report is recorded without a run; a player taken off the report = Available) and by the job once per run
+    (`app/injuries.py`, the Worker's copy first). On a status change the Worker starts the update job at once (at most
+    every 4 minutes), so projections, lineup moves and alerts follow in minutes instead of up to 15. A report only ever
+    makes a player **less** likely to play than Sleeper says, and only to Doubtful or Out (`escalateStatus` in
+    `engine.js`, `injuries.escalate` in the job; the site applies the Worker's copy with `Book.applyReports`). It never
+    clears a player Sleeper has out. Tests: `test_nov28_injury_watch.mjs`, `test_nov28_injuries.py`.
+- **Teammate absences → minutes** (Nov 28, `app/absence.py`; Fri Nov 27 Queta scored 70.5 from the bench with
+  Mitchell Robinson, a 17.5-minute center, out sick; every older teammate path counted only 20+ minute rotation
+  players, and the usage model was gated off). For each player and game in the next 4 weeks: every teammate who plays
+  10+ min counts. His minutes move by his own on/off record with that teammate (the current streak without him weighs
+  16x a game), shrunk (k = 70 games) toward a flat share of the teammate's minutes (10% for the same position group,
+  6% otherwise), times the chance the teammate sits tonight. His usual minutes already include games the teammate
+  missed, so a teammate coming back turns the boost into a cut; a traded teammate's minutes are gone for good.
+  Factor = new minutes / usual minutes, kept in 0.7-1.5. Written to `static/absence.json` (this week's games carry the
+  reasons, shown as a "minutes ±X%" chip on the Research tab) and `absence_debug.json`. Fitted by
+  `research/absence_fit.py` (`app/data/absence_model.json`). The factor is **not multiplied into the projection**:
+  this season the blend already prices absences on average (blend × factor: MAE +0.012, 95% interval -0.01 to 0.04).
+  It sets the game's **upside bucket** below. Test: `test_nov28_absence.py`.
+- **Upside by absence bucket** (Nov 28, `app/upside.py`, engine `Book.situB` / `situM` / `situQ`). On this season's
+  graded games, games the absence factor put at 1.35x+ went 1.5x their projection 41% of the time (13% for normal
+  games); 1.2-1.35x: 20%. So each game falls in a bucket by its factor (edges 0.9, 1.1, 1.2, 1.35). Each bucket has
+  quantile multipliers on the normal outcome range (19 quantiles, shrunk 100 games toward no change, learned from
+  graded games with the walk-forward factor of who actually sat). The bucket's mean multiplies `mu` that night only
+  (factory: 0.89 teammate back, 1.05 / 1.09 / 1.16 for more minutes); its shape stretches the range `Q`
+  (renormalized to mean 1, so the mean isn't counted twice). Lock values, starts, waivers and trades read both. The
+  normal bucket is untouched. The page gets it through `static/learned.json` `upside` (factory numbers from
+  `app/data/upside_model.json` until the nightly trainer promotes its own, section 5). A "▲ upside" chip marks
+  buckets 3-4 on the Research tab. Tests: `test_nov28_upside.mjs`, `test_nov28_upside_train.py`.
 - **Outcome** = `mu × R`, with `R` from 100 quantiles of the player's FP/G tier (`app/data/game_ratio_quantiles.json`,
   blended toward our own projection errors), widened or narrowed by the player's own spread (`app/volatility.py`).
 
@@ -243,11 +274,12 @@ self-calibration) apply when there is no learned file, no entry for a model, or 
 | `baseline` | season-start blend R, M, c (`app/model.py` `BASE`, engine `Book.baseline`) | box scores of every season available (`app/seasons.py`: 2021-23 research parquet, the last two seasons from Sleeper kept as `seasons/*.json.gz`, this season from `memory.sqlite`); checkpoints after 1, 2, 3, 5, 10 games, target = mean of his later games; newer seasons weigh more (x0.7 per season back); grid fit | absolute error (FP/G) | R 50-1000, M 0.5-12, c 0-60; R ±100, M ±2, c ±10 |
 | `spread` | per-player spread shrinkage a, k, m (`app/volatility.py`) | same seasons; players with 35+ games and mean 15+, checkpoints 0-40 games, target = spread of the rest of his season | squared error of r | a 0-1, k 5-400, m 0.8-1.1; a ±0.1, k ±40, m ±0.04 |
 | `wins_per_point` | trade value of a weekly point (engine `WINS_PER_SCORE`, 2.2) | final weeks of verified leagues in `leagues.sqlite`: chance that a matchup ends within 4% of the league-week's median score = 2 x 0.04 x wps; shrunk 200 matchups toward the current value | log loss | 1.2-4.0; ±0.3 |
+| `upside` | outcome range by teammate-absence bucket (section 4.1): 19 quantile multipliers per bucket vs the normal bucket | graded games of this season from `memory.sqlite`: target = FP / leave-one-day-out blend projection, bucket from the walk-forward absence factor (who actually sat); each multiplier shrunk 100 games toward 1, buckets under 20 games and the normal bucket stay 1 | pinball loss over the 19 quantiles | each multiplier 0.5-2.0; ±0.15 per promotion |
 | `win_chance` | temperature t on the win-chance z-score (page outlook and trade check: Φ(t·z)) | graded win-chance log (`winprob_log.json`), raw predictions (the log is never tempered); grid 0.5-2.0 | log loss | 0.5-2.0; ±0.25 |
 
 The job applies them at the start of each run (`app/run.py`: `play_first`, `return_rate` into the availability model;
 `apply_learned` puts `baseline` and `spread` into `model.BASE` / `volatility.M`, and writes `site/static/learned.json` =
-`{baseline, wins_per_score, win_temp}` for the page and `tools/moves.mjs`). Known limits: `win_chance` learns from the
+`{baseline, wins_per_score, win_temp, upside}` for the page and `tools/moves.mjs`; `upside` is always there, the factory copy when nothing is promoted or `LEARNING` is `off`). Known limits: `win_chance` learns from the
 logged win chance, which is a simpler model than the page's (see "Win chance" below), so it corrects the width of the ranges both share,
 not the page's extra logic. The usage model (`app/usage.py`) stays on its every-run gate below: its fit needs
 teammate-absence context that isn't archived per game yet.
@@ -288,6 +320,7 @@ Every-run loops:
 | `memory.sqlite` | Every player-game with context (minutes, rest, teammates out, projections before tip) |
 | `projlog_*.json`, `expert_scores*.json`, `proj_ratios.json` | Projection logging and grades |
 | `usage_log.json`, `usage_debug.json`, `value_debug.json` | Usage grades; this week's biggest usage factors; valuation debug |
+| `absence_debug.json`, `injuries_debug.json` | This week's biggest teammate-absence minute changes with reasons; injury-report statuses that raised a Sleeper label this run (Nov 28) |
 | `league_study.json`, `leagues.sqlite` | Other-league study and its data |
 | `winprob_log.json`, `alerts.json`, `reasons.json`, `kick.json` | Win-chance log, sent alerts, cached AI reasons, Worker kick status |
 | `site_check.json`, `step_health.json`, `mobile.png`, `mobile_matchup.png` | Health of the last run: page check, step outcomes, phone-width screenshots |
@@ -305,14 +338,15 @@ Every-run loops:
 
 **`site/static/`** (generated each run, not in git): `players`, `gamelog`, `priors`, `priors_min`, `participation`,
 `quantiles`, `volatility`, `league`, `tips`, `availability`, `usage`, `context`, `experts`, `news`, `claims`, `insights`,
-`league_study`, `moves`, `plan`, `learning`, `winprob`, `health`, `learned` (learned numbers for the engine, section 5).
+`league_study`, `moves`, `plan`, `learning`, `winprob`, `health`, `absence` (teammate-absence factors, section 4.1), `learned` (learned numbers for the engine, section 5).
 
 **`app/data/`** (fitted constants, refit with `research/`): `availability_model.json`, `baseline_model.json`,
-`usage_model.json`, `volatility_model.json`, `game_ratio_quantiles.json`.
+`usage_model.json`, `volatility_model.json`, `game_ratio_quantiles.json`, `absence_model.json` (`research/absence_fit.py`), `upside_model.json` (`research/boom_fit.py`; the upside trainer's factory).
 
 **Worker KV**: `lineups_<season>_w<week>`, `opp_lineups_<season>_w<week>`, `sleeper_locks_<season>_w<week>`,
-`sleeper_locks_status`, `elig`, `locks_w<week>`, `kick`, `day_<date>`, `league`, `my_roster`. Free plan: 1,000
-writes/day, so it writes only on change. `/state` returns `lineups` and `oppLineups`.
+`sleeper_locks_status`, `elig`, `locks_w<week>`, `kick`, `day_<date>`, `league`, `my_roster`, `injuries_<date>` (the
+injury watch: `{items, changes, kickedAt}`, 3-day expiry). Free plan: 1,000 writes/day, so it writes only on change.
+`/state` returns `lineups`, `oppLineups` and `injuries`.
 
 ## 7. Secrets and configuration
 Never in the repo. Names only:
@@ -337,11 +371,14 @@ Each of these can be re-checked. If new evidence overturns one, change it and up
 | Bars × calibration from real Lock-In leagues, only when its 95% interval excludes 0 and the study used the right volatility tiers | The Nov 10 ×0.90 came from a study bug (every player got the bench tier); as of Nov 25 the best scale is 1.05 with CI [-0.49, 0.68], so **no calibration is applied** (`studyBarScale` returns 1) | `league_study.json` `best_scale`, `tier_units`; `studyBarScale` |
 | The engine's lock rule beats real managers | as of Nov 10: +6.1% of projection (CI 2.5-9.7) | `league_study.json` `engine_minus_manager` |
 | Opponent modeled with real managers' lock rates, not the engine's | other-league study; `test_human_locks.mjs`, `test_nov15_opp_final.mjs` | `league_study.json` `lock_rate_eligible` |
-| Today's starters by expected points, not option value | option-value ranking benched stars for ~0.2-point edges inside model error | `test_today_pick.mjs` |
+| Today's starters by expected points, not option value; +0.5 to whoever is already in the slot | option-value ranking benched stars for ~0.2-point edges inside model error. Nov 28 (Fri Nov 27: White 34.8 + 0.5 kept UTIL over Queta 34.9, who scored 70.5): paired study, 300 weeks x 3 seeds. Dropping the +0.5: +0.98 pts/week (CI 0.07-1.88) on Ryan's roster, -0.06 (CI -1.20 to 1.08) and +0.15 (CI -0.88 to 1.17) on the default league; pooled about +0.36 (CI about -0.23 to 0.95). Weighting upside (0.25-1x option value): no seed's interval above 0. So nothing changed | `test_today_pick.mjs`; `node tools/today_study.mjs [weeks] [seed] [plan_debug.json]` |
 | Projection blend weights fitted on graded games (not inverse-MSE) | as of Nov 10: MAE 9.04 vs RotoWire 9.22, leave-one-day-out, n=1,995 | `experts.stack_weights`; `graded_rows` |
 | Per-minute baseline for the model | `research/baseline_fit.py`: MAE 4.63 → 4.54 | rerun the fit |
 | Per-player spread, shrunk hard | `research/volatility_fit.py`: small held-out gain | `output_vol.json` |
 | GTD/DTD play far more than the published 48% | as of Nov 10: GTD 78.5% (n=158), DTD 91% (n=35); now blended | `availability_log.json` calibration |
+| Teammates who play 10+ min count, by each player's own on/off record, shrunk toward a share of the teammate's minutes | Nov 28: walk-forward on 2021-24 box scores, each season held out in turn: FP error down 0.46 / 0.45 / 0.39 per game (95% intervals all below 0, ~23,000 games each); Robinson (17.5 min) was below the old 20-minute cut | `research/absence_fit.py`; `test_nov28_absence.py` |
+| Absences change the range (upside), not the average projection | Nov 28: this season the blend already prices absences on average (no MAE gain from multiplying it in), but 1.35x+ games went 1.5x their projection 41% of the time vs 13%; the upside fit lowered pinball loss on later days (-0.008, CI -0.012 to -0.005, 2,508 games) and did no harm on earlier ones (CI -0.004 to 0.003) | `research/boom_fit.py`; `upside_model.json` `fit` |
+| Team injury reports read every minute before tips, only toward sitting | Nov 16 Queta (ruled out 5:16 pm ET, Sleeper GTD 2+ h); the job runs every 15 min | `test_nov28_injury_watch.mjs`, `injuries_debug.json` |
 | News "ruled out" beats a lagging Sleeper label | Nov 16 Queta: ruled out 5:16 pm ET, Sleeper GTD for 2+ h | `test_nov16_news_out.py` |
 | Sleeper's lock record is authoritative when available | it's the app's own record; inference misread locks before (Oct 29, Nov 1, Nov 15) | `test_nov16_sleeper_locks.mjs` |
 | Public `matchup_legs_raw` lock record as the fallback when the token fails | Nov 27: identical to the logged-in record, 112 of 112 locks, all teams, weeks 5-6 | `lock_source_check.json` `summary` |
@@ -363,4 +400,8 @@ Each of these can be re-checked. If new evidence overturns one, change it and up
 - The logged win chance uses a simpler model than the displayed one (section 5).
 - Lineup records are samples (15 s apart): a bench trip shorter than that is invisible unless Ryan taps "Sleeper won't
   let me lock this". The opponent has no such button.
+- ESPN's injury report JSON layout is read defensively and wasn't verified from the sandbox (no network); the job log's
+  `injury reports:` line shows how many it read. Team names map to Sleeper codes by a fixed table.
+- The teammate-absence model has no depth chart and no lineup confirmations; it learns only from who actually played.
+  Its factor for Queta on Nov 27 was 1.09 (normal bucket), so the upside model alone wouldn't have flipped that start.
 - League and user ids are constants in `app/run.py`, `tools/moves.mjs`, `site/app.js` and `worker/src/index.js`.

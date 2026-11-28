@@ -1,0 +1,130 @@
+{
+ "share_same": 0.1,
+ "share_other": 0.06,
+ "k": 70,
+ "e": 1.0,
+ "lo": 0.7,
+ "hi": 1.5,
+ "streak": 16,
+ "note": "Teammate absences -> minutes (app/absence.py). Fitted by research/absence_fit.py on 2021-24 box scores; see 'fit' for the held-out checks.",
+ "fit": {
+  "loso": [
+   {
+    "test": "2021-22",
+    "params": {
+     "share_same": 0.1,
+     "share_other": 0.06,
+     "k": 70,
+     "streak": 16,
+     "e": 1.0
+    },
+    "rows": 22793,
+    "min_mae_gain": 0.637,
+    "fp_mae_gain": 0.459,
+    "fp_ci95": [
+     -0.526,
+     -0.394
+    ],
+    "moved_5pct": 13210,
+    "fp_mae_gain_moved": 0.775
+   },
+   {
+    "test": "2022-23",
+    "params": {
+     "share_same": 0.1,
+     "share_other": 0.06,
+     "k": 70,
+     "streak": 16,
+     "e": 1.0
+    },
+    "rows": 22949,
+    "min_mae_gain": 0.561,
+    "fp_mae_gain": 0.446,
+    "fp_ci95": [
+     -0.509,
+     -0.385
+    ],
+    "moved_5pct": 13245,
+    "fp_mae_gain_moved": 0.752
+   },
+   {
+    "test": "2023-24",
+    "params": {
+     "share_same": 0.1,
+     "share_other": 0.06,
+     "k": 120,
+     "streak": 128,
+     "e": 1.1
+    },
+    "rows": 23246,
+    "min_mae_gain": 0.555,
+    "fp_mae_gain": 0.385,
+    "fp_ci95": [
+     -0.44,
+     -0.334
+    ],
+    "moved_5pct": 13156,
+    "fp_mae_gain_moved": 0.661
+   }
+  ],
+  "params": {
+   "share_same": 0.1,
+   "share_other": 0.06,
+   "k": 70,
+   "streak": 16,
+   "e": 1.0,
+   "lo": 0.7,
+   "hi": 1.5
+  },
+  "this_season": {
+   "season": "2026",
+   "games": 5063,
+   "mae_current": 8.855,
+   "mae_with": 8.867,
+   "diff": 0.012,
+   "ci95": [
+    -0.01,
+    0.036
+   ],
+   "moved_5pct": 1842,
+   "mae_moved_current": 8.876,
+   "mae_moved_with": 8.897,
+   "weights_current": [
+    0.56,
+    0.24,
+    0.2
+   ],
+   "weights_with": [
+    0.5,
+    0.36,
+    0.14
+   ],
+   "queta": [
+    [
+     "2026-11-15",
+     0.968
+    ],
+    [
+     "2026-11-18",
+     0.973
+    ],
+    [
+     "2026-11-21",
+     1.231
+    ],
+    [
+     "2026-11-22",
+     1.138
+    ],
+    [
+     "2026-11-24",
+     1.059
+    ],
+    [
+     "2026-11-27",
+     1.092
+    ]
+   ]
+  }
+ }
+}

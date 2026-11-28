@@ -112,8 +112,8 @@ gh run view <run-id> --log | grep -i "availability\|news\|error"        # what t
 | What the page shows, tabs, wording | `site/app.js`, `site/index.html` (inline CSS) |
 | Phone alerts | `app/alerts.py` (reads `site/static/plan.json` / `moves.json` from `tools/moves.mjs`) |
 | Waivers, trades, IR | `site/engine.js` (`Valuer`, `tradeIdeas`, `waiverMoves`, `irMoves`) + `tools/moves.mjs` |
-| Will he play (injury designations, news timelines) | `app/availability.py`, `app/news.py` |
-| Projections | `app/model.py`, `app/experts.py`, `app/memory.py` (context), `app/usage.py`, `app/volatility.py` |
+| Will he play (injury designations, news timelines, team injury reports) | `app/availability.py`, `app/news.py`, `app/injuries.py`, `worker/src/injuries.js` |
+| Projections | `app/model.py`, `app/experts.py`, `app/memory.py` (context), `app/usage.py`, `app/absence.py` (teammates out → minutes), `app/upside.py` (range by absence), `app/volatility.py` |
 | Lock eligibility records | `worker/src/lineup.js` (samples four times a minute, both teams), `worker/src/index.js`, `app/lineups.py`, engine `eligFromSnaps` / `lockState`, the site's "won't lock" button (`app.js`) |
 | Sleeper's own lock record | `worker/src/index.js` (`sleeperLocks`), engine `sleeperLocksFor` / `lockState` |
 | Other-league study (bar calibration, opponent lock rates) | `app/leagues.py`, `app/league_study.py`, `app/league_run.py` |

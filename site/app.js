@@ -67,7 +67,7 @@ async function loadLive() {
   const { week, league } = base, season = league.season;
   const days = weekDays(base.schedule, week), today = etToday();
   const tipDays = days.filter(d => d >= today || d === days.find(x => x >= today));
-  const [schedule, rosters, matchups, stats, proj, trending, snapsGh, overridesGh, locksGh, oppSnaps, backend, tips, news, claims, moves, context, insights, learning, avail, usage, others, health, winprob] = await Promise.all([
+  const [schedule, rosters, matchups, stats, proj, trending, snapsGh, overridesGh, locksGh, oppSnaps, backend, tips, news, claims, moves, context, insights, learning, avail, usage, others, health, winprob, absence] = await Promise.all([
     get(`${S2}/schedule/nba/regular/${season}`).catch(() => base.schedule),
     get(`${S1}/league/${LEAGUE}/rosters`), get(`${S1}/league/${LEAGUE}/matchups/${week}`).then(async m => mergeMatchups(m, [await get(`https://api.sleeper.com/v1/league/${LEAGUE}/matchups/${week}`).catch(() => null)])),
     get(`${S2}/stats/nba/${season}/${week}?season_type=regular`), get(`${S2}/projections/nba/${season}/${week}?season_type=regular`),
@@ -86,7 +86,8 @@ async function loadLive() {
     get(`static/usage.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({})),
     get(`static/league_study.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => null),
     get(`static/health.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({})),
-    get(`static/winprob.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => null)]);
+    get(`static/winprob.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => null),
+    get(`static/absence.json?_=${Math.floor(Date.now() / 60000)}`).catch(() => ({}))]);
   // backend (minute-level lineup records, shared answers) wins over the 15-minute GitHub state branch
   const snaps = mergeSnaps(snapsGh, backend.lineups);
   // the opponent's too (Nov 26: the Worker samples both lineups four times a minute; the state branch has the job's 15-minute copy)
@@ -94,7 +95,7 @@ async function loadLive() {
   const overrides = { ...overridesGh, ...(backend.elig || {}) };
   const locks = { ...locksGh, ...(backend.locks || {}) };
   base.schedule = schedule;
-  live = { rosters, matchups, stats, proj, trending, snaps, oppSnaps: oppSnapsAll, overrides, locks, tips, news, claims, moves, context, insights, learning, avail, usage, others, health, winprob, backend: !!backend.ok, sleeperLocks: backend.sleeperLocks || null, at: new Date() };
+  live = { rosters, matchups, stats, proj, trending, snaps, oppSnaps: oppSnapsAll, overrides, locks, tips, news, claims, moves, context, insights, learning, avail, usage, others, health, winprob, absence, backend: !!backend.ok, injuries: backend.injuries?.items || null, sleeperLocks: backend.sleeperLocks || null, at: new Date() };
   void tipDays;
 }
 
@@ -115,9 +116,10 @@ const STYLE = v => v <= -0.15 ? "Safest: lock early" : v < 0 ? "Safer: lock more
 function compute() {
   const book = new Book({ scoring: base.league.scoring_settings, players: base.players, priors: base.priors,
                           gamelog: base.gamelog.games, weights: base.experts.weights, ctx: live.context || {}, avail: live.avail, usage: live.usage, vol: base.vol, priorMin: base.priorMin, part: base.part,
-                          baseline: base.learnedNums?.baseline, winTemp: base.learnedNums?.win_temp });
+                          baseline: base.learnedNums?.baseline, winTemp: base.learnedNums?.win_temp, upside: base.learnedNums?.upside, absence: live.absence });
   bookRef = book;
   book.addStats(live.stats); book.addProjections(live.proj);
+  book.applyReports(live.injuries);            // team injury reports read every minute before tips (Nov 28)
   const mine = live.rosters.find(r => r.owner_id === USER);
   const my = live.matchups.find(m => m.roster_id === mine.roster_id);
   const opp = live.matchups.find(m => m.matchup_id === my.matchup_id && m.roster_id !== mine.roster_id);
@@ -442,10 +444,14 @@ function researchRows(c, roster, who) {
       const [lo, hi] = range80(g.Q || base.Q, g.mu);
       const chips = (cx?.parts || []).map(x => `<span class="chip ${x.f >= 1 ? "up" : "down"}" title="${esc(x.why)}">${esc(x.k)} ${x.f >= 1 ? "+" : ""}${Math.round((x.f - 1) * 100)}%</span>`).join(" ");
       const us = live.usage?.[p]?.[g.date], uChip = us && Math.abs(us[0] - 1) >= 0.02 ? ` <span class="chip ${us[0] >= 1 ? "up" : "down"}" title="${esc((us[1] || []).join("; ") || "teammates out")}">usage ${us[0] >= 1 ? "+" : ""}${Math.round((us[0] - 1) * 100)}%</span>` : "";
+      // Nov 28: teammates out -> minutes (app/absence.py), and the upside bucket it puts the game in (app/upside.py)
+      const ab = live.absence?.[p]?.[g.date], sb = book.situB(p, g.date);
+      const aChip = ab && Math.abs(ab[0] - 1) >= 0.05 ? ` <span class="chip ${ab[0] >= 1 ? "up" : "down"}" title="${esc((ab[1] || []).join("; ") || "teammates out")}${ab[2] ? ` (about ${Math.round(ab[2])} min vs his usual ${Math.round(ab[3])})` : ""}">minutes ${ab[0] >= 1 ? "+" : ""}${Math.round((ab[0] - 1) * 100)}%</span>` : "";
+      const sChip = sb != null && sb >= 3 ? ` <span class="chip up" title="Games like this (teammates out, ${sb >= 4 ? "35" : "20"}%+ more minutes) have gone 1.5x their projection far more often than usual">▲ upside</span>` : "";
       rows.push(`<tr><td>${k ? "" : esc(book.name(p))}${!k && book.status(p) ? `<span class="st">${esc(book.status(p))}</span>` : ""}${!k && tr ? ` <span class="chip ${tr.dir === "up" ? "up" : "down"}" title="${esc(tr.why)}">${tr.dir === "up" ? "▲" : "▼"} role</span>` : ""}</td>` +
         `<td class="pos">${k ? "" : esc(book.pos(p).join("/"))}</td><td>${esc(day(g.date))} ${g.b2b ? '<span class="pos">b2b</span>' : ""} <span class="pos">vs ${esc(g.opp)}${g.tip ? " · " + esc(tipTime(g.tip)) : ""}</span></td>` +
         `<td class="n"><b>${r1(g.mu)}</b></td><td class="n pos">${rw ? r1(rw) : "–"} / ${r1(mdl)} / ${cx ? r1(mdl * cx.f) : "–"}</td><td class="n">${lo}–${hi}</td>` +
-        `<td style="white-space:normal">${chips || uChip ? chips + uChip : '<span class="pos">neutral</span>'}</td><td class="pos" title="${esc((live.avail?.players?.[p]?.basis ? "Play chance: " + live.avail.players[p].basis + ". " : "") + riskWhy)}">${k ? "" : risk} · ${Math.round(g.q * 100)}%${!k && live.avail?.players?.[p]?.timeline ? " ⏱" : ""}</td>` +
+        `<td style="white-space:normal">${chips || uChip || aChip || sChip ? chips + uChip + aChip + sChip : '<span class="pos">neutral</span>'}</td><td class="pos" title="${esc((live.avail?.players?.[p]?.basis ? "Play chance: " + live.avail.players[p].basis + ". " : "") + riskWhy)}">${k ? "" : risk} · ${Math.round(g.q * 100)}%${!k && live.avail?.players?.[p]?.timeline ? " ⏱" : ""}</td>` +
         `<td style="white-space:normal;min-width:220px">${k ? "" : takeCell(p)}</td></tr>`);
     });
   }

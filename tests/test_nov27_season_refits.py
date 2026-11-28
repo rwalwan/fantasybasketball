@@ -175,7 +175,7 @@ assert wc.step({"t": 1.0}, {"t": 1.6}) == {"t": 1.25}
 print("ok: win chance learns a temperature above 1 when favorites win more than predicted:", t)
 
 # --- the job puts the learned numbers where they are used ---------------------------------------------------------------
-from app import run, model, volatility
+from app import run, model, volatility, upside
 json.dump({"models": {"baseline": {"params": {"R": 300.0, "M": 6.0, "c": 10.0}},
                       "spread": {"params": {"a": 0.3, "k": 80.0, "m": 0.94}},
                       "wins_per_point": {"params": {"wps": 2.5}}, "win_chance": {"params": {"t": 1.25}}}, "log": []},
@@ -188,12 +188,14 @@ try:
     assert (model.BASE["R_minutes"], model.BASE["M_games"]) == (300.0, 6.0)
     assert (volatility.M["a_prev"], volatility.M["k_games"]) == (0.3, 80.0)
     out = json.load(open(os.path.join(run.ROOT, "site", "static", "learned.json")))
+    fac = upside.for_page(upside.factory())        # Nov 28: the upside model always rides along (factory until promoted)
+    assert out.pop("upside") == json.loads(json.dumps(fac))
     assert out == {"baseline": {"R": 300.0, "M": 6.0, "c": 10.0}, "wins_per_score": 2.5, "win_temp": 1.25}, out
     os.environ["LEARNING"] = "off"
     model.BASE.update(keep_b); volatility.M.update(keep_v)
     run.apply_learned()
     assert model.BASE["R_minutes"] == keep_b["R_minutes"]
-    assert json.load(open(os.path.join(run.ROOT, "site", "static", "learned.json"))) == {}
+    assert json.load(open(os.path.join(run.ROOT, "site", "static", "learned.json"))) == {"upside": json.loads(json.dumps(fac))}
 finally:
     os.environ.pop("LEARNING", None)
     learned.STATE, run.ROOT = old_state, old_root

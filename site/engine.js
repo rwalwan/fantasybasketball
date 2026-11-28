@@ -83,6 +83,15 @@ export function tierQ(tiers, base, fallback) {
 export const lockBar = (Q, after) => (after.length ? contValues(Q, after)[0] : 0);
 export const range80 = (Q, mu) => [Math.round(mu * Q[10] * 10) / 10, Math.round(mu * Q[89] * 10) / 10];
 
+// Nov 28 (injury watch, worker/src/injuries.js): escalate a Sleeper status with a fresher injury report, only toward
+// "less likely to play" and only to Doubtful or Out (a report can be ahead of Sleeper's label; taking a player OFF a
+// Sleeper label on its say-so would be the riskier mistake). Same rule as app/injuries.py escalate.
+const INJ_RANK = { null: 0, "": 0, Available: 0, Probable: 1, "Day-To-Day": 2, DTD: 2, GTD: 2, Questionable: 2, Doubtful: 3, Out: 4 };
+export function escalateStatus(sleeperStatus, reportStatus) {
+  const r = INJ_RANK[reportStatus] ?? 0, s = INJ_RANK[sleeperStatus ?? ""] ?? 4;   // IR, Suspended, NA...: already out
+  return r > s && (reportStatus === "Out" || reportStatus === "Doubtful") ? reportStatus : null;
+}
+
 // ---------- player book ----------
 const STATUS_Q = { Probable: 0.9, "Day-To-Day": 0.75, GTD: 0.6, Questionable: 0.55, Doubtful: 0.2,
   Out: 0, IR: 0, Suspended: 0, NA: 0, DNR: 0, COV: 0 };
@@ -95,11 +104,15 @@ export const RETURN_RAMP = [0.86, 0.96];
 // Sleeper's published docs (review 2), so actual spending also counts: any roster with waiver_budget_used > 0.
 export const usesFaab = (settings, rosters = []) => settings?.waiver_type === 2 || rosters.some(r => (r?.settings?.waiver_budget_used || 0) > 0);     // tip to final: used for relief sequencing AND when a relief swap is safe
 export const B2B_FACTOR = 0.93, PRIOR_GAMES = 8;   // b2b/non-b2b play-rate ratio (availability_model.json)
+// today's starters: expected points, + TODAY_KEEP for whoever is already in the slot, + TODAY_UPSIDE x the game's
+// option value over the slot's keep-line. Nov 28 study (tools/today_study.mjs, 900 paired weeks, 3 seeds): no other
+// keep bonus or upside weight was better on more than one seed (SYSTEM.md section 8), so these stay
+export const TODAY_KEEP = 0.5, TODAY_UPSIDE = 1e-3;
 // per-minute baseline and participation (BASELINE: copy of app/data/baseline_model.json, checked by tests/test_baseline.py)
 export const BASELINE = { R: 200, M: 4, c: 10, part: [0.130, 0.366, 0.474, 0.607, 0.748, 0.929] };
 
 export class Book {
-  constructor({ scoring, players, priors, gamelog, weights, ctx, avail, usage, vol, priorMin, part, baseline, winTemp }) {
+  constructor({ scoring, players, priors, gamelog, weights, ctx, avail, usage, vol, priorMin, part, baseline, winTemp, absence, upside }) {
     // R, M, c the nightly trainer promoted (static/learned.json, app/train_models.py Baseline); factory BASELINE otherwise
     this.bl = { ...BASELINE, ...(baseline || {}) };
     // win-chance temperature the nightly trainer promoted (app/train_models.py WinChance): z x winTemp; 1 = as computed
@@ -108,6 +121,11 @@ export class Book {
     this.part = part || {};              // pid -> play-rate factor from recent participation (healthy players who sat)
     this.vol = vol || {};                // pid -> r: his own game-to-game spread vs his tier's (app/volatility.py)
     this.usage = usage || {};            // pid -> {date: [factor, reasons?]} teammates out etc. (app/usage.py)
+    // Nov 28 (Queta / Robinson): teammate absences -> minutes (app/absence.py: pid -> {date: [f, reasons?, min, usual]})
+    // and the upside model (app/upside.py, via static/learned.json): each absence bucket's outcome range
+    this.absence = absence || {};
+    this.upside = upside || null;
+    this._situ = new Map();
     this.avail = avail || null;          // {model, players: {pid: {status, q: {date: p}}}} (app/availability.py)
     this.sc = scoring;
     this.ctx = ctx || {};                                 // "pid|date" -> {f, parts} matchup context (app/memory.py)
@@ -129,6 +147,19 @@ export class Book {
     if (p.fantasy_positions) m.pos = p.fantasy_positions;
     if ("injury_status" in p) m.status = p.injury_status;
   }
+  // Nov 28: the Worker's minute-by-minute read of ESPN's injury report (worker/src/injuries.js) can be ahead of
+  // Sleeper's label by hours (Nov 16, Queta). A report only ever moves a player toward sitting (escalateStatus).
+  // items = {"TEAM|name": {pid, status, ...}}. Returns the players changed.
+  applyReports(items) {
+    const out = [];
+    for (const it of Object.values(items || {})) {
+      const m = it?.pid && this.meta[it.pid];
+      if (!m || (m.team && it.team && m.team !== it.team)) continue;
+      const st = escalateStatus(m.status, it.status);
+      if (st) { out.push({ pid: it.pid, from: m.status || null, to: st }); m.status = st; }
+    }
+    return out;
+  }
   addStats(rows) {
     for (const r of rows || []) {
       this._meta(r);
@@ -149,6 +180,29 @@ export class Book {
     }
   }
   usageF(p, date) { return this.usage?.[p]?.[date]?.[0] ?? 1; }
+  absF(p, date) { return this.absence?.[p]?.[date]?.[0] ?? 1; }
+  // which upside bucket a game is in (app/upside.py bucket: count of edges at or below f); null = no model
+  situB(p, date) {
+    const U = this.upside; if (!U?.edges) return null;
+    const f = this.absF(p, date); return U.edges.filter(e => f >= e).length;
+  }
+  // the bucket's average outcome multiplier: the projection moves by this much (1 in the normal bucket)
+  situM(p, date) { const b = this.situB(p, date); return b == null ? 1 : (this.upside.mean?.[b] ?? 1); }
+  // the bucket's outcome range: each quantile of Q times the bucket's multiplier at that level, re-sorted and
+  // rescaled to mean 1 (the mean already moved the projection through situM)
+  situQ(p, date, Q) {
+    const b = this.situB(p, date), g = b == null ? null : this.upside.g?.[b];
+    if (!g || g.every(v => v === 1)) return Q;
+    let byQ = this._situ.get(b); if (!byQ) this._situ.set(b, byQ = new Map());
+    if (byQ.has(Q)) return byQ.get(Q);
+    const t = this.upside.taus, n = Q.length;
+    const at = tau => { if (tau <= t[0]) return g[0]; if (tau >= t.at(-1)) return g.at(-1);
+      const i = t.findIndex(x => x >= tau); return g[i - 1] + (g[i] - g[i - 1]) * (tau - t[i - 1]) / (t[i] - t[i - 1]); };
+    const v = Q.map((x, k) => x * at((k + 0.5) / n)).sort((a, c) => a - c), m = v.reduce((a, c) => a + c, 0) / n;
+    const out = m > 0 ? v.map(x => x / m) : Q;
+    byQ.set(Q, out);
+    return out;
+  }
   name(p) { return this.meta[p]?.name || p; }
   team(p) { return this.meta[p]?.team; }
   pos(p) { return this.meta[p]?.pos || []; }
@@ -184,7 +238,7 @@ export class Book {
     if (this.w.usage) srcs.push([this.w.usage, base * this.usageF(p, date)]);
     let tw = srcs.reduce((a, [w]) => a + w, 0);
     if (tw <= 0) { srcs.splice(0, srcs.length, [1, base]); tw = 1; }   // weighted sources missing (no RotoWire line): model
-    return Math.round((srcs.reduce((a, [w, v]) => a + w * v, 0) / tw) * (this.w.scale ?? 1) * 10) / 10;
+    return Math.round((srcs.reduce((a, [w, v]) => a + w * v, 0) / tw) * (this.w.scale ?? 1) * this.situM(p, date) * 10) / 10;
   }
   // P(he plays that game). From the job's availability model when it matches his current status (designation
   // rates, reported return timelines, historical return hazard); otherwise the same model from status alone,
@@ -393,7 +447,7 @@ export class WeekPlan {
     const ramp = gone >= 5 && !OUT.has(this.b.status(p)) ? RETURN_RAMP : [];
     return this.teamDays(t).filter(d => !done.has(d) && !this.tipped(p, d)).map((d, j) => {
       const b2b = all.includes(addDays(d, -1));
-      return { date: d, mu: ramp[j] ? Math.round(this.b.gameMu(p, d) * ramp[j] * 10) / 10 : this.b.gameMu(p, d), q: this.b.playProb(p, dayDiff(d, this.today), b2b, d, j), Q: this.qOf(p),
+      return { date: d, mu: ramp[j] ? Math.round(this.b.gameMu(p, d) * ramp[j] * 10) / 10 : this.b.gameMu(p, d), q: this.b.playProb(p, dayDiff(d, this.today), b2b, d, j), Q: this.b.situQ(p, d, this.qOf(p)),
                opp: this.tg[t][d].opp, b2b, tip: this.tip(p, d) };
     });
   }
@@ -777,6 +831,7 @@ export class WeekPlan {
       const cands = gameOn[this.today] || [];
       const M = cands.map(c => (laterU[c.p]?.length ? Math.max(0, base.total - planLater(c.p).total) : 0));
       oppCost = Object.fromEntries(cands.map((c, ci) => [c.p, M[ci]]));
+      const keepB = opts.keepBonus ?? TODAY_KEEP, upW = opts.upsideW ?? TODAY_UPSIDE;
       const val = (k, ci) => { const T = base.Ws[k] + M[ci], g = cands[ci].g; return g.q * expectedMax(g.Q || Q, g.mu, T) + (1 - g.q) * T - T; };
       const m = freePlans.map((pl, k) => cands.map((c, ci) => {
         if (!fits(pl.x.s, this.b.pos(c.p))) return null;
@@ -784,7 +839,7 @@ export class WeekPlan {
         // today's starters are simply the best expected games today across every slot each player fits; the
         // opportunity cost only sets the keep-line. (Ranking by option value instead benched Luka and Durant for
         // ~0.2-point edges inside the model's error.) Ties: whoever is already in the slot.
-        return cands[ci].g.mu * cands[ci].g.q + (c.p === pl.x.p ? 0.5 : 0) + 1e-3 * val(k, ci);
+        return cands[ci].g.mu * cands[ci].g.q + (c.p === pl.x.p ? keepB : 0) + upW * val(k, ci);
       }));
       this.lastToday = freePlans.map((pl, k) => [pl.x.s, Math.round(base.Ws[k] * 10) / 10, cands.map((c, ci) => m[k][ci] == null ? null : [this.b.name(c.p), Math.round(M[ci] * 10) / 10, Math.round(m[k][ci] * 100) / 100]).filter(Boolean)]);
       const todayPick = cands.length ? maxAssign(m) : [];
@@ -1062,7 +1117,8 @@ export class Valuer {
       const games = all.filter(d => days.includes(d)).map(d => {
         const prev = new Date(d + "T12:00:00Z"); prev.setUTCDate(prev.getUTCDate() - 1);
         const q = this.b.playProb(p, null, all.includes(prev.toISOString().slice(0, 10)), d, ahead.indexOf(d));
-        return { mu: base * this.b.usageF(p, d), q, Q: Qp };    // usage: teammates out in the next 4 weeks
+        // usage: teammates out in the next 4 weeks; upside bucket: absences' effect on the mean and the range
+        return { mu: base * this.b.usageF(p, d) * this.b.situM(p, d), q, Q: this.b.situQ(p, d, Qp) };
       });
       return games.length ? contValues(this.Q, games)[0] : 0;
     });

@@ -13,6 +13,7 @@ from . import experts
 from . import news as newsmod
 from . import memory, insights, availability, learned
 from . import usage as usagemod
+from . import absence as absencemod, upside as upsidemod, injuries as injuriesmod
 from .engine import free_agent_watch, team_game_dates, week_dates
 from . import volatility
 from .scoring import fantasy_points
@@ -113,6 +114,18 @@ def main():
     slots = [s for s in lg["roster_positions"] if s not in ("BN", "IR")]
     tracker = LineupTracker(season, week)
     backend = fetch_backend(season, week)
+    # Nov 28: injury reports fresher than Sleeper's labels (the Worker's minute-by-minute copy before tips, else our
+    # own read of ESPN's report) raise a player's status to Doubtful/Out before play chances are built (app/injuries.py)
+    try:
+        reports = ((backend.get("injuries") or {}).get("items")) or injuriesmod.fetch()
+        esc = injuriesmod.apply(meta, reports, newsmod.Names(meta))
+        print(f"injury reports: {len(reports)} listed, {len(esc)} raised over Sleeper's label"
+              + (": " + ", ".join(f"{e['name']} {e['from'] or 'healthy'} -> {e['to']}" for e in esc[:8]) if esc else ""))
+        with open(os.path.join(ROOT, "data", "state", "injuries_debug.json"), "w") as f:
+            json.dump({"source": "worker" if (backend.get("injuries") or {}).get("items") else "job", "listed": len(reports),
+                       "raised": esc, "worker_changes": (backend.get("injuries") or {}).get("changes", [])[:20]}, f, indent=1)
+    except Exception as e:
+        print("injury reports unavailable:", e, file=sys.stderr)
     if backend.get("kick"):
         os.makedirs(os.path.join(ROOT, "data", "state"), exist_ok=True)
         with open(os.path.join(ROOT, "data", "state", "kick.json"), "w") as f:
@@ -205,6 +218,28 @@ def main():
     except Exception as e:
         print("usage failed:", e, file=sys.stderr)
 
+    # teammate absences -> minutes (app/absence.py, Nov 28: Queta / Robinson): every player's factor for each of his
+    # team's games in the next 4 weeks, from his on/off record and his teammates' play chances; and the upside model
+    # (app/upside.py: the outcome range by absence bucket; the nightly trainer's version when it has promoted one)
+    try:
+        prof = prof if "prof" in dir() else usagemod.profiles(season_rows, prev_rows if "prev_rows" in dir() else [])
+        horizon = horizon if "horizon" in dir() else {g["date"] for g in sched if today <= g["date"]}
+        apids = {p for p, m in meta.items() if m.get("team") and (book.games.get(p) or any(k[0] == p for k in book.proj))}
+        am = absencemod.build(con, season, meta, prof, team_game_dates(sched), horizon, av if "av" in dir() else {}, apids,
+                              book.name, availability.healthy_at, today)
+        absence_out = {}
+        for (p, d), (f, why, m, mh) in am.items():
+            if abs(f - 1) >= 0.01:
+                absence_out.setdefault(p, {})[d] = [f, why, m, mh] if d in days else [f]
+        with open(os.path.join(ROOT, "site", "static", "absence.json"), "w") as f:
+            json.dump(absence_out, f, separators=(",", ":"))
+        top = sorted(((f, book.name(p), d, why) for (p, d), (f, why, m, mh) in am.items() if d in days and why), reverse=True)[:25]
+        with open(os.path.join(ROOT, "data", "state", "absence_debug.json"), "w") as f:
+            json.dump({"player_games": len(am), "this_week_top": [dict(name=n, date=d, factor=f, why=w) for f, n, d, w in top]}, f, indent=1)
+        print(f"absence: {len(am)} player-games, {sum(len(v) for v in absence_out.values())} moved 1%+")
+    except Exception as e:
+        print("absence failed:", e, file=sys.stderr)
+
     # blend weights fitted to graded games (finding 3: inverse-MSE let two near-duplicate sources outvote RotoWire)
     w = experts.stack_weights(experts.graded_rows(con, season))
     scores = experts.update(book, season, week, tips, w=w)
@@ -292,7 +327,8 @@ SCHED_CACHE = {}
 def apply_learned():
     """Season-level numbers the nightly trainer promoted (app/train_models.py Baseline, Spread): put them in the
     modules that use them, and write site/static/learned.json for the browser and tools/moves.mjs. No learned file or
-    LEARNING=off: the factory numbers (app/data) stay and learned.json says so."""
+    LEARNING=off: the factory numbers (app/data) stay and learned.json says so (it then carries only the factory
+    upside model, app/data/upside_model.json, which the page has no other copy of)."""
     from . import model
     out = {}
     bl = learned.get("baseline")
@@ -312,6 +348,11 @@ def apply_learned():
     if wt:
         out["win_temp"] = wt["t"]
         print("learned win-chance temperature:", wt["t"])
+    # upside model: always sent to the page (factory numbers until the trainer promotes its own)
+    up = learned.get("upside") or upsidemod.factory()
+    if up:
+        out["upside"] = upsidemod.for_page(up)
+        print("upside model:", "learned" if learned.get("upside") else "factory", {k: round(v, 3) for k, v in out["upside"]["mean"].items()})
     os.makedirs(os.path.join(ROOT, "site", "static"), exist_ok=True)
     with open(os.path.join(ROOT, "site", "static", "learned.json"), "w") as f:
         json.dump(out, f, separators=(",", ":"))

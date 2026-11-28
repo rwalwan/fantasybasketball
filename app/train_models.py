@@ -533,4 +533,69 @@ class WinChance(Model):
                 + ("(favorites win more often than the ranges said)." if new["t"] > old["t"] else "(upsets happen more often than the ranges said)."))
 
 
-MODELS = [PlayFirst(), ReturnRate(), Baseline(), Spread(), WinsPerPoint(), WinChance()]
+# ---------------------------------------------------------------------------------------------------------------
+# Upside by absence bucket (Nov 28, app/upside.py): each bucket's outcome range (multipliers on every quantile of
+# actual / projection). Data: this season's graded games in memory.sqlite, the projection = the blend refit
+# leave-one-day-out, the bucket from app/absence.walk_factors (who actually sat). Factory: app/data/upside_model.json.
+
+UP_STEP = 0.15
+UP_LIMITS = (0.5, 2.0)
+
+
+class Upside(Model):
+    name = "upside"
+    title = "Upside when teammates are out (how much higher games run when minutes open up)"
+    min_train = 1000
+    min_hold = 500
+
+    def rows(self, ctx):
+        if "upside" not in ctx["cache"]:
+            import sqlite3
+            from . import upside
+            path = os.path.join(ctx["state"], "memory.sqlite")
+            if not os.path.exists(path):
+                ctx["cache"]["upside"] = []
+            else:
+                con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+                season = con.execute("SELECT max(season) FROM games").fetchone()[0]
+                ctx["cache"]["upside"] = upside.rows_from_store(con, season) if season else []
+        return ctx["cache"]["upside"]
+
+    def factory(self, ctx):
+        from . import upside
+        return upside.factory()
+
+    def fit(self, rows, base):
+        from . import upside
+        return upside.fit(rows)
+
+    def loss(self, P, rows):
+        from . import upside
+        return upside.loss(P, rows)
+
+    def bounds(self, P):
+        for b, g in (P.get("g") or {}).items():
+            for v in g:
+                if not UP_LIMITS[0] <= v <= UP_LIMITS[1]:
+                    return f"bucket {b} multiplier {v}"
+        return None if P.get("g") else "no multipliers"
+
+    def step(self, old, new):
+        from . import upside
+        g = {b: [round(o + float(np.clip(n - o, -UP_STEP, UP_STEP)), 3) for o, n in zip(old["g"][b], new["g"][b])]
+             for b in new["g"]}
+        out = dict(new, g=g)
+        out["mean"] = {b: round(upside.mean_mult(out, b), 3) for b in g}
+        return out
+
+    def describe(self, old, new):
+        from . import upside
+        ch = []
+        for b in new["g"]:
+            a, z = upside.mean_mult(old, b), upside.mean_mult(new, b)
+            if abs(z - a) >= 0.02:
+                ch.append(f"{upside.NAMES.get(int(b), b)}: x{a:.2f} to x{z:.2f} on average")
+        return ("Changed: " + "; ".join(ch) + ".") if ch else ""
+
+
+MODELS = [PlayFirst(), ReturnRate(), Baseline(), Spread(), WinsPerPoint(), WinChance(), Upside()]
