@@ -1,0 +1,2090 @@
+{
+ "at": "2026-11-27T01:07:14.159Z",
+ "week": 6,
+ "matchup_legs_raw": {
+  "status": 200,
+  "legs": [
+   {
+    "bans": null,
+    "custom_points": null,
+    "league_id": "1400915575915491328",
+    "leg": 6,
+    "matchup_id": 4,
+    "max_points": null,
+    "picks": null,
+    "player_map": null,
+    "players": [
+     "1809",
+     "1822",
+     "1872",
+     "1957",
+     "2050",
+     "2086",
+     "2128",
+     "2145",
+     "2258",
+     "2458",
+     "2568",
+     "2711",
+     "2718",
+     "2723",
+     "2728",
+     "4871"
+    ],
+    "players_by_date": null,
+    "points": null,
+    "proj_points": null,
+    "roster_id": 1,
+    "round": 6,
+    "starters": [
+     "1957",
+     "2086",
+     "4871",
+     "1822",
+     "2050",
+     "2568",
+     "2728",
+     "2718",
+     "1872",
+     "2145"
+    ],
+    "starters_by_date": null,
+    "starters_games": {
+     "1822": "1393301048076034048",
+     "1957": "1393723921454333952",
+     "2050": "1393723925434728448",
+     "2086": "1393723921416585216",
+     "2568": "1393301051490197504",
+     "2728": "1393723919902441472",
+     "4871": "1393723922897174528"
+    },
+    "subs": null
+   },
+   {
+    "bans": null,
+    "custom_points": null,
+    "league_id": "1400915575915491328",
+    "leg": 6,
+    "matchup_id": 4,
+    "max_points": null,
+    "picks": null,
+    "player_map": null,
+    "players": [
+     "1350",
+     "1433",
+     "1660",
+     "1747",
+     "1830",
+     "1883",
+     "1959",
+     "1970",
+     "1975",
+     "1997",
+     "2090",
+     "2136",
+     "2275",
+     "2302",
+     "2438",
+     "2733",
+     "2752"
+    ],
+    "players_by_date": null,
+    "points": null,
+    "proj_points": null,
+    "roster_id": 3,
+    "round": 6,
+    "starters": [
+     "1970",
+     "2090",
+     "1975",
+     "1433",
+     "2136",
+     "2752",
+     "1883",
+     "2275",
+     "1350",
+     "1997"
+    ],
+    "starters_by_date": null,
+    "starters_games": {
+     "1433": "1393723924411318272",
+     "1883": "1393301047908261888",
+     "2275": "1393301054258438144"
+    },
+    "subs": null
+   }
+  ]
+ },
+ "introspection": {
+  "status": 200,
+  "data": {
+   "__type": {
+    "fields": [
+     {
+      "name": "round",
+      "type": {
+       "kind": "SCALAR",
+       "name": "Int"
+      }
+     },
+     {
+      "name": "league_id",
+      "type": {
+       "kind": "SCALAR",
+       "name": "Snowflake"
+      }
+     },
+     {
+      "name": "leg",
+      "type": {
+       "kind": "SCALAR",
+       "name": "Int"
+      }
+     },
+     {
+      "name": "points",
+      "type": {
+       "kind": "SCALAR",
+       "name": "Float"
+      }
+     },
+     {
+      "name": "players",
+      "type": {
+       "kind": "SCALAR",
+       "name": "Set"
+      }
+     },
+     {
+      "name": "picks",
+      "type": {
+       "kind": "SCALAR",
+       "name": "Map"
+      }
+     },
+     {
+      "name": "roster_id",
+      "type": {
+       "kind": "SCALAR",
+       "name": "Int"
+      }
+     },
+     {
+      "name": "custom_points",
+      "type": {
+       "kind": "SCALAR",
+       "name": "Float"
+      }
+     },
+     {
+      "name": "proj_points",
+      "type": {
+       "kind": "SCALAR",
+       "name": "Float"
+      }
+     },
+     {
+      "name": "max_points",
+      "type": {
+       "kind": "SCALAR",
+       "name": "Float"
+      }
+     },
+     {
+      "name": "matchup_id",
+      "type": {
+       "kind": "SCALAR",
+       "name": "Int"
+      }
+     },
+     {
+      "name": "bans",
+      "type": {
+       "kind": "SCALAR",
+       "name": "Map"
+      }
+     },
+     {
+      "name": "players_by_date",
+      "type": {
+       "kind": "SCALAR",
+       "name": "Map"
+      }
+     },
+     {
+      "name": "starters",
+      "type": {
+       "kind": "SCALAR",
+       "name": "List"
+      }
+     },
+     {
+      "name": "starters_by_date",
+      "type": {
+       "kind": "SCALAR",
+       "name": "Map"
+      }
+     },
+     {
+      "name": "starters_games",
+      "type": {
+       "kind": "SCALAR",
+       "name": "Map"
+      }
+     },
+     {
+      "name": "subs",
+      "type": {
+       "kind": "SCALAR",
+       "name": "Map"
+      }
+     },
+     {
+      "name": "player_map",
+      "type": {
+       "kind": "SCALAR",
+       "name": "Map"
+      }
+     }
+    ]
+   }
+  }
+ },
+ "schema": {
+  "status": 200,
+  "query": [
+   "get_active_players(sport): Player",
+   "get_dismissals(): Map",
+   "get_matchmaking_league(league_id): MatchmakingLobby",
+   "get_quest(quest_id): UserQuest",
+   "get_user_matchmaking_preferences(): MatchmakingUser",
+   "get_daily_draft_contest(contest_id): DailyDraftContest",
+   "read_receipts(parent_type,parent_id): ReadReceipt",
+   "user_drafts_by_draft(draft_id): UserDraft",
+   "league_dues_balance(league_id): Map",
+   "league_rosters(league_id): Roster",
+   "get_player_news(limit,sport,player_id): PlayerNews",
+   "pinned_messages(parent_id): Message",
+   "me(): User",
+   "league_dues_transactions(filter,league_id): LeagueDuesTransaction",
+   "reactions(message_id,parent_id,reaction): Reaction",
+   "outbound_requests(request_type): Request",
+   "derby_user_positions(user_id,currency_type,derby_id): Position",
+   "league_dues_payout_plans(league_id,statuses,payout_config_id): LeagueDuesPayoutPlan",
+   "pushed_topics(channel_id): Topic",
+   "tournament_picks(round,league_id,roster_id): TournamentPick",
+   "league_users_metadata(league_id): Map",
+   "is_friend(friend_id): Boolean",
+   "achievements(user_id): Achievement",
+   "my_picks_affinity(): Map",
+   "app_info(): Map",
+   "topics(before,order_by,channel_tags,channel_id,show_hidden,show_shadowed): Topic",
+   "inbound_requests(request_type): Request",
+   "search_players(prefix,limit,sport): Player",
+   "my_channels(): Channel",
+   "owned_leagues(user_id,season,season_type,sport): League",
+   "trending_players(sort,sport): Player",
+   "promo_transactions_by_parent_reference(reference_type,reference_action,reference_id): CurrencyTransaction",
+   "derby_user_parlays(offset,limit,user_id,derby_id,include_pick_counts): Parlay",
+   "get_player(sport,player_id): Player",
+   "squad_bank_by_id(league_id,reward_tracker_id): FullRewardTracker",
+   "matchup_legs(round,league_id): MatchupLeg",
+   "get_player_outlook(season,sport,player_id): PlayerNews",
+   "user_roster(user_id,season,season_type,sport,roster_id): UserRoster",
+   "get_referral_promo_code(): String",
+   "league_groups(company_id,season,season_type,sport): LeagueGroup",
+   "my_currency_transaction_by_ref_ids(reference_type,reference_action,reference_ids): CurrencyTransaction",
+   "recently_contacted_friends(): Friend",
+   "season_stats(category,order_by,season,season_type,sport,positions): Stat",
+   "league_dues_owed_by_roster(league_id): LeagueDuesRosterOwed",
+   "previous_squad_weekly_meter(league_id): FullRewardTracker",
+   "league_dues_config(league_id): LeagueDuesConfig",
+   "get_matchmaking_user(user_id,game,game_bucket): MatchmakingUser",
+   "user_roles_for_type(user_id,type_id): Role",
+   "channels_for_user(user_id): Channel",
+   "my_purchases(): Purchase",
+   "get_player_stats(category,week,season,season_type,sport,player_id,game_id): Stat",
+   "active_channel_topics(limit,channel_id): Topic",
+   "get_featured_mascots(): ItemType",
+   "roster_draft_picks_by_owner(league_id,owner_roster_id): RosterDraftPick",
+   "get_dm_by_members(members): Dm",
+   "my_profile(): UserProfile",
+   "blocked_users(): BlockedUser",
+   "num_pending_parlays(): Int",
+   "roles_by_type(type_id): Role",
+   "events(parent_type,parent_id): Event",
+   "top_tab_content(version,eg,ftfe): TopTabContentGroup",
+   "league_transactions_by_status(status,league_id,leg): LeagueTransaction",
+   "all_friends(): Friend",
+   "mark_mention_as_read(message_id): Boolean",
+   "get_promos_page(flags): PromoPage",
+   "plays(date,week,season,season_type,sport,game_id): Play",
+   "preferences_for_type_id(type_id): Preference",
+   "my_preferences(): Preference",
+   "league_note(league_id): LeagueNote",
+   "list_poll_votes(limit,poll_id): PollVote",
+   "recent_squad_banks(league_id): RewardTrackerInfo",
+   "weekly_stats(category,week,order_by,season,season_type,sport,positions): Stat",
+   "league_sync_list_leagues(cookie,provider,s2,swid): Map",
+   "scores(date,week,season,season_type,sport,game_id): Score",
+   "league_players(league_id): LeaguePlayer",
+   "pinned_topics(channel_id): Topic",
+   "teams(sport): Team",
+   "roster_draft_picks_by_draft(draft_id): RosterDraftPick",
+   "get_team(sport,team): Team",
+   "create_read_receipt(parent_type,message_id,topic_id,channel_id,parent_id): Boolean",
+   "view_shared_promo(user_id,share_id): SharedPromo",
+   "suggest_username(email): String",
+   "my_squad_parlays(limit,include_pick_counts): Parlay",
+   "dm_members(dm_id): DmUser",
+   "all_tournament_picks(league_id): TournamentPick",
+   "search_leagues(term): League",
+   "league_user_by_user(season,season_type,sport): LeagueUser",
+   "message(message_id,parent_id): Message",
+   "get_dm_settings(dm_id): DmUser",
+   "requests(type_id,request_type): Request",
+   "my_purchasable_mascots(): ItemType",
+   "player_performance_topic(season,season_type,sport,player_id,game_id): Topic",
+   "league_transactions(status,type,limit,league_id,leg,roster_id): LeagueTransaction",
+   "my_channel_bans(ban_id): ChannelBan",
+   "recommended_channels(limit): Channel",
+   "roster_standings(round,league_id): RosterStanding",
+   "roster_draft_picks(league_id,season): RosterDraftPick",
+   "get_in_progress_user_pools(offset,limit): UserPool",
+   "my_parlays(offset,type,limit,league_id,include_pick_counts,status_filter): Parlay",
+   "my_derby_prizes(): UserDerbyPrize",
+   "my_picks_init(): Map",
+   "get_async_bundles(): String",
+   "my_passkeys(): Passkey",
+   "draft_offers(sport,draft_id,pick_no): DraftOffer",
+   "get_user_draft_settings(draft_id): UserDraft",
+   "league_user(league_id): LeagueUser",
+   "promo_by_id(promo_id): Promo",
+   "item_types(): ItemType",
+   "sport_info(sport): Map",
+   "get_favorite_teams(user_id,sport): Team",
+   "codes_by_type(type,type_id): Code",
+   "find_friends(my_contact_info,contact_infos): DiscoveredContact",
+   "recommended_categorized_channels(): List",
+   "stats_for_players_in_week(category,week,season,season_type,sport,player_ids): Stat",
+   "get_user_pool_by_id(pool_id): UserPool",
+   "is_subscribed(type_id): Boolean",
+   "download_tax_form(tax_year,form_type): String",
+   "my_currency_transactions(offset,status,limit,wallet_type,reference_action): CurrencyTransaction",
+   "user(user_id): User",
+   "my_items(): Item",
+   "search_users(prefix): User",
+   "league_boost_state(league_id): LeagueBoostState",
+   "current_squad_weekly_meter(league_id): FullRewardTracker",
+   "parlay(parlay_id,include_pick_counts): Parlay",
+   "trending_channels(limit): Channel",
+   "get_league(league_id): League",
+   "my_balances(): Map",
+   "trending_topics(limit,channel_ids): Topic",
+   "give_get_referral_claims(): Map",
+   "generate_parlay_transactions_report(start_time,end_time,verification_code,email_or_phone): String",
+   "companies(): Company",
+   "recent_weekly_meters(league_id): RewardTrackerInfo",
+   "previous_squad_bank(league_id): FullRewardTracker",
+   "game_stats(category,order_by,season,season_type,sport,game_id,positions): Stat",
+   "user_drafts_by_status(status,before,season,season_type,sport): UserDraft",
+   "my_dms(limit,unread): Dm",
+   "get_promos_shared_to_you(): SharedPromo",
+   "tax_forms(): Map",
+   "topic_feed(before,limit,channel_ids): Topic",
+   "league_dues_user(user_id,league_id): LeagueDuesUser",
+   "friend_by_id(friend_id): Friend",
+   "get_onboarding_rewards(sport): OnboardingReward",
+   "get_player_news_by_id(source,sport,player_id,source_key): PlayerNews",
+   "list_all_active_promos(): Promo",
+   "weekly_meter_by_id(league_id,reward_tracker_id): FullRewardTracker",
+   "league_dues_users(league_id): LeagueDueUsersWithHash",
+   "active_quests(): UserQuest",
+   "channels_by_parent(parent_id): Channel",
+   "league_transactions_by_player(offset,limit,league_id,player_id): LeagueTransaction",
+   "search_players_in_text(text,sport): Map",
+   "matchup_challenges(league_id): MatchupChallenge",
+   "my_matchup_challenges(leg,season): MatchupChallenge",
+   "league_event_logs(limit,league_id,before_log_id,event_types): LeagueEventLog",
+   "my_currencies(wallet_type,withdrawable_only): Map",
+   "legal_agreements(): String",
+   "available_line_promotions(include_boosts): LinePromotion",
+   "draft_queue(draft_id): String",
+   "list_promos_by_type(type): Promo",
+   "campaigns_by_email(): Map",
+   "is_eligible_for_promo(location,league_id,promo_id): Boolean",
+   "current_squad_bank(league_id): FullRewardTracker",
+   "check_responsible_gaming_limits(limits_to_test): List",
+   "matchup_challenge_config(league_id): MatchupChallengeConfig",
+   "league_dues_payout_plan(league_id,payout_config_id,payout_plan_id): LeagueDuesPayoutPlan",
+   "get_code(code): Code",
+   "get_pickem_scoring_settings(league_id): Map",
+   "login(password,passkey,email_or_phone_or_username,captcha,passkey_conversation_id): User",
+   "activities(type,before,user_id): Activity",
+   "topic(topic_id,channel_id): Topic",
+   "my_currencies_and_transactions(wallet_type,transactions_limit,transactions_offset): CurrenciesAndTransactions",
+   "my_winnings(): Winnings",
+   "user_drafts_by_league_mock(league_id): UserDraft",
+   "league_playoff_bracket(league_id): Map",
+   "drafts_by_league_id(league_id): Draft",
+   "metadata(type,key): Metadata",
+   "get_poll(poll_id): Poll",
+   "leagues_by_group(limit,group_id): League",
+   "trending_channel_topics(limit,channel_id): Topic",
+   "draft_picks(draft_id): DraftPick",
+   "matchup_challenge(league_id,challenge_id): MatchupChallenge",
+   "league_users(league_id): LeagueUser",
+   "event_queue_count(event_id): Int",
+   "latest_topics(limit,channel_ids): Topic",
+   "get_user_pools(offset,status,limit,sport,pool_type): UserPool",
+   "top_squad_banks(league_id,num_banks): FullRewardTracker",
+   "matchup_legs_related_to_roster(league_id,roster_id,start_round,end_round): MatchupLeg",
+   "get_matchmaking_league_activity(league_id): MatchmakingLeagueActivity",
+   "my_currency_transaction_by_reference(reference_type,reference_action,reference_id): CurrencyTransaction",
+   "get_pickem_legs(league_id,roster_id): PickemLeg",
+   "download_cftc_monthly_statement(month,year): String",
+   "active_topics(limit,channel_ids): Topic",
+   "messages(before,order_by,parent_id,show_hidden): Message",
+   "get_league_manual_history(league_id): LeagueManualHistory",
+   "get_pickem_picks_for_league(league_id,leg_id,include_tiebreaker): Map",
+   "search_channel_bans(prefix,channel_id): ChannelBan",
+   "user_drafts(before,season,season_type,sport): UserDraft",
+   "dm(dm_id): Dm",
+   "search_matchmaking_leagues(size,tags,from,season,season_type,sport,custom_tags,commitment_high,commitment_low,player_count): MatchmakingLobby",
+   "my_league_folders(): LeagueFolder",
+   "user_rosters(user_id,season,season_type,sport): UserRoster",
+   "search_channel_users(prefix,channel_id): ChannelUser",
+   "download_cftc_daily_statement(month,year,day): String",
+   "my_leagues(season,season_type,sport,exclude_previous,exclude_archived): League",
+   "watched_players(season,season_type,sport): Player",
+   "league_dues_payout_configs(status,league_id): LeagueDuesPayoutConfig",
+   "get_draft(sport,draft_id): Draft",
+   "sweepstakes_entries_count_total(): Int",
+   "purchasable_item_refresh(): Map",
+   "my_currencies_detailed(wallet_type): Map",
+   "mentions(before,unread): Mention",
+   "my_active_derbys(): DerbyUser",
+   "league_playoff_loser_bracket(league_id): Map",
+   "my_friends(limit,after_username): Friend",
+   "league_parlays(offset,limit,league_id,include_pick_counts,status_filter,user_id_filter,filter_self): Parlay",
+   "blockers(): BlockedUser",
+   "my_active_positions(currency_type): Position",
+   "league_dues_payment_methods(include_venmo,include_cards,include_apple_pay): LeagueDuesPaymentMethod",
+   "sweepstakes_entries_count_today(): Int",
+   "league_dues_payout_config(league_id,payout_config_id): LeagueDuesPayoutConfig",
+   "login_context_by_email_or_phone_or_username(email_or_phone_or_username): Map",
+   "league_dues_active_payout_polls(league_id): LeagueDuesPayoutPoll",
+   "draft_autopickers(sport,draft_id): Snowflake",
+   "channels(channel_ids): Channel",
+   "channel_tags(channel_id): ChannelTag",
+   "league_transactions_filtered(limit,league_id,type_filters,status_filters,roster_id_filters,leg_filters): LeagueTransaction",
+   "mutual_friends(friend_id): Friend",
+   "search_dms(term): Dm",
+   "get_pickem_leg(league_id,roster_id,leg_id): PickemLeg",
+   "matchup_legs_raw(round,league_id): MatchupLeg",
+   "get_responsible_gaming_limit_identifiers(): String",
+   "list_eligible_promos(flags,location,user_id): Promo",
+   "search_matchmaking_league_users(size,from,league_id): MatchmakingUser",
+   "my_payment_methods(wallet_type): PaymentMethod",
+   "rosters_by_user(user_id,season,season_type,sport): Roster",
+   "my_ip_location(): IpLocation",
+   "channel_members(channel_id,after_username): ChannelUser",
+   "my_events(type): Event",
+   "my_orders(offset,filter,limit): ContractOrder",
+   "my_closed_positions(offset,limit,currency_type): Position",
+   "channel_bans(channel_id,after_username): ChannelBan",
+   "messages_by_reaction(limit,parent_id,reaction): Message"
+  ],
+  "mutation": [
+   "create_league_folder",
+   "set_user_exclusion",
+   "remove_pickem_pick",
+   "verify_confirm_one_click",
+   "unban_channel_user",
+   "save_tournament_pick",
+   "set_league_mascot",
+   "force_cancel_transaction",
+   "remove_matchup_leg_pick",
+   "league_remove_user",
+   "retry_matchup_challenge_funding",
+   "league_create_transaction",
+   "draft_hover_player",
+   "assign_role",
+   "update_league_group_draft_settings",
+   "create_topic_reaction",
+   "watch_player",
+   "propose_trade",
+   "clear_responsible_gaming_limit",
+   "decline_matchup_challenge",
+   "migrate_league_note",
+   "draft_remove_user",
+   "invite_to_dm",
+   "delete_channel",
+   "update_user_avatar_url",
+   "reorder_league_folders",
+   "update_opponents",
+   "league_sync_use_recovery_code",
+   "remove_matchup_leg_ban",
+   "sync_app_information",
+   "delete_user_roster",
+   "create_channel",
+   "create_draft",
+   "skip_startup_draft",
+   "sync_aeropay_accounts",
+   "enter_daily_draft_bonuses",
+   "update_referral_promo_code",
+   "enter_event_queue",
+   "reset_password",
+   "clear_unread_mentions",
+   "gift_item_to_user",
+   "set_pickem_tiebreaker",
+   "poll_edit_choice",
+   "clone_tournament_picks",
+   "remove_friend",
+   "update_tiebreaker",
+   "reward_onboarding",
+   "update_league_group_metadata",
+   "league_update_custom_standings",
+   "signal",
+   "unlock_chopped_roster",
+   "delete_topic",
+   "pay_league_dues",
+   "react_to_draft_pick",
+   "set_league_mascot_emotion",
+   "league_update_settings",
+   "set_league_matchmaking",
+   "suggest_matchmaking_user",
+   "dm_unpaid_league_dues",
+   "continue_league",
+   "purchase_item_with_cookies",
+   "update_draft_start_time",
+   "like_league_player",
+   "league_sync_send_recovery_code",
+   "leave_league",
+   "randomize_draft_order",
+   "update_user_roster_positions",
+   "update_play_description_override",
+   "hide_dm",
+   "delete_passkey",
+   "leave_event_queue",
+   "track_score_view",
+   "add_league_player_note",
+   "roster_update_starters",
+   "unblock_user",
+   "propose_league_dues_payout_changes",
+   "add_matchup_leg_pick",
+   "deposit",
+   "create_roster",
+   "create_user_roster",
+   "delete_topic_reaction",
+   "migrate_pinned_messages",
+   "confirm_payment_methods",
+   "propose_matchup_challenge",
+   "league_update_display_order",
+   "update_user_display_name",
+   "league_sync_login",
+   "disable_league_dues_config",
+   "update_user_roster_players",
+   "rescore_pickem_league",
+   "reorder_channel_tags",
+   "poll_add_choice",
+   "boost_league",
+   "draft_pass_offering",
+   "delete_dm",
+   "unassign_roster_draft_pick",
+   "update_league_group_roster_positions",
+   "create_shared_promo",
+   "delete_channel_tag",
+   "make_pickem_pick",
+   "claim_promo",
+   "league_sync_get_mask",
+   "reorder_channels",
+   "update_draft_settings",
+   "acknowledge_derby_prize",
+   "sync_badge_count",
+   "offline_withdrawal",
+   "league_update_avatar",
+   "update_dismissals",
+   "push_notify_join_voice_lounge",
+   "set_league_mascot_message",
+   "set_user_league_matchmaking_preferences",
+   "claim_gift",
+   "track_channel_join",
+   "consent_to_electronic_delivery",
+   "block_user",
+   "update_dm_member",
+   "override_league_playoff_brackets",
+   "poll_edit_prompt",
+   "typing",
+   "update_draft_type",
+   "verify_update_one_click",
+   "remove_league_player_note",
+   "clear_unread_dms",
+   "league_update_scoring_settings",
+   "add_player_tag",
+   "roster_update_metadata",
+   "aeropay_deposit",
+   "rescind_matchup_challenge",
+   "leave_channels",
+   "pickem_commish_revive",
+   "roster_update_settings",
+   "channel_update_favorite",
+   "claim_shared_promo",
+   "update_user_flairs",
+   "league_sync_create_league",
+   "remove_user_from_autopick",
+   "update_waiver_claim",
+   "remove_co_owner",
+   "unpin_message",
+   "randomize_opponents",
+   "change_password2",
+   "league_update_name",
+   "link_aeropay_account",
+   "roster_update_reserve",
+   "update_company",
+   "update_user_roster_metadata",
+   "create_event",
+   "clear_pending_withdrawal",
+   "rotate_purchasable_mascots",
+   "remove_dismissals",
+   "update_squad_waitlist_eligibility",
+   "remove_favorite_team",
+   "save_league_dues_payout_configs",
+   "send_matchmaking_request",
+   "add_matchup_leg_ban",
+   "poll_unvote",
+   "update_draft_status",
+   "join_draft",
+   "submit_waiver_claim",
+   "ban_channel_user",
+   "request_password_reset",
+   "remove_channel_tag",
+   "reorder_roles",
+   "add_favorite_team",
+   "roster_update_taxi",
+   "poll_vote",
+   "create_message",
+   "get_aeropay_aggregator_credentials",
+   "update_draft_order",
+   "register_aeropay_user",
+   "bank_withdrawal",
+   "use_code",
+   "update_user_draft_settings",
+   "create_poll",
+   "update_league_group_settings",
+   "create_passkey_start",
+   "update_user_roster_settings",
+   "import_league_users",
+   "draft_set_keeper",
+   "update_user_real_name",
+   "delete_league_manual_history",
+   "draft_cpu_pick_player",
+   "roster_change_owner",
+   "claim_draft_slot",
+   "hide_topic",
+   "request_verification",
+   "user",
+   "update_league_boost_state",
+   "decline_request",
+   "draft_nominate_player",
+   "join_matchmaking_league",
+   "update_draft_queue",
+   "set_favorite_teams",
+   "remove_role_permission",
+   "socure_documents_request",
+   "delete_reaction",
+   "leave_channel",
+   "assign_roster_draft_pick",
+   "add_role_permission",
+   "set_responsible_gaming_limit",
+   "remove_divisions",
+   "invite_friends",
+   "join_public_league",
+   "add_async_bundles",
+   "claim_promo_v2",
+   "add_league_group_admin",
+   "create_topic",
+   "purchase_gift_for_league",
+   "add_league_player_trade_block",
+   "remove_player_tag",
+   "update_league_group_group_settings",
+   "create_passkey_finalize",
+   "league_update_owners",
+   "leave_derby",
+   "withdraw_league_dues",
+   "draft_resume_offering",
+   "delete_draft",
+   "use_item",
+   "league_dues_wallet_deposit",
+   "delete_message",
+   "tip_user",
+   "cancel_waiver_claim",
+   "create_channel_tag",
+   "verify_verification_code",
+   "cancel_verification",
+   "verify_start_one_click",
+   "sync_push_tags",
+   "redeem_receipt_for_cookies",
+   "put_user_on_autopick",
+   "change_message_text",
+   "enter_daily_draft",
+   "shadow_topic",
+   "draft_make_offer",
+   "update_league_group_scoring_settings",
+   "create_verification_code",
+   "poll_set_closes_at",
+   "unshadow_topic",
+   "reset_to_startup_draft",
+   "delete_async_bundles",
+   "clone_draft",
+   "cc_withdrawal",
+   "confirm_aeropay_user",
+   "roster_set_keepers",
+   "delete_league_group",
+   "pin_message",
+   "unwatch_player",
+   "set_ftu_offer",
+   "cancel_request",
+   "upsert_league_dues_config",
+   "convert_league_dues_to_tracker",
+   "send_league_dues_reminder",
+   "update_user_roster_scoring_settings",
+   "interactive_bank_deposit",
+   "poll_remove_choice",
+   "tag_braze_user",
+   "update_draft_metadata",
+   "reset_password_with_code",
+   "create_league_group_league",
+   "create_parlay",
+   "tip_topic_author",
+   "clear_tournament_picks",
+   "save_cftc_questionnaire",
+   "verify_bank_payment_method",
+   "league_update_metadata",
+   "report_user",
+   "push_topic",
+   "assistant_thread",
+   "import_league_history",
+   "update_topic_title_map",
+   "draft_end_phase",
+   "remove_payment_method",
+   "verify_change_info",
+   "recalculate_matchup_scoring",
+   "chop_roster",
+   "send_download_link",
+   "sync_push_token",
+   "interac_set_security_question",
+   "create_invite_link",
+   "update_channel_tag",
+   "create_league_group",
+   "accept_legal_agreement",
+   "set_contest_entry_name",
+   "leave_draft",
+   "draft_clear_afk_rounds",
+   "add_channel_tag",
+   "draft_remove_pick",
+   "verify_user_profile",
+   "delete_user",
+   "accept_trade",
+   "import_draft",
+   "update_channel",
+   "league_dues_deposit",
+   "delete_company",
+   "delete_roster",
+   "order_contract",
+   "unlike_league_player",
+   "join_channel",
+   "update_matchup_leg_custom_points",
+   "unsubscribe_from_topic",
+   "revoke_role",
+   "create_post",
+   "upsert_league_manual_history",
+   "change_password",
+   "tip_message_author",
+   "accept_matchup_challenge",
+   "clear_notifications",
+   "update_league_folder",
+   "unpin_topic",
+   "join_derby",
+   "update_league_group",
+   "update_matchup_leg",
+   "cancel_parlay",
+   "create_dm",
+   "draft_force_auction_pick",
+   "purchase_gift_for_user",
+   "pin_topic",
+   "delete_league",
+   "convert_league_dues_to_sleeper_safe",
+   "update_channel_tags",
+   "league_update_roster_positions",
+   "remove_league_player_trade_block",
+   "process_transaction",
+   "create_company",
+   "force_update_matchup_leg",
+   "leave_dm",
+   "update_preferences",
+   "accept_request",
+   "unwatch_all_players",
+   "create_league",
+   "update_league_user_metadata",
+   "clone_to_chopped",
+   "reject_trade",
+   "configure_divisions",
+   "create_supplemental_draft",
+   "create_reaction",
+   "unboost_league",
+   "gift_item_to_league",
+   "update_squad_bank_grading_mode",
+   "delete_event",
+   "login_via_passkey_start",
+   "league_update_note",
+   "update_user_summoner_name",
+   "aeropay_withdraw",
+   "create_file",
+   "change_dm_title",
+   "cc_deposit",
+   "unhide_topic",
+   "send_request",
+   "draft_pick_player",
+   "join_channels",
+   "draft_set_nominator",
+   "applepay_deposit",
+   "remove_role",
+   "add_role",
+   "verify_bank_payment_and_withdraw",
+   "change_topic_title",
+   "create_topic_subscriptions",
+   "batch_upsert_league_dues_users",
+   "update_parlay",
+   "verify_contact_update"
+  ],
+  "types": [
+   "UserFlair",
+   "Mention",
+   "PaymentMethodInput",
+   "Line",
+   "PlayoffMatchOverride",
+   "LeagueEventLog",
+   "Play",
+   "Float",
+   "DailyDraftContest",
+   "LeagueDuesPayeeInput",
+   "AuthenticatorResponseInput",
+   "File",
+   "ChannelTag",
+   "OnboardingReward",
+   "IpLocation",
+   "Promo",
+   "LeagueDuesPayoutConfig",
+   "Request",
+   "RosterStanding",
+   "ContractOrderFilter",
+   "Reaction",
+   "Set",
+   "LeaguePlayer",
+   "CurrenciesAndTransactions",
+   "InteractiveBankDepositResult",
+   "ContractOrder",
+   "CcDepositResult",
+   "Position",
+   "Dm",
+   "MatchmakingLeagueActivity",
+   "UserDraft",
+   "PublicKeyCredentialInput",
+   "RootMutationType",
+   "MatchmakingUser",
+   "OfflineWithdrawalPaperCheckInfo",
+   "Poll",
+   "TournamentPick",
+   "Code",
+   "String",
+   "LeagueDuesWalletDepositResult",
+   "MatchupChallenge",
+   "AssistantThread",
+   "DiscoveredContact",
+   "PlayerNews",
+   "ParlayLeg",
+   "FullRewardTracker",
+   "Metadata",
+   "DraftPick",
+   "CheckResponsibleGamingLimitInput",
+   "Topic",
+   "Item",
+   "LeagueDuesPayoutChangeInput",
+   "LeagueDuesPayoutPlan",
+   "MatchupChallengeConfig",
+   "Snowflake",
+   "LocalizedString",
+   "UserProfile",
+   "Preference",
+   "InputPickemPick",
+   "UserPool",
+   "Passkey",
+   "Achievement",
+   "UserQuest",
+   "ChannelUser",
+   "UserDerbyPrize",
+   "Roster",
+   "LeagueDuesUser",
+   "LeagueDuesPaymentResult",
+   "DmUser",
+   "MapWithSnowflakeKey",
+   "LeagueDuesPayoutConfigInput",
+   "Channel",
+   "Parlay",
+   "RootQueryType",
+   "LeagueBoostState",
+   "SharedPromo",
+   "User",
+   "LeagueDuesPaymentMethod",
+   "BlockedUser",
+   "LocalizedJson",
+   "Winnings",
+   "LeagueManualHistory",
+   "LocalizedMap",
+   "RewardTrackerInfo",
+   "InputPickemTiebreaker",
+   "Purchase",
+   "LeagueUser",
+   "Friend",
+   "CurrencyTransaction",
+   "LeagueDuesTransaction",
+   "Role",
+   "PollVote",
+   "LinePromotion",
+   "LeagueDuesPayoutPoll",
+   "Message",
+   "ItemType",
+   "MapWithSnowflakeKeyValue",
+   "ClientPossibleMultipliers",
+   "DerbyUser",
+   "DraftOffer",
+   "ReadReceipt",
+   "SnowflakeList",
+   "LeagueNote",
+   "Json",
+   "PromoPage",
+   "TopicReaction",
+   "LeagueDuesSeasonPaid",
+   "RosterDraftPick",
+   "PlayStat",
+   "LeagueTransaction",
+   "Company",
+   "Team",
+   "LeagueDuesTransactionFilterInput",
+   "SnowflakeSet",
+   "Activity",
+   "RewardActionLog",
+   "LeagueHistoryImport",
+   "LeagueDueUsersWithHash",
+   "ContactInfo",
+   "UserPlayoffStatus",
+   "Score",
+   "Player",
+   "Int",
+   "LeagueDuesConfig",
+   "List",
+   "TopTabContentGroup",
+   "MatchmakingLobby",
+   "UserRoster",
+   "Draft",
+   "Boolean",
+   "PossibleMultipliers",
+   "PickemLeg",
+   "MatchupLeg",
+   "Map",
+   "Stat",
+   "ResponsibleGamingLimit",
+   "OfflineWithdrawalAchInfo",
+   "PaymentMethod",
+   "League",
+   "LeagueDuesRosterOwed",
+   "ChannelBan",
+   "LeagueFolder",
+   "UserTipTransactionLog",
+   "Event",
+   "UpdateSquadBankGradingModeResult",
+   "LeagueGroup",
+   "Location",
+   "LeagueDuesUserInput",
+   "__Directive",
+   "__DirectiveLocation",
+   "__InputValue",
+   "__Field",
+   "__Type",
+   "__Schema",
+   "__EnumValue"
+  ]
+ },
+ "event_log_fields": [
+  {
+   "name": "data",
+   "type": {
+    "kind": "SCALAR",
+    "name": "Json"
+   }
+  },
+  {
+   "name": "created",
+   "type": {
+    "kind": "SCALAR",
+    "name": "Int"
+   }
+  },
+  {
+   "name": "event_type",
+   "type": {
+    "kind": "SCALAR",
+    "name": "String"
+   }
+  },
+  {
+   "name": "league_id",
+   "type": {
+    "kind": "SCALAR",
+    "name": "Snowflake"
+   }
+  },
+  {
+   "name": "log_id",
+   "type": {
+    "kind": "SCALAR",
+    "name": "Snowflake"
+   }
+  }
+ ],
+ "event_logs": {
+  "status": 200,
+  "errors": [
+   "Unauthorized"
+  ],
+  "rows": null
+ },
+ "suggestions": [
+  "Cannot query field \"eligible\" on type \"MatchupLeg\".",
+  "Cannot query field \"ineligible\" on type \"MatchupLeg\".",
+  "Cannot query field \"lock_eligible\" on type \"MatchupLeg\"."
+ ],
+ "worker": {
+  "at": "2026-11-27T01:05:43.087Z",
+  "week": 6,
+  "http": 200,
+  "errors": [],
+  "legs": [
+   {
+    "bans": null,
+    "picks": null,
+    "player_map": {
+     "1809": {
+      "position": "PF",
+      "status": "ACT",
+      "number": 20,
+      "first_name": "John",
+      "last_name": "Collins",
+      "sport": "nba",
+      "team": "DET",
+      "player_id": "1809",
+      "fantasy_positions": [
+       "C",
+       "PF"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": null,
+      "years_exp": 9,
+      "news_updated": 1795622707454
+     },
+     "1822": {
+      "position": "SF",
+      "status": "ACT",
+      "number": 0,
+      "first_name": "Jayson",
+      "last_name": "Tatum",
+      "sport": "nba",
+      "team": "BOS",
+      "player_id": "1822",
+      "fantasy_positions": [
+       "PF",
+       "SF"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": null,
+      "years_exp": 9,
+      "news_updated": 1795618808101
+     },
+     "1872": {
+      "position": "PG",
+      "status": "ACT",
+      "number": 4,
+      "first_name": "De'Aaron",
+      "last_name": "Fox",
+      "sport": "nba",
+      "team": "SAS",
+      "player_id": "1872",
+      "fantasy_positions": [
+       "PG"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": "DTD",
+      "years_exp": 9,
+      "news_updated": 1795740918652
+     },
+     "1957": {
+      "position": "PG",
+      "status": "ACT",
+      "number": 2,
+      "first_name": "Shai",
+      "last_name": "Gilgeous-Alexander",
+      "sport": "nba",
+      "team": "OKC",
+      "player_id": "1957",
+      "fantasy_positions": [
+       "PG"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": null,
+      "years_exp": 8,
+      "news_updated": 1795667111619
+     },
+     "2050": {
+      "position": "PF",
+      "status": "ACT",
+      "number": 15,
+      "first_name": "De'Andre",
+      "last_name": "Hunter",
+      "sport": "nba",
+      "team": "SAC",
+      "player_id": "2050",
+      "fantasy_positions": [
+       "PF",
+       "SF"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": null,
+      "years_exp": 7,
+      "news_updated": 1795542947890
+     },
+     "2086": {
+      "position": "SG",
+      "status": "ACT",
+      "number": 11,
+      "first_name": "Tyler",
+      "last_name": "Herro",
+      "sport": "nba",
+      "team": "MIL",
+      "player_id": "2086",
+      "fantasy_positions": [
+       "PG",
+       "SG"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": null,
+      "years_exp": 7,
+      "news_updated": 1795676713340
+     },
+     "2128": {
+      "position": "C",
+      "status": "ACT",
+      "number": 7,
+      "first_name": "Paul",
+      "last_name": "Reed",
+      "sport": "nba",
+      "team": "DET",
+      "player_id": "2128",
+      "fantasy_positions": [
+       "C",
+       "PF"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": null,
+      "years_exp": 6,
+      "news_updated": 1795623607612
+     },
+     "2145": {
+      "position": "SG",
+      "status": "ACT",
+      "number": 30,
+      "first_name": "Tre",
+      "last_name": "Jones",
+      "sport": "nba",
+      "team": "CHI",
+      "player_id": "2145",
+      "fantasy_positions": [
+       "PG",
+       "SF",
+       "SG"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": null,
+      "years_exp": 6,
+      "news_updated": 1795529747294
+     },
+     "2258": {
+      "position": "SG",
+      "status": "ACT",
+      "number": 5,
+      "first_name": "Quentin",
+      "last_name": "Grimes",
+      "sport": "nba",
+      "team": "LAL",
+      "player_id": "2258",
+      "fantasy_positions": [
+       "SF",
+       "SG"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": null,
+      "years_exp": 5,
+      "news_updated": 1795540847723
+     },
+     "2458": {
+      "position": "PF",
+      "status": "ACT",
+      "number": 5,
+      "first_name": "Paolo",
+      "last_name": "Banchero",
+      "sport": "nba",
+      "team": "ORL",
+      "player_id": "2458",
+      "fantasy_positions": [
+       "PF"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": "Out",
+      "years_exp": 4,
+      "news_updated": 1792860658146
+     },
+     "2568": {
+      "position": "SF",
+      "status": "ACT",
+      "number": 24,
+      "first_name": "Brandon",
+      "last_name": "Miller",
+      "sport": "nba",
+      "team": "CHA",
+      "player_id": "2568",
+      "fantasy_positions": [
+       "PF",
+       "SF",
+       "SG"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": null,
+      "years_exp": 3,
+      "news_updated": 1795666211563
+     },
+     "2711": {
+      "position": "SF",
+      "status": "ACT",
+      "number": 23,
+      "first_name": "Tristan",
+      "last_name": "da Silva",
+      "sport": "nba",
+      "team": "ORL",
+      "player_id": "2711",
+      "fantasy_positions": [
+       "PF",
+       "SF"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": null,
+      "years_exp": 2,
+      "news_updated": 1795585504646
+     },
+     "2718": {
+      "position": "C",
+      "status": "ACT",
+      "number": 14,
+      "first_name": "Zach",
+      "last_name": "Edey",
+      "sport": "nba",
+      "team": "MEM",
+      "player_id": "2718",
+      "fantasy_positions": [
+       "C"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": "DTD",
+      "years_exp": 2,
+      "news_updated": 1795735817429
+     },
+     "2723": {
+      "position": "SG",
+      "status": "ACT",
+      "number": 14,
+      "first_name": "Ja'Kobe",
+      "last_name": "Walter",
+      "sport": "nba",
+      "team": "TOR",
+      "player_id": "2723",
+      "fantasy_positions": [
+       "SF",
+       "SG"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": null,
+      "years_exp": 2,
+      "news_updated": 1795503618862
+     },
+     "2728": {
+      "position": "C",
+      "status": "ACT",
+      "number": 23,
+      "first_name": "Donovan",
+      "last_name": "Clingan",
+      "sport": "nba",
+      "team": "POR",
+      "player_id": "2728",
+      "fantasy_positions": [
+       "C"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": null,
+      "years_exp": 2,
+      "news_updated": 1795534847064
+     },
+     "4871": {
+      "position": "PG",
+      "status": "ACT",
+      "number": 0,
+      "first_name": "Mikel",
+      "last_name": "Brown Jr.",
+      "sport": "nba",
+      "team": "BKN",
+      "player_id": "4871",
+      "fantasy_positions": [
+       "PG",
+       "SG"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": null,
+      "years_exp": 0,
+      "news_updated": 1795537248689
+     }
+    },
+    "players_by_date": null,
+    "roster_id": 1,
+    "starters": [
+     "1957",
+     "2086",
+     "4871",
+     "1822",
+     "2050",
+     "2568",
+     "2728",
+     "2718",
+     "1872",
+     "2145"
+    ],
+    "starters_by_date": null,
+    "starters_games": {
+     "1822": "1393301048076034048",
+     "1957": "1393723921454333952",
+     "2050": "1393723925434728448",
+     "2086": "1393723921416585216",
+     "2568": "1393301051490197504",
+     "2728": "1393723919902441472",
+     "4871": "1393723922897174528"
+    },
+    "subs": null
+   },
+   {
+    "bans": null,
+    "picks": null,
+    "player_map": {
+     "1350": {
+      "position": "C",
+      "status": "ACT",
+      "number": 27,
+      "first_name": "Rudy",
+      "last_name": "Gobert",
+      "sport": "nba",
+      "team": "MIN",
+      "player_id": "1350",
+      "fantasy_positions": [
+       "C"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": null,
+      "years_exp": 13,
+      "news_updated": 1795678512629
+     },
+     "1433": {
+      "position": "SF",
+      "status": "ACT",
+      "number": 7,
+      "first_name": "Kevin",
+      "last_name": "Durant",
+      "sport": "nba",
+      "team": "HOU",
+      "player_id": "1433",
+      "fantasy_positions": [
+       "PF",
+       "SF"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": null,
+      "years_exp": 19,
+      "news_updated": 1795671011892
+     },
+     "1660": {
+      "position": "PF",
+      "status": "ACT",
+      "number": 33,
+      "first_name": "Mario",
+      "last_name": "Hezonja",
+      "sport": "nba",
+      "team": "CLE",
+      "player_id": "1660",
+      "fantasy_positions": [
+       "PF",
+       "SF"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": null,
+      "years_exp": 5,
+      "news_updated": 1795244752654
+     },
+     "1747": {
+      "position": "PG",
+      "status": "ACT",
+      "number": 27,
+      "first_name": "Jamal",
+      "last_name": "Murray",
+      "sport": "nba",
+      "team": "DEN",
+      "player_id": "1747",
+      "fantasy_positions": [
+       "PG"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": null,
+      "years_exp": 10,
+      "news_updated": 1795621207990
+     },
+     "1830": {
+      "position": "SG",
+      "status": "ACT",
+      "number": 9,
+      "first_name": "Derrick",
+      "last_name": "White",
+      "sport": "nba",
+      "team": "BOS",
+      "player_id": "1830",
+      "fantasy_positions": [
+       "PG",
+       "SG"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": null,
+      "years_exp": 9,
+      "news_updated": 1795623907737
+     },
+     "1883": {
+      "position": "C",
+      "status": "ACT",
+      "number": 34,
+      "first_name": "Wendell",
+      "last_name": "Carter Jr.",
+      "sport": "nba",
+      "team": "ORL",
+      "player_id": "1883",
+      "fantasy_positions": [
+       "C"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": null,
+      "years_exp": 8,
+      "news_updated": 1795615807920
+     },
+     "1959": {
+      "position": "SF",
+      "status": "ACT",
+      "number": 8,
+      "first_name": "Grayson",
+      "last_name": "Allen",
+      "sport": "nba",
+      "team": "CHA",
+      "player_id": "1959",
+      "fantasy_positions": [
+       "SF",
+       "SG"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": "DTD",
+      "years_exp": 8,
+      "news_updated": 1795639809726
+     },
+     "1970": {
+      "position": "PG",
+      "status": "ACT",
+      "number": 77,
+      "first_name": "Luka",
+      "last_name": "Dončić",
+      "sport": "nba",
+      "team": "LAL",
+      "player_id": "1970",
+      "fantasy_positions": [
+       "PG"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": null,
+      "years_exp": 8,
+      "news_updated": 1795539348480
+     },
+     "1975": {
+      "position": "SF",
+      "status": "ACT",
+      "number": 25,
+      "first_name": "Mikal",
+      "last_name": "Bridges",
+      "sport": "nba",
+      "team": "NYK",
+      "player_id": "1975",
+      "fantasy_positions": [
+       "PF",
+       "SF",
+       "SG"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": null,
+      "years_exp": 8,
+      "news_updated": 1795669211862
+     },
+     "1997": {
+      "position": "C",
+      "status": "ACT",
+      "number": 21,
+      "first_name": "Daniel",
+      "last_name": "Gafford",
+      "sport": "nba",
+      "team": "DAL",
+      "player_id": "1997",
+      "fantasy_positions": [
+       "C"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": null,
+      "years_exp": 7,
+      "news_updated": 1795609506301
+     },
+     "2090": {
+      "position": "PG",
+      "status": "ACT",
+      "number": 2,
+      "first_name": "Ty",
+      "last_name": "Jerome",
+      "sport": "nba",
+      "team": "MEM",
+      "player_id": "2090",
+      "fantasy_positions": [
+       "PG",
+       "SG"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": null,
+      "years_exp": 7,
+      "news_updated": 1795714215642
+     },
+     "2136": {
+      "position": "C",
+      "status": "ACT",
+      "number": 17,
+      "first_name": "Onyeka",
+      "last_name": "Okongwu",
+      "sport": "nba",
+      "team": "ATL",
+      "player_id": "2136",
+      "fantasy_positions": [
+       "C",
+       "PF"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": null,
+      "years_exp": 6,
+      "news_updated": 1795458914530
+     },
+     "2275": {
+      "position": "C",
+      "status": "ACT",
+      "number": 20,
+      "first_name": "Day'Ron",
+      "last_name": "Sharpe",
+      "sport": "nba",
+      "team": "BKN",
+      "player_id": "2275",
+      "fantasy_positions": [
+       "C"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": null,
+      "years_exp": 5,
+      "news_updated": 1795632608456
+     },
+     "2302": {
+      "position": "C",
+      "status": "ACT",
+      "number": 88,
+      "first_name": "Neemias",
+      "last_name": "Queta",
+      "sport": "nba",
+      "team": "BOS",
+      "player_id": "2302",
+      "fantasy_positions": [
+       "C"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": null,
+      "years_exp": 5,
+      "news_updated": 1795619407962
+     },
+     "2438": {
+      "position": "C",
+      "status": "ACT",
+      "number": 0,
+      "first_name": "Jalen",
+      "last_name": "Duren",
+      "sport": "nba",
+      "team": "DET",
+      "player_id": "2438",
+      "fantasy_positions": [
+       "C"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": "Out",
+      "years_exp": 4,
+      "news_updated": 1795733117849
+     },
+     "2733": {
+      "position": "C",
+      "status": "ACT",
+      "number": 20,
+      "first_name": "Alex",
+      "last_name": "Sarr",
+      "sport": "nba",
+      "team": "WAS",
+      "player_id": "2733",
+      "fantasy_positions": [
+       "C",
+       "PF"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": null,
+      "years_exp": 2,
+      "news_updated": 1795623007574
+     },
+     "2752": {
+      "position": "SG",
+      "status": "ACT",
+      "number": 24,
+      "first_name": "Cam",
+      "last_name": "Spencer",
+      "sport": "nba",
+      "team": "MEM",
+      "player_id": "2752",
+      "fantasy_positions": [
+       "PG",
+       "SF",
+       "SG"
+      ],
+      "team_abbr": null,
+      "team_changed_at": null,
+      "injury_status": null,
+      "years_exp": 2,
+      "news_updated": 1795714515542
+     }
+    },
+    "players_by_date": null,
+    "roster_id": 3,
+    "starters": [
+     "1970",
+     "2090",
+     "1975",
+     "1433",
+     "2136",
+     "2752",
+     "1883",
+     "2275",
+     "1350",
+     "1997"
+    ],
+    "starters_by_date": null,
+    "starters_games": {
+     "1433": "1393723924411318272",
+     "1883": "1393301047908261888",
+     "2275": "1393301054258438144"
+    },
+    "subs": null
+   }
+  ],
+  "event_logs": {
+   "http": 200,
+   "errors": [],
+   "rows": [
+    {
+     "created": 1795577916126,
+     "data": {
+      "started": [],
+      "leg": 6,
+      "roster_id": 9,
+      "usernames": {
+       "887478641490518016": "asurap"
+      },
+      "benched": [],
+      "sub_changes": {},
+      "commissioner_user_id": "887478641490518016"
+     },
+     "event_type": "matchup_leg_updated",
+     "league_id": "1400915575915491328",
+     "log_id": "1431161145703546880"
+    },
+    {
+     "created": 1794803083687,
+     "data": {
+      "started": [],
+      "leg": 4,
+      "roster_id": 9,
+      "usernames": {
+       "887478641490518016": "asurap"
+      },
+      "benched": [],
+      "sub_changes": {},
+      "commissioner_user_id": "887478641490518016"
+     },
+     "event_type": "matchup_leg_updated",
+     "league_id": "1400915575915491328",
+     "log_id": "1427911262909521920"
+    },
+    {
+     "created": 1794679302541,
+     "data": {
+      "started": [],
+      "leg": 4,
+      "roster_id": 9,
+      "usernames": {
+       "887478641490518016": "asurap"
+      },
+      "benched": [],
+      "sub_changes": {},
+      "commissioner_user_id": "887478641490518016"
+     },
+     "event_type": "matchup_leg_updated",
+     "league_id": "1400915575915491328",
+     "log_id": "1427392087153704960"
+    },
+    {
+     "created": 1794519763212,
+     "data": {
+      "started": [],
+      "leg": 4,
+      "roster_id": 9,
+      "usernames": {
+       "887478641490518016": "asurap"
+      },
+      "benched": [],
+      "sub_changes": {},
+      "commissioner_user_id": "887478641490518016"
+     },
+     "event_type": "matchup_leg_updated",
+     "league_id": "1400915575915491328",
+     "log_id": "1426722930707939328"
+    },
+    {
+     "created": 1794189950720,
+     "data": {
+      "started": [],
+      "leg": 3,
+      "roster_id": 8,
+      "usernames": {
+       "887478641490518016": "asurap"
+      },
+      "benched": [],
+      "sub_changes": {},
+      "commissioner_user_id": "887478641490518016"
+     },
+     "event_type": "matchup_leg_updated",
+     "league_id": "1400915575915491328",
+     "log_id": "1425339596849307648"
+    },
+    {
+     "created": 1793856716690,
+     "data": {
+      "started": [],
+      "leg": 3,
+      "roster_id": 9,
+      "usernames": {
+       "887478641490518016": "asurap"
+      },
+      "benched": [],
+      "sub_changes": {},
+      "commissioner_user_id": "887478641490518016"
+     },
+     "event_type": "matchup_leg_updated",
+     "league_id": "1400915575915491328",
+     "log_id": "1423941912028610560"
+    },
+    {
+     "created": 1793856697339,
+     "data": {
+      "started": [],
+      "leg": 3,
+      "roster_id": 9,
+      "usernames": {
+       "887478641490518016": "asurap"
+      },
+      "benched": [],
+      "sub_changes": {},
+      "commissioner_user_id": "887478641490518016"
+     },
+     "event_type": "matchup_leg_updated",
+     "league_id": "1400915575915491328",
+     "log_id": "1423941830860357632"
+    },
+    {
+     "created": 1793856691667,
+     "data": {
+      "started": [],
+      "leg": 3,
+      "roster_id": 9,
+      "usernames": {
+       "887478641490518016": "asurap"
+      },
+      "benched": [],
+      "sub_changes": {},
+      "commissioner_user_id": "887478641490518016"
+     },
+     "event_type": "matchup_leg_updated",
+     "league_id": "1400915575915491328",
+     "log_id": "1423941807074516992"
+    },
+    {
+     "created": 1793856687789,
+     "data": {
+      "started": [
+       "0"
+      ],
+      "leg": 3,
+      "roster_id": 9,
+      "usernames": {
+       "887478641490518016": "asurap"
+      },
+      "benched": [
+       "1799"
+      ],
+      "sub_changes": {},
+      "commissioner_user_id": "887478641490518016"
+     },
+     "event_type": "matchup_leg_updated",
+     "league_id": "1400915575915491328",
+     "log_id": "1423941790804815872"
+    },
+    {
+     "created": 1793413113486,
+     "data": {
+      "started": [],
+      "leg": 2,
+      "roster_id": 9,
+      "usernames": {
+       "887478641490518016": "asurap"
+      },
+      "benched": [],
+      "sub_changes": {},
+      "commissioner_user_id": "887478641490518016"
+     },
+     "event_type": "matchup_leg_updated",
+     "league_id": "1400915575915491328",
+     "log_id": "1422081305331429376"
+    },
+    {
+     "created": 1793413102483,
+     "data": {
+      "started": [
+       "4866"
+      ],
+      "leg": 2,
+      "roster_id": 9,
+      "usernames": {
+       "887478641490518016": "asurap"
+      },
+      "benched": [
+       "2455"
+      ],
+      "sub_changes": {},
+      "commissioner_user_id": "887478641490518016"
+     },
+     "event_type": "matchup_leg_updated",
+     "league_id": "1400915575915491328",
+     "log_id": "1422081259181486080"
+    },
+    {
+     "created": 1793079254529,
+     "data": {
+      "started": [],
+      "leg": 2,
+      "roster_id": 9,
+      "usernames": {
+       "887478641490518016": "asurap"
+      },
+      "benched": [],
+      "sub_changes": {},
+      "commissioner_user_id": "887478641490518016"
+     },
+     "event_type": "matchup_leg_updated",
+     "league_id": "1400915575915491328",
+     "log_id": "1420680999372595200"
+    },
+    {
+     "created": 1792954291345,
+     "data": {
+      "started": [],
+      "leg": 1,
+      "roster_id": 9,
+      "usernames": {
+       "887478641490518016": "asurap"
+      },
+      "benched": [],
+      "sub_changes": {},
+      "commissioner_user_id": "887478641490518016"
+     },
+     "event_type": "matchup_leg_updated",
+     "league_id": "1400915575915491328",
+     "log_id": "1420156865790128128"
+    },
+    {
+     "created": 1792954179642,
+     "data": {
+      "started": [],
+      "leg": 1,
+      "roster_id": 9,
+      "usernames": {
+       "887478641490518016": "asurap"
+      },
+      "benched": [],
+      "sub_changes": {},
+      "commissioner_user_id": "887478641490518016"
+     },
+     "event_type": "matchup_leg_updated",
+     "league_id": "1400915575915491328",
+     "log_id": "1420156397273792512"
+    },
+    {
+     "created": 1792954165306,
+     "data": {
+      "started": [],
+      "leg": 1,
+      "roster_id": 9,
+      "usernames": {
+       "887478641490518016": "asurap"
+      },
+      "benched": [],
+      "sub_changes": {},
+      "commissioner_user_id": "887478641490518016"
+     },
+     "event_type": "matchup_leg_updated",
+     "league_id": "1400915575915491328",
+     "log_id": "1420156337144246272"
+    },
+    {
+     "created": 1792953578081,
+     "data": {
+      "started": [],
+      "leg": 1,
+      "roster_id": 9,
+      "usernames": {
+       "887478641490518016": "asurap"
+      },
+      "benched": [],
+      "sub_changes": {},
+      "commissioner_user_id": "887478641490518016"
+     },
+     "event_type": "matchup_leg_updated",
+     "league_id": "1400915575915491328",
+     "log_id": "1420153874148286464"
+    },
+    {
+     "created": 1792563956300,
+     "data": {
+      "started": [],
+      "leg": 1,
+      "roster_id": 9,
+      "usernames": {
+       "887478641490518016": "asurap"
+      },
+      "benched": [],
+      "sub_changes": {},
+      "commissioner_user_id": "887478641490518016"
+     },
+     "event_type": "matchup_leg_updated",
+     "league_id": "1400915575915491328",
+     "log_id": "1418519681949593600"
+    },
+    {
+     "created": 1792563953791,
+     "data": {
+      "started": [],
+      "leg": 1,
+      "roster_id": 9,
+      "usernames": {
+       "887478641490518016": "asurap"
+      },
+      "benched": [],
+      "sub_changes": {},
+      "commissioner_user_id": "887478641490518016"
+     },
+     "event_type": "matchup_leg_updated",
+     "league_id": "1400915575915491328",
+     "log_id": "1418519671426027520"
+    },
+    {
+     "created": 1788366958545,
+     "data": {
+      "user_id": "887478641490518016",
+      "changes": {
+       "num_teams": {
+        "new": 12,
+        "old": 10
+       }
+      },
+      "usernames": {
+       "887478641490518016": "asurap"
+      }
+     },
+     "event_type": "league_settings_updated",
+     "league_id": "1400915575915491328",
+     "log_id": "1400916197481926656"
+    }
+   ]
+  }
+ }
+}
