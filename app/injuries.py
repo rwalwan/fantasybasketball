@@ -3,6 +3,10 @@ hours before each tip by the Worker (worker/src/injuries.js, saved in KV and ser
 the job itself (in case the Worker's copy is missing). A report only ever makes a player LESS likely to play than
 Sleeper says, and only to Doubtful or Out (Nov 16: Queta ruled out at 5:16 pm ET while Sleeper still said GTD).
 Same rule as site/engine.js escalateStatus (tests/test_nov28_injury_watch.mjs, test_nov28_injuries.py)."""
+import datetime as dt
+import re
+from zoneinfo import ZoneInfo
+
 import requests
 
 URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/injuries"
@@ -48,7 +52,36 @@ def escalate(sleeper_status, report_status):
     return report_status if r > s and report_status in ("Out", "Doubtful") else None
 
 
-def apply(meta, reports, names):
+WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]     # date.weekday() order
+SAYS_OUT = re.compile(r"\b(out|ruled out|won't play|will not play|inactive|sidelined|miss(es)?|doubtful)\b")
+SAYS_MAYBE = re.compile(r"\b(probable|upgraded|available|questionable|game-time|expected to play|will play|cleared|in the lineup|return(s|ed)?)\b")
+ET = ZoneInfo("America/New_York")
+
+
+def current(x, now=None):
+    """Nov 28 (first live run): ESPN's status field lags its own notes and outlives the game it was about (Grayson
+    Allen "Out" with "upgraded to probable for Saturday's game"; Landale "Out" from "out for Friday's game", read on
+    Saturday). A report counts only when its note says he sits, nothing in it says he may play, and it's about a game
+    still to come: the weekday it names is today or later (ET), or, naming none, it's under 24 hours old.
+    Same rule as site/engine.js reportCurrent."""
+    now = now or dt.datetime.now(dt.timezone.utc)
+    c = (x.get("comment") or "").lower()
+    try:
+        at = dt.datetime.fromisoformat((x.get("at") or "").replace("Z", "+00:00"))
+        if at.tzinfo is None:
+            at = at.replace(tzinfo=dt.timezone.utc)
+    except ValueError:
+        return False
+    if not c or not SAYS_OUT.search(c) or SAYS_MAYBE.search(c):
+        return False
+    wd = next((i for i, w in enumerate(WEEKDAYS) if w in c), None)
+    if wd is None:
+        return dt.timedelta(0) - dt.timedelta(hours=1) <= now - at <= dt.timedelta(hours=24)
+    d0 = at.astimezone(ET).date()
+    return d0 + dt.timedelta(days=(wd - d0.weekday()) % 7) >= now.astimezone(ET).date()
+
+
+def apply(meta, reports, names, now=None):
     """Raise Sleeper's injury_status in meta where a report is more severe. reports: [{name, team, status, ...}] or the
     Worker's {key: {pid, name, team, status, ...}}; names: news.Names (report name -> Sleeper id). Returns the changes."""
     items = list(reports.values()) if isinstance(reports, dict) else list(reports or [])
@@ -56,7 +89,7 @@ def apply(meta, reports, names):
     for x in items:
         pid = x.get("pid") or names.pid(x.get("name"), x.get("team"))
         m = meta.get(pid) if pid else None
-        if not m or m.get("team") != x.get("team"):
+        if not m or m.get("team") != x.get("team") or not current(x, now):
             continue
         new = escalate(m.get("injury_status"), x.get("status"))
         if new:

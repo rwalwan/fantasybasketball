@@ -117,12 +117,20 @@ def main():
     # Nov 28: injury reports fresher than Sleeper's labels (the Worker's minute-by-minute copy before tips, else our
     # own read of ESPN's report) raise a player's status to Doubtful/Out before play chances are built (app/injuries.py)
     try:
-        reports = ((backend.get("injuries") or {}).get("items")) or injuriesmod.fetch()
+        # the Worker's copy covers only teams within 2 h of a tip: read the whole report too, the Worker's entries last
+        wk = list(((backend.get("injuries") or {}).get("items") or {}).values())
+        try:
+            own = injuriesmod.fetch()
+        except Exception as e:
+            own = []
+            print("injury report fetch failed:", e, file=sys.stderr)
+        reports = own + wk
+        cur = sum(1 for x in reports if injuriesmod.current(x))
         esc = injuriesmod.apply(meta, reports, newsmod.Names(meta))
-        print(f"injury reports: {len(reports)} listed, {len(esc)} raised over Sleeper's label"
+        print(f"injury reports: {len(reports)} listed, {cur} current (note says he sits, about a game to come), {len(esc)} raised over Sleeper's label"
               + (": " + ", ".join(f"{e['name']} {e['from'] or 'healthy'} -> {e['to']}" for e in esc[:8]) if esc else ""))
         with open(os.path.join(ROOT, "data", "state", "injuries_debug.json"), "w") as f:
-            json.dump({"source": "worker" if (backend.get("injuries") or {}).get("items") else "job", "listed": len(reports),
+            json.dump({"listed": len(own), "worker_items": len(wk), "current": cur,
                        "raised": esc, "worker_changes": (backend.get("injuries") or {}).get("changes", [])[:20]}, f, indent=1)
     except Exception as e:
         print("injury reports unavailable:", e, file=sys.stderr)

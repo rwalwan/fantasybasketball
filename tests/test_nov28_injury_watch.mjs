@@ -6,7 +6,7 @@
 // nothing is fetched. A report only ever makes a player LESS likely to play than Sleeper says (escalate).
 import assert from "node:assert/strict";
 import { parseInjuries, watchInjuries, windowTeams } from "../worker/src/injuries.js";
-import { escalateStatus as escalate, Book } from "../site/engine.js";
+import { escalateStatus as escalate, Book, reportCurrent } from "../site/engine.js";
 
 const feed = (st, extra = []) => ({ injuries: [
   { displayName: "Boston Celtics", injuries: [{ status: st, shortComment: "Robinson (illness) is out Friday", date: "2026-11-27T20:01Z",
@@ -51,6 +51,13 @@ prev = saved;
 r = await run("2026-11-27T23:20:00Z", "Out", prev);
 assert.equal(saved.items["BOS|derrick white"].status, "Available"); assert.equal(kicks, 2);
 
+// a new note with the same status (Out from Friday, now ruled out for Saturday) is news too
+prev = saved;
+const feedAt = (at) => ({ injuries: [{ displayName: "Boston Celtics", injuries: [{ status: "Out", shortComment: "Robinson is out Saturday", date: at, athlete: { displayName: "Mitchell Robinson" } }] }] });
+r = await watchInjuries({ fetchInjuries: async () => feedAt("2026-11-27T23:25Z"), tips, now: new Date("2026-11-27T23:30:00Z"), players, prev,
+  save: async v => { saved = v; }, kick: async () => { kicks++; return { ok: true }; } });
+assert.equal(kicks, 3); assert.equal(saved.items["BOS|mitchell robinson"].at, "2026-11-27T23:25Z");
+
 // escalate only toward sitting
 assert.equal(escalate(null, "Out"), "Out");
 assert.equal(escalate("GTD", "Out"), "Out");
@@ -61,8 +68,22 @@ assert.equal(escalate(null, "Questionable"), null, "a questionable tag isn't eno
 assert.equal(escalate("IR", "Out"), null);
 // the page applies the saved report to the book: Robinson GTD on Sleeper, Out on the report -> Out; Queta untouched
 const book = new Book({ scoring: {}, players: { 1887: ["Mitchell Robinson", "BOS", ["C"], "GTD"], 2302: ["Neemias Queta", "BOS", ["C"], null] }, priors: {}, gamelog: {} });
-const ch = book.applyReports({ "BOS|mitchell robinson": { pid: "1887", team: "BOS", status: "Out" }, "BOS|neemias queta": { pid: "2302", team: "BOS", status: "Questionable" } });
+const FRI = new Date("2026-11-27T22:00:00Z"), SAT = new Date("2026-11-28T18:41:00Z");
+const rob = { pid: "1887", team: "BOS", status: "Out", comment: "Robinson (illness) is out Friday", at: "2026-11-27T20:01Z" };
+const ch = book.applyReports({ "BOS|mitchell robinson": rob, "BOS|neemias queta": { pid: "2302", team: "BOS", status: "Questionable", comment: "Queta is questionable", at: "2026-11-27T20:01Z" } }, FRI);
 assert.deepEqual(ch, [{ pid: "1887", from: "GTD", to: "Out" }]);
 assert.equal(book.status("1887"), "Out"); assert.equal(book.status("2302"), null);
 assert.deepEqual(book.applyReports(null), []);
+// first live run (Nov 28): ESPN's "Out" lags its own note and outlives the game it was about
+const allen = { status: "Out", comment: "Allen (concussion) has been upgraded to probable for Saturday's game against the Nets.", at: "2026-11-28T18:08Z" };
+const landale = { status: "Out", comment: "Landale (hip) is out for Friday's game against the Celtics.", at: "2026-11-26T22:44Z" };
+assert.equal(reportCurrent(allen, SAT), false, "a note that says probable wins over the Out label");
+assert.equal(reportCurrent(landale, SAT), false, "Friday's game is over by Saturday");
+assert.equal(reportCurrent(landale, new Date("2026-11-27T20:00:00Z")), true);
+assert.equal(reportCurrent(rob, SAT), false);
+assert.equal(reportCurrent({ comment: "Smith has been ruled out.", at: "2026-11-28T15:00Z" }, SAT), true);
+assert.equal(reportCurrent({ comment: "Smith has been ruled out.", at: "2026-11-27T15:00Z" }, SAT), false, "no day named: 24 hours");
+const b2 = new Book({ scoring: {}, players: { 1959: ["Grayson Allen", "CHA", ["SG"], "GTD"] }, priors: {}, gamelog: {} });
+assert.deepEqual(b2.applyReports({ "CHA|grayson allen": { pid: "1959", team: "CHA", ...allen } }, SAT), []);
+assert.equal(b2.status("1959"), "GTD");
 console.log("ok: Nov 28 injury watch");

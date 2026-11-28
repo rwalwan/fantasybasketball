@@ -146,11 +146,16 @@ Worker (every minute): Sleeper lineup ─> KV lineups_<season>_w<week>   Sleeper
   - **Team injury reports** (Nov 28): ESPN's public injury report, read by the Worker every minute in the 2 hours
     before each tip (only the teams about to play; saved to KV `injuries_<date>` only on a change; the first read of a
     team's report is recorded without a run; a player taken off the report = Available) and by the job once per run
-    (`app/injuries.py`, the Worker's copy first). On a status change the Worker starts the update job at once (at most
-    every 4 minutes), so projections, lineup moves and alerts follow in minutes instead of up to 15. A report only ever
-    makes a player **less** likely to play than Sleeper says, and only to Doubtful or Out (`escalateStatus` in
-    `engine.js`, `injuries.escalate` in the job; the site applies the Worker's copy with `Book.applyReports`). It never
-    clears a player Sleeper has out. Tests: `test_nov28_injury_watch.mjs`, `test_nov28_injuries.py`.
+    (`app/injuries.py`: the whole report plus the Worker's entries). On a new status or a new note the Worker starts the
+    update job at once (at most every 4 minutes), so projections, lineup moves and alerts follow in minutes instead of
+    up to 15. A report only ever makes a player **less** likely to play than Sleeper says, and only to Doubtful or Out
+    (`escalateStatus` in `engine.js`, `injuries.escalate` in the job; the site applies the Worker's copy with
+    `Book.applyReports`). It never clears a player Sleeper has out. **ESPN's status field is not trusted on its own**
+    (first live run, Nov 28: 10 of 99 listed "Out" were stale or contradicted, e.g. Grayson Allen "Out" with the note
+    "upgraded to probable for Saturday's game", Landale "Out" from Friday's game): a report counts only when its note
+    says he sits, nothing in it says he may play, and the weekday it names is today or later in ET, or, naming none,
+    it's under 24 hours old (`reportCurrent` / `injuries.current`). Tests: `test_nov28_injury_watch.mjs`,
+    `test_nov28_injuries.py`.
 - **Teammate absences → minutes** (Nov 28, `app/absence.py`; Fri Nov 27 Queta scored 70.5 from the bench with
   Mitchell Robinson, a 17.5-minute center, out sick; every older teammate path counted only 20+ minute rotation
   players, and the usage model was gated off). For each player and game in the next 4 weeks: every teammate who plays
@@ -401,7 +406,8 @@ Each of these can be re-checked. If new evidence overturns one, change it and up
 - Lineup records are samples (15 s apart): a bench trip shorter than that is invisible unless Ryan taps "Sleeper won't
   let me lock this". The opponent has no such button.
 - ESPN's injury report JSON layout is read defensively and wasn't verified from the sandbox (no network); the job log's
-  `injury reports:` line shows how many it read. Team names map to Sleeper codes by a fixed table.
+  `injury reports:` line shows how many it read and how many are current. Whether a note is current is read from
+  its words (a few phrases, a weekday), which can misread an unusual note; the miss is toward Sleeper's own label. Team names map to Sleeper codes by a fixed table.
 - The teammate-absence model has no depth chart and no lineup confirmations; it learns only from who actually played.
   Its factor for Queta on Nov 27 was 1.09 (normal bucket), so the upside model alone wouldn't have flipped that start.
 - League and user ids are constants in `app/run.py`, `tools/moves.mjs`, `site/app.js` and `worker/src/index.js`.

@@ -87,6 +87,23 @@ export const range80 = (Q, mu) => [Math.round(mu * Q[10] * 10) / 10, Math.round(
 // "less likely to play" and only to Doubtful or Out (a report can be ahead of Sleeper's label; taking a player OFF a
 // Sleeper label on its say-so would be the riskier mistake). Same rule as app/injuries.py escalate.
 const INJ_RANK = { null: 0, "": 0, Available: 0, Probable: 1, "Day-To-Day": 2, DTD: 2, GTD: 2, Questionable: 2, Doubtful: 3, Out: 4 };
+// Nov 28 (first live run): ESPN's status field lags its own notes and outlives the game it was about (Grayson Allen
+// "Out" with "upgraded to probable for Saturday's game"; Landale "Out" from "out for Friday's game" on Saturday). So a
+// report counts only when its note says he sits, nothing in it says he may play, and it's about a game still to come:
+// the weekday it names is today or later (ET), or, naming none, it's under 24 hours old. Same rule as app/injuries.py.
+const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+const SAYS_OUT = /\b(out|ruled out|won't play|will not play|inactive|sidelined|miss(es)?|doubtful)\b/;
+const SAYS_MAYBE = /\b(probable|upgraded|available|questionable|game-time|expected to play|will play|cleared|in the lineup|return(s|ed)?)\b/;
+const etYmd = d => d.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+export function reportCurrent(it, now = new Date()) {
+  const c = (it?.comment || "").toLowerCase(), at = it?.at ? new Date(it.at) : null;
+  if (!c || !SAYS_OUT.test(c) || SAYS_MAYBE.test(c) || !at || isNaN(at)) return false;
+  const wd = WEEKDAYS.findIndex(w => c.includes(w));
+  if (wd < 0) return now - at <= 24 * 3600e3 && at - now <= 3600e3;
+  const d0 = new Date(etYmd(at) + "T12:00:00Z");                     // the report's own day (ET), noon UTC
+  const day = new Date(d0.getTime() + ((wd - d0.getUTCDay() + 7) % 7) * 86400e3).toISOString().slice(0, 10);
+  return day >= etYmd(now);
+}
 export function escalateStatus(sleeperStatus, reportStatus) {
   const r = INJ_RANK[reportStatus] ?? 0, s = INJ_RANK[sleeperStatus ?? ""] ?? 4;   // IR, Suspended, NA...: already out
   return r > s && (reportStatus === "Out" || reportStatus === "Doubtful") ? reportStatus : null;
@@ -150,11 +167,11 @@ export class Book {
   // Nov 28: the Worker's minute-by-minute read of ESPN's injury report (worker/src/injuries.js) can be ahead of
   // Sleeper's label by hours (Nov 16, Queta). A report only ever moves a player toward sitting (escalateStatus).
   // items = {"TEAM|name": {pid, status, ...}}. Returns the players changed.
-  applyReports(items) {
+  applyReports(items, now = new Date()) {
     const out = [];
     for (const it of Object.values(items || {})) {
       const m = it?.pid && this.meta[it.pid];
-      if (!m || (m.team && it.team && m.team !== it.team)) continue;
+      if (!m || (m.team && it.team && m.team !== it.team) || !reportCurrent(it, now)) continue;
       const st = escalateStatus(m.status, it.status);
       if (st) { out.push({ pid: it.pid, from: m.status || null, to: st }); m.status = st; }
     }

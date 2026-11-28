@@ -44,7 +44,7 @@ export function windowTeams(tips, now) {
   return Object.entries(tips || {}).filter(([, t]) => { const m = (new Date(t) - now) / 60000; return m >= 0 && m <= WINDOW_MIN; }).map(([team]) => team);
 }
 
-// One minute's watch. prev = {items: {"TEAM|name": {pid, name, team, status, comment, at}}, changes: [...], kickedAt}.
+// One minute's watch (a change = a new status or a new note). prev = {items: {"TEAM|name": {pid, name, team, status, comment, at}}, changes: [...], kickedAt}.
 // Returns {active, changed: [...], kicked}. Writes (save) only when a status changed.
 export async function watchInjuries({ fetchInjuries, tips, now, players = {}, prev = {}, save, kick }) {
   const teams = new Set(windowTeams(tips, now));
@@ -61,7 +61,8 @@ export async function watchInjuries({ fetchInjuries, tips, now, players = {}, pr
     const k = `${x.team}|${norm(x.name)}`;
     seen.add(k);
     const rec = { pid: pidOf[k] || null, name: x.name, team: x.team, status: x.status, comment: x.comment, at: x.at, seen: old[k]?.seen || stamp };
-    if (!old[k] || old[k].status !== x.status) { rec.seen = stamp; changed.push({ k, name: x.name, team: x.team, from: old[k]?.status || null, to: x.status, at: stamp }); }
+    // a new note counts too: ESPN's status can stay "Out" from an earlier game while the note becomes about tonight
+    if (!old[k] || old[k].status !== x.status || (x.at && old[k].at !== x.at)) { rec.seen = stamp; changed.push({ k, name: x.name, team: x.team, from: old[k]?.status || null, to: x.status, at: stamp }); }
     items[k] = rec;
   }
   // taken off the report = cleared to play
